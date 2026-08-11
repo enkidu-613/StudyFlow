@@ -34,7 +34,7 @@ sudo -v
 
 ~~~bash
 sudo apt-get update
-sudo apt-get install -y docker.io docker-compose-v2 openssl rsync ufw
+sudo apt-get install -y docker.io docker-compose openssl rsync ufw
 sudo systemctl enable --now docker
 sudo usermod -aG docker studyflow
 exit
@@ -45,8 +45,11 @@ exit
 ~~~bash
 ssh studyflow-vps
 docker --version
-docker compose version
+docker-compose version
 ~~~
+
+Debian 12 的官方软件源使用 docker-compose 命令；本项目的部署命令均按此
+命令编写，不要把它替换成当前 VPS 软件源中不存在的 docker-compose-v2。
 
 ## 二、准备 Cloudflare 域名
 
@@ -185,21 +188,21 @@ STUDYFLOW_BACKUP_DIR=/var/backups/studyflow
 
 ~~~bash
 cd /home/studyflow/app/infra
-docker compose --env-file .env config
+docker-compose --env-file .env config
 ~~~
 
 没有出现变量缺失或 YAML 错误后，再构建并启动：
 
 ~~~bash
-docker compose --env-file .env up -d --build
-docker compose --env-file .env ps
+docker-compose --env-file .env up -d --build
+docker-compose --env-file .env ps
 ~~~
 
 API 容器启动时会按顺序执行数据库迁移和 Uvicorn。查看日志：
 
 ~~~bash
-docker compose --env-file .env logs --tail=100 api
-docker compose --env-file .env logs --tail=100 caddy
+docker-compose --env-file .env logs --tail=100 api
+docker-compose --env-file .env logs --tail=100 caddy
 ~~~
 
 ## 六、防火墙
