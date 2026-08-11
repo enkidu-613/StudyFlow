@@ -772,6 +772,6 @@ git commit -m "test: document StudyFlow MVP acceptance matrix"
 
 ## Execution Order
 
-Tasks 1–5 establish the API, database, encryption contract, and synchronization path. Tasks 6–8 establish the offline client loop. Tasks 9–11 add secure enrollment, deterministic schedule policy, and AI suggestions. Task 12 deploys the service, and Task 13 verifies the complete Android/macOS flow.
+Tasks 1–4 establish the API foundation, database, encryption contract, and local storage. Task 9 then adds the authentication and device identity required by the protected sync routes. Task 5 implements the authenticated synchronization path; Tasks 6–8 establish the offline client loop. Tasks 10–11 add deterministic schedule policy and AI suggestions. Task 12 deploys the service, and Task 13 verifies the complete Android/macOS flow.
 
 The first implementation checkpoint is after Task 8: a user can create and complete work offline on Android and macOS, then synchronize encrypted records through the VPS. Device restrictions, UsageStats aggregation, Windows/Linux/iOS adapters, and CalDAV remain separate follow-up plans after this checkpoint passes.
