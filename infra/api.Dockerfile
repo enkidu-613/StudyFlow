@@ -10,9 +10,13 @@ COPY server/pyproject.toml ./server/pyproject.toml
 COPY server/poetry.lock ./server/poetry.lock
 COPY server/ ./server/
 
-RUN pip install --no-cache-dir poetry==1.8.5 \
+RUN pip install --no-cache-dir \
+        --index-url https://mirrors.aliyun.com/pypi/simple/ \
+        poetry==1.8.5 \
     && cd server \
     && poetry config virtualenvs.create false \
+    && poetry source add --priority=primary aliyun https://mirrors.aliyun.com/pypi/simple/ \
+    && poetry lock --no-update \
     && poetry install --only main --no-interaction --no-ansi
 
 EXPOSE 8000

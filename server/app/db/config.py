@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
-from urllib.parse import unquote, urlsplit
+from urllib.parse import parse_qsl, unquote, urlencode, urlsplit, urlunsplit
 
 
 SESSION_POOLER_PORT = 5432
@@ -27,14 +27,34 @@ class DatabaseSettings:
 
 def normalize_database_url(raw_url: str) -> str:
     if raw_url.startswith("postgresql+asyncpg://"):
-        return raw_url
-    if raw_url.startswith("postgresql://"):
-        return raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-    if raw_url.startswith("postgres://"):
-        return raw_url.replace("postgres://", "postgresql+asyncpg://", 1)
-    raise ValueError(
-        "STUDYFLOW_DATABASE_URL must target Supabase PostgreSQL via the session "
-        "pooler; SQLite and non-PostgreSQL URLs are not supported.",
+        normalized_url = raw_url
+    elif raw_url.startswith("postgresql://"):
+        normalized_url = raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    elif raw_url.startswith("postgres://"):
+        normalized_url = raw_url.replace("postgres://", "postgresql+asyncpg://", 1)
+    else:
+        raise ValueError(
+            "STUDYFLOW_DATABASE_URL must target Supabase PostgreSQL via the session "
+            "pooler; SQLite and non-PostgreSQL URLs are not supported.",
+        )
+
+    parsed_url = urlsplit(normalized_url)
+    query_parameters = parse_qsl(parsed_url.query, keep_blank_values=True)
+    translated_query = [
+        ("ssl", value) if key == "sslmode" else (key, value)
+        for key, value in query_parameters
+    ]
+    if translated_query == query_parameters:
+        return normalized_url
+
+    return urlunsplit(
+        (
+            parsed_url.scheme,
+            parsed_url.netloc,
+            parsed_url.path,
+            urlencode(translated_query),
+            parsed_url.fragment,
+        ),
     )
 
 

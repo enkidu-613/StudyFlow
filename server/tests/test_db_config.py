@@ -60,6 +60,16 @@ def test_load_database_settings_accepts_supavisor_session_pooler_port() -> None:
     assert ":5432/postgres" in settings.url
 
 
+def test_load_database_settings_translates_postgres_sslmode_for_asyncpg() -> None:
+    settings = load_database_settings(
+        "postgresql://studyflow_server.project-ref:password"
+        "@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require",
+    )
+
+    assert "ssl=require" in settings.url
+    assert "sslmode" not in settings.url
+
+
 def test_load_database_settings_preserves_direct_postgres_connectivity() -> None:
     settings = load_database_settings(
         "postgresql://studyflow_server:password@db.example.test:6543/postgres",
