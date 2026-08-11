@@ -1,0 +1,4 @@
+interface:
+  display_name: "StudyFlow 项目指导规范"
+  short_description: "StudyFlow 计划配置部署的中文友好指导规范"
+  default_prompt: "为当前 StudyFlow 任务输出可复制、可验证、解释每个配置来源的中文实施或部署方案。"
