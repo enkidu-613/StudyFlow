@@ -38,35 +38,31 @@ bash tool/flutter --version
 - API: `cd server && mise exec -- poetry install && mise exec -- poetry run pytest tests/test_health.py -q`
 - Client: `cd apps/client && bash ../../tool/flutter pub get`
 
-## What is implemented (MVP)
+## What is implemented
 
 - **Offline-first client**: tasks, schedule blocks, focus sessions, and
-  check-ins persist encrypted in a local Drift/SQLite store and queue
-  operations for later sync.
-- **Encrypted sync**: record-level client encryption; the FastAPI service
-  stores only opaque ciphertext plus sync metadata in Supabase PostgreSQL.
-- **Auth & pairing**: account bootstrap, device pairing codes, refresh
-  tokens, recovery-key export from Settings, and recovery-key restore when a
-  device loses its local account key.
+  check-ins persist in a local Drift/SQLite store and queue operations for
+  later sync.
+- **Email & password auth**: `POST /v1/auth/register`, `login`, `refresh`,
+  and `logout`; Argon2id password hashes, rotating refresh tokens stored as
+  digests, short-lived access JWTs scoped by `user_id`.
+- **User-scoped JSON sync**: `POST /v1/sync/push` and `GET /v1/sync/pull`
+  store JSONB payloads keyed by the JWT `user_id`; idempotent operation IDs,
+  cursor-based pull, and per-user isolation.
 - **Deterministic schedule policy**: `POST /v1/schedule/proposals/validate`
   proposes small, confirmation-gated sleep-window adjustments anchored to the
   target wake time; locked blocks and rest intervals are preserved.
-- **Privacy-bounded AI gateway**: `POST /v1/ai/recommendations` accepts only
-  whitelisted structured fields (redaction boundary), enforces the L0–L3
-  permission ladder (L3 needs 14 consecutive valid days plus a fresh grant),
-  and never writes tasks or schedule blocks.
-- **Deployment assets**: `infra/` contains Docker Compose (only Caddy
-  publishes 80/443), Caddyfile, and encrypted pg_dump backup/restore-check
-  scripts for a Debian 12 VPS backed by Supabase.
+- **Client-side AI settings**: each device configures its own AI Base URL,
+  model, and API key in Settings; keys stay in the device secure storage and
+  never reach the VPS. The server has no AI routes.
+- **Local PostgreSQL deployment**: `infra/` runs PostgreSQL 16, FastAPI, and
+  Caddy in Docker on a Debian 12 VPS; only Caddy publishes 80/443.
 
 ## Tests
 
 ```bash
-# Server (unit + sync + scheduler + AI gateway + deployment config)
+# Server (auth + sync + scheduler + database config + deployment config)
 cd server && mise exec -- poetry run pytest
-
-# Integration (cross-device sync scenarios, no physical device needed)
-mise exec -- poetry run pytest ../tests/integration/test_end_to_end_sync.py
 
 # Client
 cd apps/client && bash ../../tool/flutter test
@@ -84,10 +80,10 @@ Device acceptance matrices: `tests/device/android-originos6-matrix.md`
 完整的 Debian 12、Docker、Caddy、Cloudflare、防火墙和加密备份步骤请阅读
 `infra/README.md`。生产环境不要使用已经停止维护的 Fedora 34 镜像。
 
-在 VPS 上使用 `openssl rand -hex 32` 分别生成
-`STUDYFLOW_BOOTSTRAP_TOKEN` 和 `STUDYFLOW_TOKEN_SIGNING_KEY`。客户端只需要
-通过 `--dart-define` 接收公开的 `STUDYFLOW_API_BASE_URL`，不需要数据库密码、
-Supabase service key 或服务器认证密钥。
+在 VPS 的 `infra/` 目录执行 `./bootstrap-env.sh api.example.com` 自动生成
+`.env`（数据库密码、JWT 密钥、备份口令）。客户端只需要通过
+`--dart-define` 接收公开的 `STUDYFLOW_API_BASE_URL`，不需要数据库密码、
+JWT 密钥或 AI Key。
 
 ## License boundaries
 
