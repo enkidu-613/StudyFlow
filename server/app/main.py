@@ -10,6 +10,9 @@ from server.app.db.engine import (
     create_session_factory,
 )
 from server.app.health.routes import router as health_router
+from server.app.sync.repository import SyncOperationRepository
+from server.app.sync.routes import router as sync_router
+from server.app.sync.service import SyncService
 
 
 def create_app() -> FastAPI:
@@ -20,16 +23,22 @@ def create_app() -> FastAPI:
     except DatabaseConfigurationError as exc:
         app.state.database_engine = None
         app.state.database_readiness = MissingDatabaseReadinessProbe(str(exc))
+        app.state.auth_service = None
+        app.state.sync_service = None
     else:
         app.state.database_engine = database_engine
         app.state.database_readiness = DatabaseReadinessProbe(database_engine)
+        session_factory = create_session_factory(database_engine)
+        app.state.sync_service = SyncService(
+            SyncOperationRepository(session_factory),
+        )
         try:
             auth_settings = AuthSettings.from_env()
         except ValueError:
             app.state.auth_service = None
         else:
             app.state.auth_service = AuthService(
-                create_session_factory(database_engine),
+                session_factory,
                 auth_settings,
             )
 
@@ -39,6 +48,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(auth_router)
+    app.include_router(sync_router)
     return app
 
 

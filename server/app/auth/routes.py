@@ -3,7 +3,11 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from server.app.auth.dependencies import (
+    get_account_context,
+    get_auth_service,
+)
 
 from server.app.auth.models import (
     AuthResponse,
@@ -21,43 +25,6 @@ from server.app.db.context import AccountContext
 
 
 router = APIRouter()
-bearer = HTTPBearer(auto_error=False)
-
-
-def get_auth_service(request: Request) -> AuthService:
-    service = getattr(request.app.state, "auth_service", None)
-    if service is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Authentication is not configured.",
-        )
-    return service
-
-
-async def get_auth_identity(
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
-    service: Annotated[AuthService, Depends(get_auth_service)],
-) -> AuthIdentity:
-    if credentials is None or credentials.scheme.lower() != "bearer":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Bearer access token is required.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    try:
-        return await service.authenticate_access_token(credentials.credentials)
-    except AuthServiceError as exc:
-        raise _http_error(exc) from exc
-
-
-async def get_account_context(
-    identity: Annotated[AuthIdentity, Depends(get_auth_identity)],
-) -> AccountContext:
-    """Return the verified account/device boundary for protected data routes."""
-    return AccountContext(
-        account_id=identity.account_id,
-        device_id=identity.device_id,
-    )
 
 
 @router.post(
@@ -111,8 +78,10 @@ async def refresh(
 
 
 @router.get("/v1/auth/session", response_model=SessionResponse)
-async def session(identity: Annotated[AuthIdentity, Depends(get_auth_identity)]) -> SessionResponse:
-    return SessionResponse(account_id=identity.account_id, device_id=identity.device_id)
+async def session(
+    context: Annotated[AccountContext, Depends(get_account_context)],
+) -> SessionResponse:
+    return SessionResponse(account_id=context.account_id, device_id=context.device_id)
 
 
 @router.post(
@@ -122,12 +91,15 @@ async def session(identity: Annotated[AuthIdentity, Depends(get_auth_identity)])
 )
 async def create_pairing_code(
     request: CreatePairingCodeRequest,
-    identity: Annotated[AuthIdentity, Depends(get_auth_identity)],
+    context: Annotated[AccountContext, Depends(get_account_context)],
     service: Annotated[AuthService, Depends(get_auth_service)],
 ) -> PairingCodeResponse:
     try:
         created = await service.create_pairing_code(
-            identity,
+            AuthIdentity(
+                account_id=context.account_id,
+                device_id=context.device_id,
+            ),
             target_device_id=request.target_device_id,
             target_device_public_key=request.target_device_public_key,
             envelope=request.encrypted_account_data_key_envelope,
@@ -158,11 +130,17 @@ async def pair_device(
 @router.post("/v1/devices/revoke", status_code=status.HTTP_204_NO_CONTENT)
 async def revoke_device(
     request: RevokeDeviceRequest,
-    identity: Annotated[AuthIdentity, Depends(get_auth_identity)],
+    context: Annotated[AccountContext, Depends(get_account_context)],
     service: Annotated[AuthService, Depends(get_auth_service)],
 ) -> Response:
     try:
-        await service.revoke_device(identity, request.device_id)
+        await service.revoke_device(
+            AuthIdentity(
+                account_id=context.account_id,
+                device_id=context.device_id,
+            ),
+            request.device_id,
+        )
     except AuthServiceError as exc:
         raise _http_error(exc) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -17,7 +17,10 @@ class SyncOperationPayload:
     record_id: UUID
     payload_nonce: bytes
     payload_ciphertext: bytes
+    logical_clock: int = 0
+    entity_type: str = "task"
     is_tombstone: bool = False
+    schema_version: int = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,9 +59,12 @@ class SyncOperationRepository:
                         device_id=context.device_id,
                         operation_id=operation.operation_id,
                         record_id=operation.record_id,
+                        logical_clock=operation.logical_clock,
+                        entity_type=operation.entity_type,
                         payload_nonce=operation.payload_nonce,
                         payload_ciphertext=operation.payload_ciphertext,
                         is_tombstone=operation.is_tombstone,
+                        schema_version=operation.schema_version,
                     )
                     .on_conflict_do_nothing(
                         index_elements=["account_id", "operation_id"],

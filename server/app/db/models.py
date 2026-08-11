@@ -5,11 +5,13 @@ from uuid import UUID
 
 from sqlalchemy import (
     BigInteger,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
     Identity,
     Index,
+    Integer,
     LargeBinary,
     PrimaryKeyConstraint,
     String,
@@ -70,6 +72,18 @@ class SyncOperation(TimestampedModel, Base):
     __table_args__ = (
         UniqueConstraint("account_id", "operation_id", name="uq_sync_operations_account_operation"),
         Index("ix_sync_operations_account_server_sequence", "account_id", "server_sequence"),
+        CheckConstraint(
+            "logical_clock >= 0",
+            name="ck_sync_operations_logical_clock_nonnegative",
+        ),
+        CheckConstraint(
+            "entity_type IN ('task', 'schedule_block', 'focus_session', 'check_in')",
+            name="ck_sync_operations_entity_type",
+        ),
+        CheckConstraint(
+            "schema_version = 1",
+            name="ck_sync_operations_schema_version",
+        ),
         ForeignKeyConstraint(
             ["account_id", "device_id"],
             ["devices.account_id", "devices.device_id"],
@@ -79,7 +93,7 @@ class SyncOperation(TimestampedModel, Base):
     )
 
     server_sequence: Mapped[int] = mapped_column(
-        BigInteger,
+        BigInteger().with_variant(Integer, "sqlite"),
         Identity(always=False),
         primary_key=True,
     )
@@ -95,6 +109,13 @@ class SyncOperation(TimestampedModel, Base):
     )
     operation_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     record_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    logical_clock: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(32), nullable=False)
     payload_nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     payload_ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
-    is_tombstone: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="false")
+    is_tombstone: Mapped[bool] = mapped_column(
+        nullable=False,
+        default=False,
+        server_default="false",
+    )
+    schema_version: Mapped[int] = mapped_column(Integer, nullable=False)

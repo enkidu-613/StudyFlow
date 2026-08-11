@@ -177,7 +177,11 @@ class AuthClient:
     @property
     def authorization_headers(self) -> dict[str, str]:
         assert self.access_token is not None
-        return {"Authorization": f"Bearer {self.access_token}"}
+        assert self.device_id is not None
+        return {
+            "Authorization": f"Bearer {self.access_token}",
+            "X-Device-Id": self.device_id,
+        }
 
     def _remember(self, response: Response) -> None:
         body = response.json()
@@ -294,7 +298,7 @@ async def test_account_context_dependency_verifies_device_ownership_and_revocati
     await auth_client.bootstrap()
     assert auth_client.access_token is not None
     assert auth_client.device_id is not None
-    headers = {"Authorization": f"Bearer {auth_client.access_token}"}
+    headers = auth_client.authorization_headers
 
     accepted = await auth_client.client.get("/test/account-context", headers=headers)
     revoked = await auth_client.client.post(
@@ -680,7 +684,10 @@ async def test_account_cannot_pair_revoke_or_authenticate_as_another_accounts_de
     ).issue(account_a_id, account_b_device_id)
     session_response = await auth_client.client.get(
         "/v1/auth/session",
-        headers={"Authorization": f"Bearer {cross_owned_token}"},
+        headers={
+            "Authorization": f"Bearer {cross_owned_token}",
+            "X-Device-Id": str(account_b_device_id),
+        },
     )
 
     assert pairing.status_code == 409
@@ -719,8 +726,11 @@ async def test_revocation_invalidates_access_and_refresh_without_deleting_encryp
                     device_id=device_id,
                     operation_id=uuid4(),
                     record_id=uuid4(),
+                    logical_clock=1,
+                    entity_type="task",
                     payload_nonce=b"opaque-nonce",
                     payload_ciphertext=b"opaque-ciphertext",
+                    schema_version=1,
                 ),
             )
 
@@ -731,7 +741,10 @@ async def test_revocation_invalidates_access_and_refresh_without_deleting_encryp
     )
     protected = await auth_client.client.get(
         "/v1/auth/session",
-        headers={"Authorization": f"Bearer {access_token}"},
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "X-Device-Id": str(device_id),
+        },
     )
     refreshed = await auth_client.client.post(
         "/v1/auth/refresh",
