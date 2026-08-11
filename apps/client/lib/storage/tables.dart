@@ -1,6 +1,6 @@
-import 'package:drift/drift.dart';
+part of 'app_database.dart';
 
-class Tasks extends Table {
+class _Tasks extends Table {
   TextColumn get accountId => text()();
   TextColumn get recordId => text()();
   IntColumn get schemaVersion => integer()();
@@ -12,7 +12,7 @@ class Tasks extends Table {
   Set<Column<Object>> get primaryKey => <Column<Object>>{accountId, recordId};
 }
 
-class ScheduleBlocks extends Table {
+class _ScheduleBlocks extends Table {
   TextColumn get accountId => text()();
   TextColumn get recordId => text()();
   IntColumn get schemaVersion => integer()();
@@ -24,7 +24,7 @@ class ScheduleBlocks extends Table {
   Set<Column<Object>> get primaryKey => <Column<Object>>{accountId, recordId};
 }
 
-class FocusSessions extends Table {
+class _FocusSessions extends Table {
   TextColumn get accountId => text()();
   TextColumn get recordId => text()();
   IntColumn get schemaVersion => integer()();
@@ -36,7 +36,7 @@ class FocusSessions extends Table {
   Set<Column<Object>> get primaryKey => <Column<Object>>{accountId, recordId};
 }
 
-class CheckIns extends Table {
+class _CheckIns extends Table {
   TextColumn get accountId => text()();
   TextColumn get recordId => text()();
   IntColumn get schemaVersion => integer()();
@@ -48,7 +48,7 @@ class CheckIns extends Table {
   Set<Column<Object>> get primaryKey => <Column<Object>>{accountId, recordId};
 }
 
-class PendingOperations extends Table {
+class _PendingOperations extends Table {
   TextColumn get accountId => text()();
   TextColumn get operationId => text()();
   TextColumn get recordId => text()();

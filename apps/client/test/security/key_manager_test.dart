@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -9,6 +10,7 @@ import 'package:studyflow/security/payload_cipher.dart';
 const accountA = '11111111-1111-4111-8111-111111111111';
 const accountB = '22222222-2222-4222-8222-222222222222';
 const recordA = '33333333-3333-4333-8333-333333333333';
+const recordB = '44444444-4444-4444-8444-444444444444';
 
 void main() {
   group('KeyManager', () {
@@ -72,6 +74,59 @@ void main() {
         throwsA(isA<StateError>()),
       );
     });
+
+    test('concurrent account key bootstrap returns one durable key', () async {
+      final storage = MemorySecureKeyStore();
+      final firstManager = KeyManager(accountId: accountA, store: storage);
+      final secondManager = KeyManager(accountId: accountA, store: storage);
+
+      final createdKeys = await Future.wait(<Future<SecretKey>>[
+        firstManager.createAccountDataKey(),
+        secondManager.createAccountDataKey(),
+      ]);
+      final firstBytes = await createdKeys.first.extractBytes();
+      final secondBytes = await createdKeys.last.extractBytes();
+      final persistedBytes = await KeyManager(
+        accountId: accountA,
+        store: storage,
+      ).loadAccountDataKey().then((key) => key.extractBytes());
+
+      expect(secondBytes, firstBytes);
+      expect(persistedBytes, firstBytes);
+      expect(
+        await PayloadCipher(firstManager).decrypt(
+          await PayloadCipher(firstManager).encrypt(
+            Uint8List.fromList(const <int>[1, 2, 3]),
+            PayloadAssociatedData(
+              accountId: accountA,
+              recordId: recordA,
+              schemaVersion: 1,
+              entityType: 'task',
+            ),
+          ),
+          PayloadAssociatedData(
+            accountId: accountA,
+            recordId: recordA,
+            schemaVersion: 1,
+            entityType: 'task',
+          ),
+        ),
+        const <int>[1, 2, 3],
+      );
+    });
+
+    test('account key bootstrap fails if secure storage changes the write',
+        () async {
+      final manager = KeyManager(
+        accountId: accountA,
+        store: CorruptingSecureKeyStore(),
+      );
+
+      await expectLater(
+        manager.createAccountDataKey(),
+        throwsA(isA<KeyRecoveryException>()),
+      );
+    });
   });
 
   group('PayloadCipher', () {
@@ -97,8 +152,7 @@ void main() {
       );
     });
 
-    test('fresh nonces decrypt exactly and bind all operation metadata',
-        () async {
+    test('fresh nonces decrypt exactly', () async {
       final provider = FixedPayloadKeyProvider(
         accountId: accountA,
         bytes: List<int>.filled(32, 7),
@@ -119,17 +173,63 @@ void main() {
       expect(first.nonce, hasLength(24));
       expect(first.nonce, isNot(second.nonce));
       expect(first.ciphertext, isNot(containsAll(plaintext)));
+    });
+
+    test('account_id is authenticated', () async {
+      final keyBytes = List<int>.filled(32, 7);
+      final encrypted = await PayloadCipher(
+        FixedPayloadKeyProvider(accountId: accountA, bytes: keyBytes),
+      ).encrypt(
+        Uint8List.fromList(const <int>[1, 2, 3]),
+        _associatedData(),
+      );
+
       await expectLater(
-        cipher.decrypt(
-          first,
-          PayloadAssociatedData(
-            accountId: accountA,
-            recordId: recordA,
-            schemaVersion: 1,
-            entityType: 'check_in',
-          ),
+        PayloadCipher(
+          FixedPayloadKeyProvider(accountId: accountB, bytes: keyBytes),
+        ).decrypt(
+          encrypted,
+          _associatedData(accountId: accountB),
         ),
         throwsA(isA<SecretBoxAuthenticationError>()),
+      );
+    });
+
+    test('record_id is authenticated', () async {
+      await _expectAuthenticatedFieldFailure(
+        _associatedData(recordId: recordB),
+      );
+    });
+
+    test('schema_version is authenticated', () async {
+      await _expectAuthenticatedFieldFailure(
+        _associatedData(schemaVersion: 2),
+      );
+    });
+
+    test('entity_type is authenticated', () async {
+      await _expectAuthenticatedFieldFailure(
+        _associatedData(entityType: 'check_in'),
+      );
+    });
+
+    test('plaintext is snapshotted before awaiting the account key', () async {
+      final provider = DelayedPayloadKeyProvider(
+        accountId: accountA,
+        bytes: List<int>.filled(32, 13),
+      );
+      final cipher = PayloadCipher(provider);
+      final plaintext = Uint8List.fromList(const <int>[1, 2, 3]);
+
+      final encryptedFuture = cipher.encrypt(plaintext, _associatedData());
+      await provider.keyRequested;
+      plaintext[0] = 99;
+      provider.releaseKey();
+
+      final encrypted = await encryptedFuture;
+      expect(
+        await cipher.decrypt(encrypted, _associatedData()),
+        const <int>[1, 2, 3],
       );
     });
 
@@ -178,6 +278,22 @@ class MemorySecureKeyStore implements SecureKeyStore {
   }
 }
 
+class CorruptingSecureKeyStore extends MemorySecureKeyStore {
+  @override
+  Future<void> write({
+    required String accountId,
+    required StoredKeyName keyName,
+    required String value,
+  }) =>
+      super.write(
+        accountId: accountId,
+        keyName: keyName,
+        value: keyName == StoredKeyName.accountData
+            ? base64Encode(List<int>.filled(32, 0))
+            : value,
+      );
+}
+
 class FixedPayloadKeyProvider implements PayloadKeyProvider {
   FixedPayloadKeyProvider({required this.accountId, required List<int> bytes})
       : _key = SecretKey(bytes);
@@ -188,6 +304,65 @@ class FixedPayloadKeyProvider implements PayloadKeyProvider {
 
   @override
   Future<SecretKey> loadAccountDataKey() async => _key;
+}
+
+class DelayedPayloadKeyProvider implements PayloadKeyProvider {
+  DelayedPayloadKeyProvider({
+    required this.accountId,
+    required List<int> bytes,
+  }) : _key = SecretKey(bytes);
+
+  @override
+  final String accountId;
+  final SecretKey _key;
+  final Completer<void> _keyRequested = Completer<void>();
+  final Completer<void> _release = Completer<void>();
+
+  Future<void> get keyRequested => _keyRequested.future;
+
+  void releaseKey() => _release.complete();
+
+  @override
+  Future<SecretKey> loadAccountDataKey() async {
+    if (!_keyRequested.isCompleted) {
+      _keyRequested.complete();
+    }
+    await _release.future;
+    return _key;
+  }
+}
+
+PayloadAssociatedData _associatedData({
+  String accountId = accountA,
+  String recordId = recordA,
+  int schemaVersion = 1,
+  String entityType = 'task',
+}) =>
+    PayloadAssociatedData(
+      accountId: accountId,
+      recordId: recordId,
+      schemaVersion: schemaVersion,
+      entityType: entityType,
+    );
+
+Future<void> _expectAuthenticatedFieldFailure(
+  PayloadAssociatedData tamperedAssociatedData,
+) async {
+  final cipher = PayloadCipher(
+    FixedPayloadKeyProvider(
+      accountId: accountA,
+      bytes: List<int>.filled(32, 7),
+    ),
+  );
+  final encrypted = await cipher.encrypt(
+    Uint8List.fromList(const <int>[1, 2, 3]),
+    _associatedData(),
+  );
+
+  await expectLater(
+    cipher.decrypt(encrypted, tamperedAssociatedData),
+    throwsA(isA<SecretBoxAuthenticationError>()),
+  );
 }
 
 List<int> _hex(String value) => <int>[

@@ -1,7 +1,4 @@
-import 'package:drift/drift.dart';
-
-import 'app_database.dart';
-import 'tables.dart';
+part of 'app_database.dart';
 
 class EncryptedOperation {
   EncryptedOperation({
@@ -102,20 +99,20 @@ class EncryptedOperation {
 }
 
 class OperationDao {
-  OperationDao(this.database);
+  OperationDao._(this._database);
 
-  final AppDatabase database;
+  final _AccountDatabase _database;
 
   Future<void> enqueue(EncryptedOperation operation) async {
-    if (operation.accountId != database.activeAccountId) {
+    if (operation.accountId != _database.activeAccountId) {
       throw const OperationAccountScopeException(
         'Operation account does not match the active account.',
       );
     }
 
-    await database.transaction(() async {
-      await database.into(database.pendingOperations).insert(
-            PendingOperationsCompanion.insert(
+    await _database.transaction(() async {
+      await _database.into(_database.pendingOperations).insert(
+            _PendingOperationsCompanion.insert(
               accountId: operation.accountId,
               operationId: operation.operationId,
               recordId: operation.recordId,
@@ -137,12 +134,12 @@ class OperationDao {
       throw ArgumentError.value(limit, 'limit', 'must be positive');
     }
 
-    return database.transaction(() async {
-      final query = database.select(database.pendingOperations)
+    return _database.transaction(() async {
+      final query = _database.select(_database.pendingOperations)
         ..where(
-          (row) => row.accountId.equals(database.activeAccountId),
+          (row) => row.accountId.equals(_database.activeAccountId),
         )
-        ..orderBy(<OrderingTerm Function(PendingOperations)>[
+        ..orderBy(<OrderingTerm Function(_PendingOperations)>[
           (row) => OrderingTerm.asc(row.logicalClock),
           (row) => OrderingTerm.asc(row.operationId),
         ])

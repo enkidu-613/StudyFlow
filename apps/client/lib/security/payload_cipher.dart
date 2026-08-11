@@ -21,11 +21,11 @@ class PayloadAssociatedData {
     required this.entityType,
   })  : accountId = _normalizedUuid(accountId, 'accountId'),
         recordId = _normalizedUuid(recordId, 'recordId') {
-    if (schemaVersion != 1) {
+    if (schemaVersion <= 0) {
       throw ArgumentError.value(
         schemaVersion,
         'schemaVersion',
-        'must be the supported schema version 1',
+        'must be positive',
       );
     }
     if (!_entityTypes.contains(entityType)) {
@@ -77,9 +77,11 @@ class PayloadCipher {
     PayloadAssociatedData associatedData,
   ) async {
     _checkAccountScope(associatedData);
+    final plaintextSnapshot = Uint8List.fromList(plaintext);
+    final accountKey = await _keyProvider.loadAccountDataKey();
     final secretBox = await _algorithm.encrypt(
-      plaintext,
-      secretKey: await _keyProvider.loadAccountDataKey(),
+      plaintextSnapshot,
+      secretKey: accountKey,
       aad: associatedData.encode(),
     );
     return EncryptedPayload(

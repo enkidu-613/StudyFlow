@@ -153,3 +153,99 @@ These are host toolchain limitations. The Dart/Flutter unit tests load the downl
 - Android Keystore and macOS Keychain behavior still require device/runner validation once Xcode and the Android SDK are available.
 - Secure-store creation is serialized inside one `KeyManager`, but `flutter_secure_storage` has no atomic compare-and-set across multiple simultaneous `KeyManager` instances. Account bootstrap must remain a single-flight operation at the repository layer.
 - Future schema versions must add explicit Drift migration tests and preserve the cipher/key setup order before any schema access.
+
+## Fix round 1 (reviewer findings)
+
+This section supersedes the original report where behavior changed, especially the previous `AppDatabase`/raw-key API and the remaining concern about multiple simultaneous `KeyManager` instances.
+
+### 1. Account-key bootstrap single-flight
+
+- `KeyManager.createAccountDataKey()` now uses a static account-ID-keyed in-flight map shared by every `KeyManager` instance in the application isolate.
+- Concurrent callers for the same normalized account join one bootstrap future and receive the same key.
+- The in-flight entry is removed on success or failure and does not retain key material after bootstrap.
+- After secure-store write, bootstrap reads the value back and verifies that it exactly matches the generated key. A missing or changed value raises `KeyRecoveryException` and no unverified key is returned.
+- `loadAccountDataKey()` also joins an in-progress bootstrap instead of racing its secure-store write.
+- Regression tests start two independent managers concurrently, assert equal returned keys, reload the persisted key, use it for AEAD round-trip, and separately assert that a store which changes the written value fails bootstrap.
+
+### 2. Account-bound database keys
+
+- `KeyManager.loadDatabaseKey()` now returns an `AccountDatabaseKey`, whose constructor is private and whose normalized `accountId` is inseparable from the derived key.
+- `AccountScopedStore.open()` accepts the active account and its `KeyManager`; it rejects a manager from another account before opening or creating any database file and derives the database key internally.
+- The narrow `DatabaseOpener` accepts only the bound key object. `EncryptedDatabaseOpener` selects the database filename from that bound account, so an unrelated raw `SecretKey` can no longer be paired with an arbitrary active account.
+- `_AccountDatabase.open()` performs a second account/key binding check before invoking the opener.
+- The cross-account regression passes an account-B manager for active account A, expects `StorageAccountScopeException`, and verifies no account-A database file was created.
+
+### 3. Private Drift database and account-scoped row access
+
+- The generated Drift database, all five table declarations, generated table accessors, and the `OperationDao` constructor are now library-private parts of `app_database.dart`.
+- Production callers receive only `AccountScopedStore`, `OperationDao` through `store.operations`, and an `EncryptedRecordRepository` bound to one of the four supported encrypted entity types.
+- Task, schedule-block, focus-session, and check-in `put`/`get` paths validate the requested or record account against the database's active account. Pending-operation enqueue validates its account, while pending reads always filter the active account.
+- Record repositories also reject entity/repository mismatches and persist only account/record metadata, schema version, nonce, ciphertext/tag, and update time. No plaintext content columns were added.
+- A looped regression round-trips every required encrypted entity table and proves both cross-account writes and reads fail. The pending-operation cross-account write regression remains present.
+- `build.yaml` uses source_gen's supported `ignore_for_file` option for private generated Drift elements, preserving a clean analyzer run without making storage internals public.
+
+### 4. Plaintext snapshot before asynchronous key loading
+
+- `PayloadCipher.encrypt()` copies the caller's bytes to a new `Uint8List` before awaiting `loadAccountDataKey()`.
+- The delayed-provider regression mutates the caller buffer while key loading is suspended and proves decryption returns the original pre-mutation bytes.
+
+### 5. Complete AAD authentication coverage
+
+- Dedicated tests independently alter `account_id`, `record_id`, `schema_version`, and `entity_type`; every valid altered metadata set reaches AEAD verification and raises `SecretBoxAuthenticationError`.
+- `PayloadAssociatedData` accepts positive schema versions so future-version metadata can be authenticated and rejected by AEAD rather than blocked by test construction. Persisted Task 4 record and operation schemas remain restricted to version 1.
+- XChaCha20-Poly1305, the retained libsodium fixed vector, library-generated fresh 24-byte nonces, defensive ciphertext buffers, and fail-closed wrong-key behavior remain unchanged.
+
+### Round 1 TDD evidence
+
+The focused security RED run reproduced all behavior gaps relevant to the new tests:
+
+```text
+concurrent account key bootstrap returns one durable key
+Expected returned key bytes to match; actual keys differed
+
+schema_version is authenticated
+Invalid argument: schemaVersion 2 was rejected before AEAD verification
+
+plaintext is snapshotted before awaiting the account key
+Expected: [1, 2, 3]
+Actual:   [99, 2, 3]
+```
+
+The storage API RED run failed to compile because `AccountScopedStore`, `EncryptedLocalRecord`, `EncryptedEntityType`, and the private-store exception/API did not yet exist. After the account-bound façade and private Drift library were implemented, the same tests passed against real on-disk sqlite3mc storage.
+
+### Round 1 final verification
+
+All commands ran from `apps/client` through mise after the final code change:
+
+```text
+mise exec -- flutter test test/security/key_manager_test.dart test/storage/operation_dao_test.dart
+20 tests passed
+
+mise exec -- flutter test test/storage -r expanded
+7 tests passed
+
+mise exec -- flutter test
+21 tests passed
+
+mise exec -- flutter analyze
+No issues found
+
+mise exec -- git diff --check
+No output
+```
+
+The previously recorded native build limitations are unchanged: macOS runner compilation cannot start because `xcodebuild` is unavailable from `xcrun`, and Android runner compilation cannot start because no Android SDK/`ANDROID_HOME` is installed. Dart/Flutter unit tests continue to load and exercise the sqlite3mc native asset successfully through mise.
+
+### Round 1 security self-review
+
+- No keys, derived key bytes, credential material, plaintext payloads, or key-bearing SQL are logged or printed.
+- Extracted database-key bytes are copied for conversion and the mutable copy is zeroed immediately; the temporary hex closure is cleared after sqlite3mc setup.
+- Wrong account, missing key, changed secure-store write, wrong database key, malformed encrypted buffers, and altered AAD all fail closed.
+- Database creation is rejected before file access when the account and key manager differ.
+- Public production APIs cannot construct the private Drift database, table companions, or `OperationDao` directly.
+- No server, Supabase service-role, or database credentials were introduced into Flutter.
+
+### Round 1 concerns
+
+- Android Keystore and macOS Keychain integration still require native runner/device verification when their missing host toolchains become available.
+- The account bootstrap single-flight covers all `KeyManager` instances in the Flutter application's Dart isolate. A future architecture that performs account bootstrap from multiple independent Dart isolates or processes would require a platform-level compare-and-set or cross-isolate coordinator.

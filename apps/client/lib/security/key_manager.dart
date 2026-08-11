@@ -24,6 +24,16 @@ abstract interface class PayloadKeyProvider {
   Future<SecretKey> loadAccountDataKey();
 }
 
+final class AccountDatabaseKey {
+  AccountDatabaseKey._({required this.accountId, required SecretKey key})
+      : _key = key;
+
+  final String accountId;
+  final SecretKey _key;
+
+  Future<List<int>> extractBytes() => _key.extractBytes();
+}
+
 class FlutterSecureKeyStore implements SecureKeyStore {
   FlutterSecureKeyStore({FlutterSecureStorage? storage})
       : _storage = storage ??
@@ -60,7 +70,7 @@ class FlutterSecureKeyStore implements SecureKeyStore {
       'studyflow.v1.${_normalizedAccountId(accountId)}.${keyName.name}';
 }
 
-class KeyManager implements PayloadKeyProvider {
+final class KeyManager implements PayloadKeyProvider {
   KeyManager({
     required String accountId,
     SecureKeyStore? store,
@@ -72,34 +82,64 @@ class KeyManager implements PayloadKeyProvider {
   final SecureKeyStore _store;
   final Cipher _keyAlgorithm = Xchacha20.poly1305Aead();
 
+  static final Map<String, Future<SecretKey>> _accountDataKeyBootstraps =
+      <String, Future<SecretKey>>{};
+
   Future<SecretKey>? _deviceKeyFuture;
   Future<SecretKey>? _accountDataKeyFuture;
 
   Future<SecretKey> loadOrCreateDeviceKey() =>
       _deviceKeyFuture ??= _loadOrCreate(StoredKeyName.device);
 
-  Future<SecretKey> createAccountDataKey() async {
+  Future<SecretKey> createAccountDataKey() {
+    final inFlight = _accountDataKeyBootstraps[accountId];
+    if (inFlight != null) {
+      return inFlight;
+    }
+
+    late final Future<SecretKey> bootstrap;
+    bootstrap = _createAccountDataKeyOnce().whenComplete(() {
+      if (identical(_accountDataKeyBootstraps[accountId], bootstrap)) {
+        _accountDataKeyBootstraps.remove(accountId);
+      }
+    });
+    _accountDataKeyBootstraps[accountId] = bootstrap;
+    return bootstrap;
+  }
+
+  Future<SecretKey> _createAccountDataKeyOnce() async {
     if (await _read(StoredKeyName.accountData) != null) {
       throw StateError('The account data key already exists.');
     }
 
     final generated = await _keyAlgorithm.newSecretKey();
     await _persist(StoredKeyName.accountData, generated);
-    _accountDataKeyFuture = Future<SecretKey>.value(generated);
-    return generated;
+    final persisted = await _read(StoredKeyName.accountData);
+    if (persisted == null ||
+        base64Encode(await persisted.extractBytes()) !=
+            base64Encode(await generated.extractBytes())) {
+      throw const KeyRecoveryException(
+        'Secure key storage did not preserve the generated account key.',
+      );
+    }
+    _accountDataKeyFuture = Future<SecretKey>.value(persisted);
+    return persisted;
   }
 
   @override
   Future<SecretKey> loadAccountDataKey() =>
-      _accountDataKeyFuture ??= _loadRequired(StoredKeyName.accountData);
+      _accountDataKeyFuture ??= _accountDataKeyBootstraps[accountId] ??
+          _loadRequired(StoredKeyName.accountData);
 
-  Future<SecretKey> loadDatabaseKey() async {
+  Future<AccountDatabaseKey> loadDatabaseKey() async {
     final accountDataKey = await loadAccountDataKey();
-    return Hkdf(hmac: Hmac.sha256(), outputLength: 32).deriveKey(
+    final derivedKey =
+        await Hkdf(hmac: Hmac.sha256(), outputLength: 32).deriveKey(
       secretKey: accountDataKey,
       nonce: utf8.encode('StudyFlow database key salt v1'),
       info: utf8.encode(accountId),
     );
+    return AccountDatabaseKey._(accountId: accountId, key: derivedKey);
   }
 
   Future<SecretKey> _loadOrCreate(StoredKeyName keyName) async {

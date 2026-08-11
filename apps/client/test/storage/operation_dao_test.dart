@@ -1,10 +1,9 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:cryptography/cryptography.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:studyflow/security/key_manager.dart';
 import 'package:studyflow/storage/app_database.dart';
-import 'package:studyflow/storage/operation_dao.dart';
 
 const accountA = '11111111-1111-4111-8111-111111111111';
 const accountB = '22222222-2222-4222-8222-222222222222';
@@ -12,12 +11,15 @@ const accountB = '22222222-2222-4222-8222-222222222222';
 void main() {
   late Directory temporaryDirectory;
   late EncryptedDatabaseOpener opener;
-  late SecretKey databaseKey;
+  late MemorySecureKeyStore keyStore;
+  late KeyManager keyManager;
 
   setUp(() async {
     temporaryDirectory = await Directory.systemTemp.createTemp('studyflow-db-');
     opener = EncryptedDatabaseOpener(baseDirectory: temporaryDirectory);
-    databaseKey = SecretKey(List<int>.generate(32, (index) => index));
+    keyStore = MemorySecureKeyStore();
+    keyManager = KeyManager(accountId: accountA, store: keyStore);
+    await keyManager.createAccountDataKey();
   });
 
   tearDown(() async {
@@ -26,14 +28,9 @@ void main() {
 
   test('pending operation survives close and reopen in encrypted storage',
       () async {
-    final database = await AppDatabase.open(
-      activeAccountId: accountA,
-      databaseKey: databaseKey,
-      opener: opener,
-    );
-    final dao = OperationDao(database);
-    await dao.enqueue(operation(accountId: accountA));
-    await database.close();
+    final store = await openStore(keyManager, opener);
+    await store.operations.enqueue(operation(accountId: accountA));
+    await store.close();
 
     final databaseBytes = await opener.databaseFileFor(accountA).readAsBytes();
     expect(
@@ -41,31 +38,22 @@ void main() {
       isNot('SQLite format 3\u0000'.codeUnits),
     );
 
-    final reopened = await AppDatabase.open(
-      activeAccountId: accountA,
-      databaseKey: databaseKey,
-      opener: opener,
-    );
+    final reopened = await openStore(keyManager, opener);
     addTearDown(reopened.close);
 
-    expect(await OperationDao(reopened).pending(10), <EncryptedOperation>[
+    expect(await reopened.operations.pending(10), <EncryptedOperation>[
       operation(accountId: accountA),
     ]);
   });
 
   test('duplicate operation id does not create a second local row', () async {
-    final database = await AppDatabase.open(
-      activeAccountId: accountA,
-      databaseKey: databaseKey,
-      opener: opener,
-    );
-    addTearDown(database.close);
-    final dao = OperationDao(database);
+    final store = await openStore(keyManager, opener);
+    addTearDown(store.close);
 
-    await dao.enqueue(operation(accountId: accountA));
-    await dao.enqueue(operation(accountId: accountA));
+    await store.operations.enqueue(operation(accountId: accountA));
+    await store.operations.enqueue(operation(accountId: accountA));
 
-    expect(await dao.pending(10), hasLength(1));
+    expect(await store.operations.pending(10), hasLength(1));
   });
 
   test('encrypted operation does not expose mutable cryptographic buffers', () {
@@ -78,76 +66,112 @@ void main() {
     expect(encryptedOperation.payloadCiphertext.first, 255);
   });
 
-  test('DAO rejects an operation outside the active account', () async {
-    final database = await AppDatabase.open(
-      activeAccountId: accountA,
-      databaseKey: databaseKey,
-      opener: opener,
-    );
-    addTearDown(database.close);
+  test('operation store rejects a write outside the active account', () async {
+    final store = await openStore(keyManager, opener);
+    addTearDown(store.close);
 
     await expectLater(
-      OperationDao(database).enqueue(operation(accountId: accountB)),
+      store.operations.enqueue(operation(accountId: accountB)),
       throwsA(isA<OperationAccountScopeException>()),
     );
-    expect(await OperationDao(database).pending(10), isEmpty);
+    expect(await store.operations.pending(10), isEmpty);
   });
 
-  test('wrong or unavailable database key raises a visible recovery error',
+  test('wrong or unavailable database key fails closed', () async {
+    final store = await openStore(keyManager, opener);
+    await store.operations.enqueue(operation(accountId: accountA));
+    await store.close();
+
+    final wrongKeyManager = KeyManager(
+      accountId: accountA,
+      store: MemorySecureKeyStore(),
+    );
+    await wrongKeyManager.createAccountDataKey();
+    await expectLater(
+      openStore(wrongKeyManager, opener),
+      throwsA(isA<DatabaseRecoveryException>()),
+    );
+
+    final missingKeyManager = KeyManager(
+      accountId: accountA,
+      store: MemorySecureKeyStore(),
+    );
+    await expectLater(
+      openStore(missingKeyManager, opener),
+      throwsA(isA<KeyRecoveryException>()),
+    );
+  });
+
+  test('database key cannot be bound to a different active account', () async {
+    final accountBManager = KeyManager(accountId: accountB, store: keyStore);
+    await accountBManager.createAccountDataKey();
+
+    await expectLater(
+      AccountScopedStore.open(
+        activeAccountId: accountA,
+        keyManager: accountBManager,
+        opener: opener,
+      ),
+      throwsA(isA<StorageAccountScopeException>()),
+    );
+    expect(opener.databaseFileFor(accountA).existsSync(), isFalse);
+  });
+
+  test('all encrypted record stores reject cross-account writes and reads',
       () async {
-    final database = await AppDatabase.open(
-      activeAccountId: accountA,
-      databaseKey: databaseKey,
-      opener: opener,
-    );
-    await OperationDao(database).enqueue(operation(accountId: accountA));
-    await database.close();
+    final store = await openStore(keyManager, opener);
+    addTearDown(store.close);
+    final recordIds = <String>[
+      '10000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000002',
+      '10000000-0000-4000-8000-000000000003',
+      '10000000-0000-4000-8000-000000000004',
+    ];
 
-    await expectLater(
-      AppDatabase.open(
-        activeAccountId: accountA,
-        databaseKey: SecretKey(List<int>.filled(32, 99)),
-        opener: opener,
-      ),
-      throwsA(isA<DatabaseRecoveryException>()),
-    );
-    await expectLater(
-      AppDatabase.open(
-        activeAccountId: accountA,
-        databaseKey: null,
-        opener: opener,
-      ),
-      throwsA(isA<DatabaseRecoveryException>()),
-    );
-  });
+    for (var index = 0; index < EncryptedEntityType.values.length; index++) {
+      final entityType = EncryptedEntityType.values[index];
+      final repository = store.records(entityType);
+      final activeRecord = encryptedRecord(
+        accountId: accountA,
+        recordId: recordIds[index],
+        entityType: entityType,
+      );
 
-  test('each encrypted record table is present', () async {
-    final database = await AppDatabase.open(
-      activeAccountId: accountA,
-      databaseKey: databaseKey,
-      opener: opener,
-    );
-    addTearDown(database.close);
-
-    final names = await database
-        .customSelect(
-          "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
-        )
-        .map((row) => row.read<String>('name'))
-        .get();
-
-    expect(
-      names,
-      containsAll(<String>[
-        'check_ins',
-        'focus_sessions',
-        'pending_operations',
-        'schedule_blocks',
-        'tasks',
-      ]),
-    );
+      await repository.put(activeRecord);
+      expect(
+        await repository.get(
+          accountId: accountA,
+          recordId: recordIds[index],
+        ),
+        activeRecord,
+      );
+      await expectLater(
+        repository.put(
+          encryptedRecord(
+            accountId: accountB,
+            recordId: recordIds[index],
+            entityType: entityType,
+          ),
+        ),
+        throwsA(isA<StorageAccountScopeException>()),
+      );
+      await expectLater(
+        repository.get(accountId: accountB, recordId: recordIds[index]),
+        throwsA(isA<StorageAccountScopeException>()),
+      );
+    }
   });
 }
+
+Future<AccountScopedStore> openStore(
+  KeyManager keyManager,
+  DatabaseOpener opener,
+) =>
+    AccountScopedStore.open(
+      activeAccountId: accountA,
+      keyManager: keyManager,
+      opener: opener,
+    );
 
 EncryptedOperation operation({required String accountId}) => EncryptedOperation(
       accountId: accountId,
@@ -164,3 +188,41 @@ EncryptedOperation operation({required String accountId}) => EncryptedOperation(
       isTombstone: false,
       schemaVersion: 1,
     );
+
+EncryptedLocalRecord encryptedRecord({
+  required String accountId,
+  required String recordId,
+  required EncryptedEntityType entityType,
+}) =>
+    EncryptedLocalRecord(
+      accountId: accountId,
+      recordId: recordId,
+      entityType: entityType,
+      schemaVersion: 1,
+      payloadNonce:
+          Uint8List.fromList(List<int>.generate(24, (index) => index)),
+      payloadCiphertext: Uint8List.fromList(
+        List<int>.generate(48, (index) => 255 - index),
+      ),
+      updatedAt: DateTime.utc(2026, 8, 11),
+    );
+
+class MemorySecureKeyStore implements SecureKeyStore {
+  final Map<String, String> _values = <String, String>{};
+
+  @override
+  Future<String?> read({
+    required String accountId,
+    required StoredKeyName keyName,
+  }) async =>
+      _values['$accountId:${keyName.name}'];
+
+  @override
+  Future<void> write({
+    required String accountId,
+    required StoredKeyName keyName,
+    required String value,
+  }) async {
+    _values['$accountId:${keyName.name}'] = value;
+  }
+}

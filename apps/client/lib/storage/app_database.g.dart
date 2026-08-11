@@ -1,13 +1,15 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
+// ignore_for_file: unused_element
+
 part of 'app_database.dart';
 
 // ignore_for_file: type=lint
-class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
+class $_TasksTable extends _Tasks with TableInfo<$_TasksTable, _Task> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  $TasksTable(this.attachedDatabase, [this._alias]);
+  $_TasksTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _accountIdMeta =
       const VerificationMeta('accountId');
   @override
@@ -59,7 +61,7 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
   String get actualTableName => $name;
   static const String $name = 'tasks';
   @override
-  VerificationContext validateIntegrity(Insertable<Task> instance,
+  VerificationContext validateIntegrity(Insertable<_Task> instance,
       {bool isInserting = false}) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
@@ -111,9 +113,9 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
   @override
   Set<GeneratedColumn> get $primaryKey => {accountId, recordId};
   @override
-  Task map(Map<String, dynamic> data, {String? tablePrefix}) {
+  _Task map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return Task(
+    return _Task(
       accountId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}account_id'])!,
       recordId: attachedDatabase.typeMapping
@@ -130,19 +132,19 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
   }
 
   @override
-  $TasksTable createAlias(String alias) {
-    return $TasksTable(attachedDatabase, alias);
+  $_TasksTable createAlias(String alias) {
+    return $_TasksTable(attachedDatabase, alias);
   }
 }
 
-class Task extends DataClass implements Insertable<Task> {
+class _Task extends DataClass implements Insertable<_Task> {
   final String accountId;
   final String recordId;
   final int schemaVersion;
   final Uint8List payloadNonce;
   final Uint8List payloadCiphertext;
   final DateTime updatedAt;
-  const Task(
+  const _Task(
       {required this.accountId,
       required this.recordId,
       required this.schemaVersion,
@@ -161,8 +163,8 @@ class Task extends DataClass implements Insertable<Task> {
     return map;
   }
 
-  TasksCompanion toCompanion(bool nullToAbsent) {
-    return TasksCompanion(
+  _TasksCompanion toCompanion(bool nullToAbsent) {
+    return _TasksCompanion(
       accountId: Value(accountId),
       recordId: Value(recordId),
       schemaVersion: Value(schemaVersion),
@@ -172,10 +174,10 @@ class Task extends DataClass implements Insertable<Task> {
     );
   }
 
-  factory Task.fromJson(Map<String, dynamic> json,
+  factory _Task.fromJson(Map<String, dynamic> json,
       {ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return Task(
+    return _Task(
       accountId: serializer.fromJson<String>(json['accountId']),
       recordId: serializer.fromJson<String>(json['recordId']),
       schemaVersion: serializer.fromJson<int>(json['schemaVersion']),
@@ -198,14 +200,14 @@ class Task extends DataClass implements Insertable<Task> {
     };
   }
 
-  Task copyWith(
+  _Task copyWith(
           {String? accountId,
           String? recordId,
           int? schemaVersion,
           Uint8List? payloadNonce,
           Uint8List? payloadCiphertext,
           DateTime? updatedAt}) =>
-      Task(
+      _Task(
         accountId: accountId ?? this.accountId,
         recordId: recordId ?? this.recordId,
         schemaVersion: schemaVersion ?? this.schemaVersion,
@@ -213,8 +215,8 @@ class Task extends DataClass implements Insertable<Task> {
         payloadCiphertext: payloadCiphertext ?? this.payloadCiphertext,
         updatedAt: updatedAt ?? this.updatedAt,
       );
-  Task copyWithCompanion(TasksCompanion data) {
-    return Task(
+  _Task copyWithCompanion(_TasksCompanion data) {
+    return _Task(
       accountId: data.accountId.present ? data.accountId.value : this.accountId,
       recordId: data.recordId.present ? data.recordId.value : this.recordId,
       schemaVersion: data.schemaVersion.present
@@ -232,7 +234,7 @@ class Task extends DataClass implements Insertable<Task> {
 
   @override
   String toString() {
-    return (StringBuffer('Task(')
+    return (StringBuffer('_Task(')
           ..write('accountId: $accountId, ')
           ..write('recordId: $recordId, ')
           ..write('schemaVersion: $schemaVersion, ')
@@ -254,7 +256,7 @@ class Task extends DataClass implements Insertable<Task> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is Task &&
+      (other is _Task &&
           other.accountId == this.accountId &&
           other.recordId == this.recordId &&
           other.schemaVersion == this.schemaVersion &&
@@ -264,7 +266,7 @@ class Task extends DataClass implements Insertable<Task> {
           other.updatedAt == this.updatedAt);
 }
 
-class TasksCompanion extends UpdateCompanion<Task> {
+class _TasksCompanion extends UpdateCompanion<_Task> {
   final Value<String> accountId;
   final Value<String> recordId;
   final Value<int> schemaVersion;
@@ -272,7 +274,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
   final Value<Uint8List> payloadCiphertext;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
-  const TasksCompanion({
+  const _TasksCompanion({
     this.accountId = const Value.absent(),
     this.recordId = const Value.absent(),
     this.schemaVersion = const Value.absent(),
@@ -281,7 +283,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
-  TasksCompanion.insert({
+  _TasksCompanion.insert({
     required String accountId,
     required String recordId,
     required int schemaVersion,
@@ -295,7 +297,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
         payloadNonce = Value(payloadNonce),
         payloadCiphertext = Value(payloadCiphertext),
         updatedAt = Value(updatedAt);
-  static Insertable<Task> custom({
+  static Insertable<_Task> custom({
     Expression<String>? accountId,
     Expression<String>? recordId,
     Expression<int>? schemaVersion,
@@ -315,7 +317,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
     });
   }
 
-  TasksCompanion copyWith(
+  _TasksCompanion copyWith(
       {Value<String>? accountId,
       Value<String>? recordId,
       Value<int>? schemaVersion,
@@ -323,7 +325,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
       Value<Uint8List>? payloadCiphertext,
       Value<DateTime>? updatedAt,
       Value<int>? rowid}) {
-    return TasksCompanion(
+    return _TasksCompanion(
       accountId: accountId ?? this.accountId,
       recordId: recordId ?? this.recordId,
       schemaVersion: schemaVersion ?? this.schemaVersion,
@@ -363,7 +365,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
 
   @override
   String toString() {
-    return (StringBuffer('TasksCompanion(')
+    return (StringBuffer('_TasksCompanion(')
           ..write('accountId: $accountId, ')
           ..write('recordId: $recordId, ')
           ..write('schemaVersion: $schemaVersion, ')
@@ -376,12 +378,12 @@ class TasksCompanion extends UpdateCompanion<Task> {
   }
 }
 
-class $ScheduleBlocksTable extends ScheduleBlocks
-    with TableInfo<$ScheduleBlocksTable, ScheduleBlock> {
+class $_ScheduleBlocksTable extends _ScheduleBlocks
+    with TableInfo<$_ScheduleBlocksTable, _ScheduleBlock> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  $ScheduleBlocksTable(this.attachedDatabase, [this._alias]);
+  $_ScheduleBlocksTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _accountIdMeta =
       const VerificationMeta('accountId');
   @override
@@ -433,7 +435,7 @@ class $ScheduleBlocksTable extends ScheduleBlocks
   String get actualTableName => $name;
   static const String $name = 'schedule_blocks';
   @override
-  VerificationContext validateIntegrity(Insertable<ScheduleBlock> instance,
+  VerificationContext validateIntegrity(Insertable<_ScheduleBlock> instance,
       {bool isInserting = false}) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
@@ -485,9 +487,9 @@ class $ScheduleBlocksTable extends ScheduleBlocks
   @override
   Set<GeneratedColumn> get $primaryKey => {accountId, recordId};
   @override
-  ScheduleBlock map(Map<String, dynamic> data, {String? tablePrefix}) {
+  _ScheduleBlock map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return ScheduleBlock(
+    return _ScheduleBlock(
       accountId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}account_id'])!,
       recordId: attachedDatabase.typeMapping
@@ -504,19 +506,19 @@ class $ScheduleBlocksTable extends ScheduleBlocks
   }
 
   @override
-  $ScheduleBlocksTable createAlias(String alias) {
-    return $ScheduleBlocksTable(attachedDatabase, alias);
+  $_ScheduleBlocksTable createAlias(String alias) {
+    return $_ScheduleBlocksTable(attachedDatabase, alias);
   }
 }
 
-class ScheduleBlock extends DataClass implements Insertable<ScheduleBlock> {
+class _ScheduleBlock extends DataClass implements Insertable<_ScheduleBlock> {
   final String accountId;
   final String recordId;
   final int schemaVersion;
   final Uint8List payloadNonce;
   final Uint8List payloadCiphertext;
   final DateTime updatedAt;
-  const ScheduleBlock(
+  const _ScheduleBlock(
       {required this.accountId,
       required this.recordId,
       required this.schemaVersion,
@@ -535,8 +537,8 @@ class ScheduleBlock extends DataClass implements Insertable<ScheduleBlock> {
     return map;
   }
 
-  ScheduleBlocksCompanion toCompanion(bool nullToAbsent) {
-    return ScheduleBlocksCompanion(
+  _ScheduleBlocksCompanion toCompanion(bool nullToAbsent) {
+    return _ScheduleBlocksCompanion(
       accountId: Value(accountId),
       recordId: Value(recordId),
       schemaVersion: Value(schemaVersion),
@@ -546,10 +548,10 @@ class ScheduleBlock extends DataClass implements Insertable<ScheduleBlock> {
     );
   }
 
-  factory ScheduleBlock.fromJson(Map<String, dynamic> json,
+  factory _ScheduleBlock.fromJson(Map<String, dynamic> json,
       {ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return ScheduleBlock(
+    return _ScheduleBlock(
       accountId: serializer.fromJson<String>(json['accountId']),
       recordId: serializer.fromJson<String>(json['recordId']),
       schemaVersion: serializer.fromJson<int>(json['schemaVersion']),
@@ -572,14 +574,14 @@ class ScheduleBlock extends DataClass implements Insertable<ScheduleBlock> {
     };
   }
 
-  ScheduleBlock copyWith(
+  _ScheduleBlock copyWith(
           {String? accountId,
           String? recordId,
           int? schemaVersion,
           Uint8List? payloadNonce,
           Uint8List? payloadCiphertext,
           DateTime? updatedAt}) =>
-      ScheduleBlock(
+      _ScheduleBlock(
         accountId: accountId ?? this.accountId,
         recordId: recordId ?? this.recordId,
         schemaVersion: schemaVersion ?? this.schemaVersion,
@@ -587,8 +589,8 @@ class ScheduleBlock extends DataClass implements Insertable<ScheduleBlock> {
         payloadCiphertext: payloadCiphertext ?? this.payloadCiphertext,
         updatedAt: updatedAt ?? this.updatedAt,
       );
-  ScheduleBlock copyWithCompanion(ScheduleBlocksCompanion data) {
-    return ScheduleBlock(
+  _ScheduleBlock copyWithCompanion(_ScheduleBlocksCompanion data) {
+    return _ScheduleBlock(
       accountId: data.accountId.present ? data.accountId.value : this.accountId,
       recordId: data.recordId.present ? data.recordId.value : this.recordId,
       schemaVersion: data.schemaVersion.present
@@ -606,7 +608,7 @@ class ScheduleBlock extends DataClass implements Insertable<ScheduleBlock> {
 
   @override
   String toString() {
-    return (StringBuffer('ScheduleBlock(')
+    return (StringBuffer('_ScheduleBlock(')
           ..write('accountId: $accountId, ')
           ..write('recordId: $recordId, ')
           ..write('schemaVersion: $schemaVersion, ')
@@ -628,7 +630,7 @@ class ScheduleBlock extends DataClass implements Insertable<ScheduleBlock> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is ScheduleBlock &&
+      (other is _ScheduleBlock &&
           other.accountId == this.accountId &&
           other.recordId == this.recordId &&
           other.schemaVersion == this.schemaVersion &&
@@ -638,7 +640,7 @@ class ScheduleBlock extends DataClass implements Insertable<ScheduleBlock> {
           other.updatedAt == this.updatedAt);
 }
 
-class ScheduleBlocksCompanion extends UpdateCompanion<ScheduleBlock> {
+class _ScheduleBlocksCompanion extends UpdateCompanion<_ScheduleBlock> {
   final Value<String> accountId;
   final Value<String> recordId;
   final Value<int> schemaVersion;
@@ -646,7 +648,7 @@ class ScheduleBlocksCompanion extends UpdateCompanion<ScheduleBlock> {
   final Value<Uint8List> payloadCiphertext;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
-  const ScheduleBlocksCompanion({
+  const _ScheduleBlocksCompanion({
     this.accountId = const Value.absent(),
     this.recordId = const Value.absent(),
     this.schemaVersion = const Value.absent(),
@@ -655,7 +657,7 @@ class ScheduleBlocksCompanion extends UpdateCompanion<ScheduleBlock> {
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
-  ScheduleBlocksCompanion.insert({
+  _ScheduleBlocksCompanion.insert({
     required String accountId,
     required String recordId,
     required int schemaVersion,
@@ -669,7 +671,7 @@ class ScheduleBlocksCompanion extends UpdateCompanion<ScheduleBlock> {
         payloadNonce = Value(payloadNonce),
         payloadCiphertext = Value(payloadCiphertext),
         updatedAt = Value(updatedAt);
-  static Insertable<ScheduleBlock> custom({
+  static Insertable<_ScheduleBlock> custom({
     Expression<String>? accountId,
     Expression<String>? recordId,
     Expression<int>? schemaVersion,
@@ -689,7 +691,7 @@ class ScheduleBlocksCompanion extends UpdateCompanion<ScheduleBlock> {
     });
   }
 
-  ScheduleBlocksCompanion copyWith(
+  _ScheduleBlocksCompanion copyWith(
       {Value<String>? accountId,
       Value<String>? recordId,
       Value<int>? schemaVersion,
@@ -697,7 +699,7 @@ class ScheduleBlocksCompanion extends UpdateCompanion<ScheduleBlock> {
       Value<Uint8List>? payloadCiphertext,
       Value<DateTime>? updatedAt,
       Value<int>? rowid}) {
-    return ScheduleBlocksCompanion(
+    return _ScheduleBlocksCompanion(
       accountId: accountId ?? this.accountId,
       recordId: recordId ?? this.recordId,
       schemaVersion: schemaVersion ?? this.schemaVersion,
@@ -737,7 +739,7 @@ class ScheduleBlocksCompanion extends UpdateCompanion<ScheduleBlock> {
 
   @override
   String toString() {
-    return (StringBuffer('ScheduleBlocksCompanion(')
+    return (StringBuffer('_ScheduleBlocksCompanion(')
           ..write('accountId: $accountId, ')
           ..write('recordId: $recordId, ')
           ..write('schemaVersion: $schemaVersion, ')
@@ -750,12 +752,12 @@ class ScheduleBlocksCompanion extends UpdateCompanion<ScheduleBlock> {
   }
 }
 
-class $FocusSessionsTable extends FocusSessions
-    with TableInfo<$FocusSessionsTable, FocusSession> {
+class $_FocusSessionsTable extends _FocusSessions
+    with TableInfo<$_FocusSessionsTable, _FocusSession> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  $FocusSessionsTable(this.attachedDatabase, [this._alias]);
+  $_FocusSessionsTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _accountIdMeta =
       const VerificationMeta('accountId');
   @override
@@ -807,7 +809,7 @@ class $FocusSessionsTable extends FocusSessions
   String get actualTableName => $name;
   static const String $name = 'focus_sessions';
   @override
-  VerificationContext validateIntegrity(Insertable<FocusSession> instance,
+  VerificationContext validateIntegrity(Insertable<_FocusSession> instance,
       {bool isInserting = false}) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
@@ -859,9 +861,9 @@ class $FocusSessionsTable extends FocusSessions
   @override
   Set<GeneratedColumn> get $primaryKey => {accountId, recordId};
   @override
-  FocusSession map(Map<String, dynamic> data, {String? tablePrefix}) {
+  _FocusSession map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return FocusSession(
+    return _FocusSession(
       accountId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}account_id'])!,
       recordId: attachedDatabase.typeMapping
@@ -878,19 +880,19 @@ class $FocusSessionsTable extends FocusSessions
   }
 
   @override
-  $FocusSessionsTable createAlias(String alias) {
-    return $FocusSessionsTable(attachedDatabase, alias);
+  $_FocusSessionsTable createAlias(String alias) {
+    return $_FocusSessionsTable(attachedDatabase, alias);
   }
 }
 
-class FocusSession extends DataClass implements Insertable<FocusSession> {
+class _FocusSession extends DataClass implements Insertable<_FocusSession> {
   final String accountId;
   final String recordId;
   final int schemaVersion;
   final Uint8List payloadNonce;
   final Uint8List payloadCiphertext;
   final DateTime updatedAt;
-  const FocusSession(
+  const _FocusSession(
       {required this.accountId,
       required this.recordId,
       required this.schemaVersion,
@@ -909,8 +911,8 @@ class FocusSession extends DataClass implements Insertable<FocusSession> {
     return map;
   }
 
-  FocusSessionsCompanion toCompanion(bool nullToAbsent) {
-    return FocusSessionsCompanion(
+  _FocusSessionsCompanion toCompanion(bool nullToAbsent) {
+    return _FocusSessionsCompanion(
       accountId: Value(accountId),
       recordId: Value(recordId),
       schemaVersion: Value(schemaVersion),
@@ -920,10 +922,10 @@ class FocusSession extends DataClass implements Insertable<FocusSession> {
     );
   }
 
-  factory FocusSession.fromJson(Map<String, dynamic> json,
+  factory _FocusSession.fromJson(Map<String, dynamic> json,
       {ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return FocusSession(
+    return _FocusSession(
       accountId: serializer.fromJson<String>(json['accountId']),
       recordId: serializer.fromJson<String>(json['recordId']),
       schemaVersion: serializer.fromJson<int>(json['schemaVersion']),
@@ -946,14 +948,14 @@ class FocusSession extends DataClass implements Insertable<FocusSession> {
     };
   }
 
-  FocusSession copyWith(
+  _FocusSession copyWith(
           {String? accountId,
           String? recordId,
           int? schemaVersion,
           Uint8List? payloadNonce,
           Uint8List? payloadCiphertext,
           DateTime? updatedAt}) =>
-      FocusSession(
+      _FocusSession(
         accountId: accountId ?? this.accountId,
         recordId: recordId ?? this.recordId,
         schemaVersion: schemaVersion ?? this.schemaVersion,
@@ -961,8 +963,8 @@ class FocusSession extends DataClass implements Insertable<FocusSession> {
         payloadCiphertext: payloadCiphertext ?? this.payloadCiphertext,
         updatedAt: updatedAt ?? this.updatedAt,
       );
-  FocusSession copyWithCompanion(FocusSessionsCompanion data) {
-    return FocusSession(
+  _FocusSession copyWithCompanion(_FocusSessionsCompanion data) {
+    return _FocusSession(
       accountId: data.accountId.present ? data.accountId.value : this.accountId,
       recordId: data.recordId.present ? data.recordId.value : this.recordId,
       schemaVersion: data.schemaVersion.present
@@ -980,7 +982,7 @@ class FocusSession extends DataClass implements Insertable<FocusSession> {
 
   @override
   String toString() {
-    return (StringBuffer('FocusSession(')
+    return (StringBuffer('_FocusSession(')
           ..write('accountId: $accountId, ')
           ..write('recordId: $recordId, ')
           ..write('schemaVersion: $schemaVersion, ')
@@ -1002,7 +1004,7 @@ class FocusSession extends DataClass implements Insertable<FocusSession> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is FocusSession &&
+      (other is _FocusSession &&
           other.accountId == this.accountId &&
           other.recordId == this.recordId &&
           other.schemaVersion == this.schemaVersion &&
@@ -1012,7 +1014,7 @@ class FocusSession extends DataClass implements Insertable<FocusSession> {
           other.updatedAt == this.updatedAt);
 }
 
-class FocusSessionsCompanion extends UpdateCompanion<FocusSession> {
+class _FocusSessionsCompanion extends UpdateCompanion<_FocusSession> {
   final Value<String> accountId;
   final Value<String> recordId;
   final Value<int> schemaVersion;
@@ -1020,7 +1022,7 @@ class FocusSessionsCompanion extends UpdateCompanion<FocusSession> {
   final Value<Uint8List> payloadCiphertext;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
-  const FocusSessionsCompanion({
+  const _FocusSessionsCompanion({
     this.accountId = const Value.absent(),
     this.recordId = const Value.absent(),
     this.schemaVersion = const Value.absent(),
@@ -1029,7 +1031,7 @@ class FocusSessionsCompanion extends UpdateCompanion<FocusSession> {
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
-  FocusSessionsCompanion.insert({
+  _FocusSessionsCompanion.insert({
     required String accountId,
     required String recordId,
     required int schemaVersion,
@@ -1043,7 +1045,7 @@ class FocusSessionsCompanion extends UpdateCompanion<FocusSession> {
         payloadNonce = Value(payloadNonce),
         payloadCiphertext = Value(payloadCiphertext),
         updatedAt = Value(updatedAt);
-  static Insertable<FocusSession> custom({
+  static Insertable<_FocusSession> custom({
     Expression<String>? accountId,
     Expression<String>? recordId,
     Expression<int>? schemaVersion,
@@ -1063,7 +1065,7 @@ class FocusSessionsCompanion extends UpdateCompanion<FocusSession> {
     });
   }
 
-  FocusSessionsCompanion copyWith(
+  _FocusSessionsCompanion copyWith(
       {Value<String>? accountId,
       Value<String>? recordId,
       Value<int>? schemaVersion,
@@ -1071,7 +1073,7 @@ class FocusSessionsCompanion extends UpdateCompanion<FocusSession> {
       Value<Uint8List>? payloadCiphertext,
       Value<DateTime>? updatedAt,
       Value<int>? rowid}) {
-    return FocusSessionsCompanion(
+    return _FocusSessionsCompanion(
       accountId: accountId ?? this.accountId,
       recordId: recordId ?? this.recordId,
       schemaVersion: schemaVersion ?? this.schemaVersion,
@@ -1111,7 +1113,7 @@ class FocusSessionsCompanion extends UpdateCompanion<FocusSession> {
 
   @override
   String toString() {
-    return (StringBuffer('FocusSessionsCompanion(')
+    return (StringBuffer('_FocusSessionsCompanion(')
           ..write('accountId: $accountId, ')
           ..write('recordId: $recordId, ')
           ..write('schemaVersion: $schemaVersion, ')
@@ -1124,11 +1126,12 @@ class FocusSessionsCompanion extends UpdateCompanion<FocusSession> {
   }
 }
 
-class $CheckInsTable extends CheckIns with TableInfo<$CheckInsTable, CheckIn> {
+class $_CheckInsTable extends _CheckIns
+    with TableInfo<$_CheckInsTable, _CheckIn> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  $CheckInsTable(this.attachedDatabase, [this._alias]);
+  $_CheckInsTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _accountIdMeta =
       const VerificationMeta('accountId');
   @override
@@ -1180,7 +1183,7 @@ class $CheckInsTable extends CheckIns with TableInfo<$CheckInsTable, CheckIn> {
   String get actualTableName => $name;
   static const String $name = 'check_ins';
   @override
-  VerificationContext validateIntegrity(Insertable<CheckIn> instance,
+  VerificationContext validateIntegrity(Insertable<_CheckIn> instance,
       {bool isInserting = false}) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
@@ -1232,9 +1235,9 @@ class $CheckInsTable extends CheckIns with TableInfo<$CheckInsTable, CheckIn> {
   @override
   Set<GeneratedColumn> get $primaryKey => {accountId, recordId};
   @override
-  CheckIn map(Map<String, dynamic> data, {String? tablePrefix}) {
+  _CheckIn map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return CheckIn(
+    return _CheckIn(
       accountId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}account_id'])!,
       recordId: attachedDatabase.typeMapping
@@ -1251,19 +1254,19 @@ class $CheckInsTable extends CheckIns with TableInfo<$CheckInsTable, CheckIn> {
   }
 
   @override
-  $CheckInsTable createAlias(String alias) {
-    return $CheckInsTable(attachedDatabase, alias);
+  $_CheckInsTable createAlias(String alias) {
+    return $_CheckInsTable(attachedDatabase, alias);
   }
 }
 
-class CheckIn extends DataClass implements Insertable<CheckIn> {
+class _CheckIn extends DataClass implements Insertable<_CheckIn> {
   final String accountId;
   final String recordId;
   final int schemaVersion;
   final Uint8List payloadNonce;
   final Uint8List payloadCiphertext;
   final DateTime updatedAt;
-  const CheckIn(
+  const _CheckIn(
       {required this.accountId,
       required this.recordId,
       required this.schemaVersion,
@@ -1282,8 +1285,8 @@ class CheckIn extends DataClass implements Insertable<CheckIn> {
     return map;
   }
 
-  CheckInsCompanion toCompanion(bool nullToAbsent) {
-    return CheckInsCompanion(
+  _CheckInsCompanion toCompanion(bool nullToAbsent) {
+    return _CheckInsCompanion(
       accountId: Value(accountId),
       recordId: Value(recordId),
       schemaVersion: Value(schemaVersion),
@@ -1293,10 +1296,10 @@ class CheckIn extends DataClass implements Insertable<CheckIn> {
     );
   }
 
-  factory CheckIn.fromJson(Map<String, dynamic> json,
+  factory _CheckIn.fromJson(Map<String, dynamic> json,
       {ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return CheckIn(
+    return _CheckIn(
       accountId: serializer.fromJson<String>(json['accountId']),
       recordId: serializer.fromJson<String>(json['recordId']),
       schemaVersion: serializer.fromJson<int>(json['schemaVersion']),
@@ -1319,14 +1322,14 @@ class CheckIn extends DataClass implements Insertable<CheckIn> {
     };
   }
 
-  CheckIn copyWith(
+  _CheckIn copyWith(
           {String? accountId,
           String? recordId,
           int? schemaVersion,
           Uint8List? payloadNonce,
           Uint8List? payloadCiphertext,
           DateTime? updatedAt}) =>
-      CheckIn(
+      _CheckIn(
         accountId: accountId ?? this.accountId,
         recordId: recordId ?? this.recordId,
         schemaVersion: schemaVersion ?? this.schemaVersion,
@@ -1334,8 +1337,8 @@ class CheckIn extends DataClass implements Insertable<CheckIn> {
         payloadCiphertext: payloadCiphertext ?? this.payloadCiphertext,
         updatedAt: updatedAt ?? this.updatedAt,
       );
-  CheckIn copyWithCompanion(CheckInsCompanion data) {
-    return CheckIn(
+  _CheckIn copyWithCompanion(_CheckInsCompanion data) {
+    return _CheckIn(
       accountId: data.accountId.present ? data.accountId.value : this.accountId,
       recordId: data.recordId.present ? data.recordId.value : this.recordId,
       schemaVersion: data.schemaVersion.present
@@ -1353,7 +1356,7 @@ class CheckIn extends DataClass implements Insertable<CheckIn> {
 
   @override
   String toString() {
-    return (StringBuffer('CheckIn(')
+    return (StringBuffer('_CheckIn(')
           ..write('accountId: $accountId, ')
           ..write('recordId: $recordId, ')
           ..write('schemaVersion: $schemaVersion, ')
@@ -1375,7 +1378,7 @@ class CheckIn extends DataClass implements Insertable<CheckIn> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is CheckIn &&
+      (other is _CheckIn &&
           other.accountId == this.accountId &&
           other.recordId == this.recordId &&
           other.schemaVersion == this.schemaVersion &&
@@ -1385,7 +1388,7 @@ class CheckIn extends DataClass implements Insertable<CheckIn> {
           other.updatedAt == this.updatedAt);
 }
 
-class CheckInsCompanion extends UpdateCompanion<CheckIn> {
+class _CheckInsCompanion extends UpdateCompanion<_CheckIn> {
   final Value<String> accountId;
   final Value<String> recordId;
   final Value<int> schemaVersion;
@@ -1393,7 +1396,7 @@ class CheckInsCompanion extends UpdateCompanion<CheckIn> {
   final Value<Uint8List> payloadCiphertext;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
-  const CheckInsCompanion({
+  const _CheckInsCompanion({
     this.accountId = const Value.absent(),
     this.recordId = const Value.absent(),
     this.schemaVersion = const Value.absent(),
@@ -1402,7 +1405,7 @@ class CheckInsCompanion extends UpdateCompanion<CheckIn> {
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
-  CheckInsCompanion.insert({
+  _CheckInsCompanion.insert({
     required String accountId,
     required String recordId,
     required int schemaVersion,
@@ -1416,7 +1419,7 @@ class CheckInsCompanion extends UpdateCompanion<CheckIn> {
         payloadNonce = Value(payloadNonce),
         payloadCiphertext = Value(payloadCiphertext),
         updatedAt = Value(updatedAt);
-  static Insertable<CheckIn> custom({
+  static Insertable<_CheckIn> custom({
     Expression<String>? accountId,
     Expression<String>? recordId,
     Expression<int>? schemaVersion,
@@ -1436,7 +1439,7 @@ class CheckInsCompanion extends UpdateCompanion<CheckIn> {
     });
   }
 
-  CheckInsCompanion copyWith(
+  _CheckInsCompanion copyWith(
       {Value<String>? accountId,
       Value<String>? recordId,
       Value<int>? schemaVersion,
@@ -1444,7 +1447,7 @@ class CheckInsCompanion extends UpdateCompanion<CheckIn> {
       Value<Uint8List>? payloadCiphertext,
       Value<DateTime>? updatedAt,
       Value<int>? rowid}) {
-    return CheckInsCompanion(
+    return _CheckInsCompanion(
       accountId: accountId ?? this.accountId,
       recordId: recordId ?? this.recordId,
       schemaVersion: schemaVersion ?? this.schemaVersion,
@@ -1484,7 +1487,7 @@ class CheckInsCompanion extends UpdateCompanion<CheckIn> {
 
   @override
   String toString() {
-    return (StringBuffer('CheckInsCompanion(')
+    return (StringBuffer('_CheckInsCompanion(')
           ..write('accountId: $accountId, ')
           ..write('recordId: $recordId, ')
           ..write('schemaVersion: $schemaVersion, ')
@@ -1497,12 +1500,12 @@ class CheckInsCompanion extends UpdateCompanion<CheckIn> {
   }
 }
 
-class $PendingOperationsTable extends PendingOperations
-    with TableInfo<$PendingOperationsTable, PendingOperation> {
+class $_PendingOperationsTable extends _PendingOperations
+    with TableInfo<$_PendingOperationsTable, _PendingOperation> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  $PendingOperationsTable(this.attachedDatabase, [this._alias]);
+  $_PendingOperationsTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _accountIdMeta =
       const VerificationMeta('accountId');
   @override
@@ -1594,7 +1597,7 @@ class $PendingOperationsTable extends PendingOperations
   String get actualTableName => $name;
   static const String $name = 'pending_operations';
   @override
-  VerificationContext validateIntegrity(Insertable<PendingOperation> instance,
+  VerificationContext validateIntegrity(Insertable<_PendingOperation> instance,
       {bool isInserting = false}) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
@@ -1684,9 +1687,9 @@ class $PendingOperationsTable extends PendingOperations
   @override
   Set<GeneratedColumn> get $primaryKey => {accountId, operationId};
   @override
-  PendingOperation map(Map<String, dynamic> data, {String? tablePrefix}) {
+  _PendingOperation map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return PendingOperation(
+    return _PendingOperation(
       accountId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}account_id'])!,
       operationId: attachedDatabase.typeMapping
@@ -1713,13 +1716,13 @@ class $PendingOperationsTable extends PendingOperations
   }
 
   @override
-  $PendingOperationsTable createAlias(String alias) {
-    return $PendingOperationsTable(attachedDatabase, alias);
+  $_PendingOperationsTable createAlias(String alias) {
+    return $_PendingOperationsTable(attachedDatabase, alias);
   }
 }
 
-class PendingOperation extends DataClass
-    implements Insertable<PendingOperation> {
+class _PendingOperation extends DataClass
+    implements Insertable<_PendingOperation> {
   final String accountId;
   final String operationId;
   final String recordId;
@@ -1731,7 +1734,7 @@ class PendingOperation extends DataClass
   final bool isTombstone;
   final int schemaVersion;
   final DateTime enqueuedAt;
-  const PendingOperation(
+  const _PendingOperation(
       {required this.accountId,
       required this.operationId,
       required this.recordId,
@@ -1760,8 +1763,8 @@ class PendingOperation extends DataClass
     return map;
   }
 
-  PendingOperationsCompanion toCompanion(bool nullToAbsent) {
-    return PendingOperationsCompanion(
+  _PendingOperationsCompanion toCompanion(bool nullToAbsent) {
+    return _PendingOperationsCompanion(
       accountId: Value(accountId),
       operationId: Value(operationId),
       recordId: Value(recordId),
@@ -1776,10 +1779,10 @@ class PendingOperation extends DataClass
     );
   }
 
-  factory PendingOperation.fromJson(Map<String, dynamic> json,
+  factory _PendingOperation.fromJson(Map<String, dynamic> json,
       {ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return PendingOperation(
+    return _PendingOperation(
       accountId: serializer.fromJson<String>(json['accountId']),
       operationId: serializer.fromJson<String>(json['operationId']),
       recordId: serializer.fromJson<String>(json['recordId']),
@@ -1812,7 +1815,7 @@ class PendingOperation extends DataClass
     };
   }
 
-  PendingOperation copyWith(
+  _PendingOperation copyWith(
           {String? accountId,
           String? operationId,
           String? recordId,
@@ -1824,7 +1827,7 @@ class PendingOperation extends DataClass
           bool? isTombstone,
           int? schemaVersion,
           DateTime? enqueuedAt}) =>
-      PendingOperation(
+      _PendingOperation(
         accountId: accountId ?? this.accountId,
         operationId: operationId ?? this.operationId,
         recordId: recordId ?? this.recordId,
@@ -1837,8 +1840,8 @@ class PendingOperation extends DataClass
         schemaVersion: schemaVersion ?? this.schemaVersion,
         enqueuedAt: enqueuedAt ?? this.enqueuedAt,
       );
-  PendingOperation copyWithCompanion(PendingOperationsCompanion data) {
-    return PendingOperation(
+  _PendingOperation copyWithCompanion(_PendingOperationsCompanion data) {
+    return _PendingOperation(
       accountId: data.accountId.present ? data.accountId.value : this.accountId,
       operationId:
           data.operationId.present ? data.operationId.value : this.operationId,
@@ -1867,7 +1870,7 @@ class PendingOperation extends DataClass
 
   @override
   String toString() {
-    return (StringBuffer('PendingOperation(')
+    return (StringBuffer('_PendingOperation(')
           ..write('accountId: $accountId, ')
           ..write('operationId: $operationId, ')
           ..write('recordId: $recordId, ')
@@ -1899,7 +1902,7 @@ class PendingOperation extends DataClass
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is PendingOperation &&
+      (other is _PendingOperation &&
           other.accountId == this.accountId &&
           other.operationId == this.operationId &&
           other.recordId == this.recordId &&
@@ -1914,7 +1917,7 @@ class PendingOperation extends DataClass
           other.enqueuedAt == this.enqueuedAt);
 }
 
-class PendingOperationsCompanion extends UpdateCompanion<PendingOperation> {
+class _PendingOperationsCompanion extends UpdateCompanion<_PendingOperation> {
   final Value<String> accountId;
   final Value<String> operationId;
   final Value<String> recordId;
@@ -1927,7 +1930,7 @@ class PendingOperationsCompanion extends UpdateCompanion<PendingOperation> {
   final Value<int> schemaVersion;
   final Value<DateTime> enqueuedAt;
   final Value<int> rowid;
-  const PendingOperationsCompanion({
+  const _PendingOperationsCompanion({
     this.accountId = const Value.absent(),
     this.operationId = const Value.absent(),
     this.recordId = const Value.absent(),
@@ -1941,7 +1944,7 @@ class PendingOperationsCompanion extends UpdateCompanion<PendingOperation> {
     this.enqueuedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
-  PendingOperationsCompanion.insert({
+  _PendingOperationsCompanion.insert({
     required String accountId,
     required String operationId,
     required String recordId,
@@ -1964,7 +1967,7 @@ class PendingOperationsCompanion extends UpdateCompanion<PendingOperation> {
         payloadCiphertext = Value(payloadCiphertext),
         isTombstone = Value(isTombstone),
         schemaVersion = Value(schemaVersion);
-  static Insertable<PendingOperation> custom({
+  static Insertable<_PendingOperation> custom({
     Expression<String>? accountId,
     Expression<String>? operationId,
     Expression<String>? recordId,
@@ -1994,7 +1997,7 @@ class PendingOperationsCompanion extends UpdateCompanion<PendingOperation> {
     });
   }
 
-  PendingOperationsCompanion copyWith(
+  _PendingOperationsCompanion copyWith(
       {Value<String>? accountId,
       Value<String>? operationId,
       Value<String>? recordId,
@@ -2007,7 +2010,7 @@ class PendingOperationsCompanion extends UpdateCompanion<PendingOperation> {
       Value<int>? schemaVersion,
       Value<DateTime>? enqueuedAt,
       Value<int>? rowid}) {
-    return PendingOperationsCompanion(
+    return _PendingOperationsCompanion(
       accountId: accountId ?? this.accountId,
       operationId: operationId ?? this.operationId,
       recordId: recordId ?? this.recordId,
@@ -2067,7 +2070,7 @@ class PendingOperationsCompanion extends UpdateCompanion<PendingOperation> {
 
   @override
   String toString() {
-    return (StringBuffer('PendingOperationsCompanion(')
+    return (StringBuffer('_PendingOperationsCompanion(')
           ..write('accountId: $accountId, ')
           ..write('operationId: $operationId, ')
           ..write('recordId: $recordId, ')
@@ -2085,15 +2088,15 @@ class PendingOperationsCompanion extends UpdateCompanion<PendingOperation> {
   }
 }
 
-abstract class _$AppDatabase extends GeneratedDatabase {
-  _$AppDatabase(QueryExecutor e) : super(e);
-  $AppDatabaseManager get managers => $AppDatabaseManager(this);
-  late final $TasksTable tasks = $TasksTable(this);
-  late final $ScheduleBlocksTable scheduleBlocks = $ScheduleBlocksTable(this);
-  late final $FocusSessionsTable focusSessions = $FocusSessionsTable(this);
-  late final $CheckInsTable checkIns = $CheckInsTable(this);
-  late final $PendingOperationsTable pendingOperations =
-      $PendingOperationsTable(this);
+abstract class _$_AccountDatabase extends GeneratedDatabase {
+  _$_AccountDatabase(QueryExecutor e) : super(e);
+  $_AccountDatabaseManager get managers => $_AccountDatabaseManager(this);
+  late final $_TasksTable tasks = $_TasksTable(this);
+  late final $_ScheduleBlocksTable scheduleBlocks = $_ScheduleBlocksTable(this);
+  late final $_FocusSessionsTable focusSessions = $_FocusSessionsTable(this);
+  late final $_CheckInsTable checkIns = $_CheckInsTable(this);
+  late final $_PendingOperationsTable pendingOperations =
+      $_PendingOperationsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2102,7 +2105,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       [tasks, scheduleBlocks, focusSessions, checkIns, pendingOperations];
 }
 
-typedef $$TasksTableCreateCompanionBuilder = TasksCompanion Function({
+typedef $$_TasksTableCreateCompanionBuilder = _TasksCompanion Function({
   required String accountId,
   required String recordId,
   required int schemaVersion,
@@ -2111,7 +2114,7 @@ typedef $$TasksTableCreateCompanionBuilder = TasksCompanion Function({
   required DateTime updatedAt,
   Value<int> rowid,
 });
-typedef $$TasksTableUpdateCompanionBuilder = TasksCompanion Function({
+typedef $$_TasksTableUpdateCompanionBuilder = _TasksCompanion Function({
   Value<String> accountId,
   Value<String> recordId,
   Value<int> schemaVersion,
@@ -2121,8 +2124,9 @@ typedef $$TasksTableUpdateCompanionBuilder = TasksCompanion Function({
   Value<int> rowid,
 });
 
-class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
-  $$TasksTableFilterComposer({
+class $$_TasksTableFilterComposer
+    extends Composer<_$_AccountDatabase, $_TasksTable> {
+  $$_TasksTableFilterComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -2149,9 +2153,9 @@ class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
       column: $table.updatedAt, builder: (column) => ColumnFilters(column));
 }
 
-class $$TasksTableOrderingComposer
-    extends Composer<_$AppDatabase, $TasksTable> {
-  $$TasksTableOrderingComposer({
+class $$_TasksTableOrderingComposer
+    extends Composer<_$_AccountDatabase, $_TasksTable> {
+  $$_TasksTableOrderingComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -2180,9 +2184,9 @@ class $$TasksTableOrderingComposer
       column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
 }
 
-class $$TasksTableAnnotationComposer
-    extends Composer<_$AppDatabase, $TasksTable> {
-  $$TasksTableAnnotationComposer({
+class $$_TasksTableAnnotationComposer
+    extends Composer<_$_AccountDatabase, $_TasksTable> {
+  $$_TasksTableAnnotationComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -2208,28 +2212,28 @@ class $$TasksTableAnnotationComposer
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 }
 
-class $$TasksTableTableManager extends RootTableManager<
-    _$AppDatabase,
-    $TasksTable,
-    Task,
-    $$TasksTableFilterComposer,
-    $$TasksTableOrderingComposer,
-    $$TasksTableAnnotationComposer,
-    $$TasksTableCreateCompanionBuilder,
-    $$TasksTableUpdateCompanionBuilder,
-    (Task, BaseReferences<_$AppDatabase, $TasksTable, Task>),
-    Task,
+class $$_TasksTableTableManager extends RootTableManager<
+    _$_AccountDatabase,
+    $_TasksTable,
+    _Task,
+    $$_TasksTableFilterComposer,
+    $$_TasksTableOrderingComposer,
+    $$_TasksTableAnnotationComposer,
+    $$_TasksTableCreateCompanionBuilder,
+    $$_TasksTableUpdateCompanionBuilder,
+    (_Task, BaseReferences<_$_AccountDatabase, $_TasksTable, _Task>),
+    _Task,
     PrefetchHooks Function()> {
-  $$TasksTableTableManager(_$AppDatabase db, $TasksTable table)
+  $$_TasksTableTableManager(_$_AccountDatabase db, $_TasksTable table)
       : super(TableManagerState(
           db: db,
           table: table,
           createFilteringComposer: () =>
-              $$TasksTableFilterComposer($db: db, $table: table),
+              $$_TasksTableFilterComposer($db: db, $table: table),
           createOrderingComposer: () =>
-              $$TasksTableOrderingComposer($db: db, $table: table),
+              $$_TasksTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
-              $$TasksTableAnnotationComposer($db: db, $table: table),
+              $$_TasksTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback: ({
             Value<String> accountId = const Value.absent(),
             Value<String> recordId = const Value.absent(),
@@ -2239,7 +2243,7 @@ class $$TasksTableTableManager extends RootTableManager<
             Value<DateTime> updatedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
-              TasksCompanion(
+              _TasksCompanion(
             accountId: accountId,
             recordId: recordId,
             schemaVersion: schemaVersion,
@@ -2257,7 +2261,7 @@ class $$TasksTableTableManager extends RootTableManager<
             required DateTime updatedAt,
             Value<int> rowid = const Value.absent(),
           }) =>
-              TasksCompanion.insert(
+              _TasksCompanion.insert(
             accountId: accountId,
             recordId: recordId,
             schemaVersion: schemaVersion,
@@ -2273,19 +2277,19 @@ class $$TasksTableTableManager extends RootTableManager<
         ));
 }
 
-typedef $$TasksTableProcessedTableManager = ProcessedTableManager<
-    _$AppDatabase,
-    $TasksTable,
-    Task,
-    $$TasksTableFilterComposer,
-    $$TasksTableOrderingComposer,
-    $$TasksTableAnnotationComposer,
-    $$TasksTableCreateCompanionBuilder,
-    $$TasksTableUpdateCompanionBuilder,
-    (Task, BaseReferences<_$AppDatabase, $TasksTable, Task>),
-    Task,
+typedef $$_TasksTableProcessedTableManager = ProcessedTableManager<
+    _$_AccountDatabase,
+    $_TasksTable,
+    _Task,
+    $$_TasksTableFilterComposer,
+    $$_TasksTableOrderingComposer,
+    $$_TasksTableAnnotationComposer,
+    $$_TasksTableCreateCompanionBuilder,
+    $$_TasksTableUpdateCompanionBuilder,
+    (_Task, BaseReferences<_$_AccountDatabase, $_TasksTable, _Task>),
+    _Task,
     PrefetchHooks Function()>;
-typedef $$ScheduleBlocksTableCreateCompanionBuilder = ScheduleBlocksCompanion
+typedef $$_ScheduleBlocksTableCreateCompanionBuilder = _ScheduleBlocksCompanion
     Function({
   required String accountId,
   required String recordId,
@@ -2295,7 +2299,7 @@ typedef $$ScheduleBlocksTableCreateCompanionBuilder = ScheduleBlocksCompanion
   required DateTime updatedAt,
   Value<int> rowid,
 });
-typedef $$ScheduleBlocksTableUpdateCompanionBuilder = ScheduleBlocksCompanion
+typedef $$_ScheduleBlocksTableUpdateCompanionBuilder = _ScheduleBlocksCompanion
     Function({
   Value<String> accountId,
   Value<String> recordId,
@@ -2306,9 +2310,9 @@ typedef $$ScheduleBlocksTableUpdateCompanionBuilder = ScheduleBlocksCompanion
   Value<int> rowid,
 });
 
-class $$ScheduleBlocksTableFilterComposer
-    extends Composer<_$AppDatabase, $ScheduleBlocksTable> {
-  $$ScheduleBlocksTableFilterComposer({
+class $$_ScheduleBlocksTableFilterComposer
+    extends Composer<_$_AccountDatabase, $_ScheduleBlocksTable> {
+  $$_ScheduleBlocksTableFilterComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -2335,9 +2339,9 @@ class $$ScheduleBlocksTableFilterComposer
       column: $table.updatedAt, builder: (column) => ColumnFilters(column));
 }
 
-class $$ScheduleBlocksTableOrderingComposer
-    extends Composer<_$AppDatabase, $ScheduleBlocksTable> {
-  $$ScheduleBlocksTableOrderingComposer({
+class $$_ScheduleBlocksTableOrderingComposer
+    extends Composer<_$_AccountDatabase, $_ScheduleBlocksTable> {
+  $$_ScheduleBlocksTableOrderingComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -2366,9 +2370,9 @@ class $$ScheduleBlocksTableOrderingComposer
       column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
 }
 
-class $$ScheduleBlocksTableAnnotationComposer
-    extends Composer<_$AppDatabase, $ScheduleBlocksTable> {
-  $$ScheduleBlocksTableAnnotationComposer({
+class $$_ScheduleBlocksTableAnnotationComposer
+    extends Composer<_$_AccountDatabase, $_ScheduleBlocksTable> {
+  $$_ScheduleBlocksTableAnnotationComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -2394,32 +2398,32 @@ class $$ScheduleBlocksTableAnnotationComposer
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 }
 
-class $$ScheduleBlocksTableTableManager extends RootTableManager<
-    _$AppDatabase,
-    $ScheduleBlocksTable,
-    ScheduleBlock,
-    $$ScheduleBlocksTableFilterComposer,
-    $$ScheduleBlocksTableOrderingComposer,
-    $$ScheduleBlocksTableAnnotationComposer,
-    $$ScheduleBlocksTableCreateCompanionBuilder,
-    $$ScheduleBlocksTableUpdateCompanionBuilder,
+class $$_ScheduleBlocksTableTableManager extends RootTableManager<
+    _$_AccountDatabase,
+    $_ScheduleBlocksTable,
+    _ScheduleBlock,
+    $$_ScheduleBlocksTableFilterComposer,
+    $$_ScheduleBlocksTableOrderingComposer,
+    $$_ScheduleBlocksTableAnnotationComposer,
+    $$_ScheduleBlocksTableCreateCompanionBuilder,
+    $$_ScheduleBlocksTableUpdateCompanionBuilder,
     (
-      ScheduleBlock,
-      BaseReferences<_$AppDatabase, $ScheduleBlocksTable, ScheduleBlock>
+      _ScheduleBlock,
+      BaseReferences<_$_AccountDatabase, $_ScheduleBlocksTable, _ScheduleBlock>
     ),
-    ScheduleBlock,
+    _ScheduleBlock,
     PrefetchHooks Function()> {
-  $$ScheduleBlocksTableTableManager(
-      _$AppDatabase db, $ScheduleBlocksTable table)
+  $$_ScheduleBlocksTableTableManager(
+      _$_AccountDatabase db, $_ScheduleBlocksTable table)
       : super(TableManagerState(
           db: db,
           table: table,
           createFilteringComposer: () =>
-              $$ScheduleBlocksTableFilterComposer($db: db, $table: table),
+              $$_ScheduleBlocksTableFilterComposer($db: db, $table: table),
           createOrderingComposer: () =>
-              $$ScheduleBlocksTableOrderingComposer($db: db, $table: table),
+              $$_ScheduleBlocksTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
-              $$ScheduleBlocksTableAnnotationComposer($db: db, $table: table),
+              $$_ScheduleBlocksTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback: ({
             Value<String> accountId = const Value.absent(),
             Value<String> recordId = const Value.absent(),
@@ -2429,7 +2433,7 @@ class $$ScheduleBlocksTableTableManager extends RootTableManager<
             Value<DateTime> updatedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
-              ScheduleBlocksCompanion(
+              _ScheduleBlocksCompanion(
             accountId: accountId,
             recordId: recordId,
             schemaVersion: schemaVersion,
@@ -2447,7 +2451,7 @@ class $$ScheduleBlocksTableTableManager extends RootTableManager<
             required DateTime updatedAt,
             Value<int> rowid = const Value.absent(),
           }) =>
-              ScheduleBlocksCompanion.insert(
+              _ScheduleBlocksCompanion.insert(
             accountId: accountId,
             recordId: recordId,
             schemaVersion: schemaVersion,
@@ -2463,22 +2467,22 @@ class $$ScheduleBlocksTableTableManager extends RootTableManager<
         ));
 }
 
-typedef $$ScheduleBlocksTableProcessedTableManager = ProcessedTableManager<
-    _$AppDatabase,
-    $ScheduleBlocksTable,
-    ScheduleBlock,
-    $$ScheduleBlocksTableFilterComposer,
-    $$ScheduleBlocksTableOrderingComposer,
-    $$ScheduleBlocksTableAnnotationComposer,
-    $$ScheduleBlocksTableCreateCompanionBuilder,
-    $$ScheduleBlocksTableUpdateCompanionBuilder,
+typedef $$_ScheduleBlocksTableProcessedTableManager = ProcessedTableManager<
+    _$_AccountDatabase,
+    $_ScheduleBlocksTable,
+    _ScheduleBlock,
+    $$_ScheduleBlocksTableFilterComposer,
+    $$_ScheduleBlocksTableOrderingComposer,
+    $$_ScheduleBlocksTableAnnotationComposer,
+    $$_ScheduleBlocksTableCreateCompanionBuilder,
+    $$_ScheduleBlocksTableUpdateCompanionBuilder,
     (
-      ScheduleBlock,
-      BaseReferences<_$AppDatabase, $ScheduleBlocksTable, ScheduleBlock>
+      _ScheduleBlock,
+      BaseReferences<_$_AccountDatabase, $_ScheduleBlocksTable, _ScheduleBlock>
     ),
-    ScheduleBlock,
+    _ScheduleBlock,
     PrefetchHooks Function()>;
-typedef $$FocusSessionsTableCreateCompanionBuilder = FocusSessionsCompanion
+typedef $$_FocusSessionsTableCreateCompanionBuilder = _FocusSessionsCompanion
     Function({
   required String accountId,
   required String recordId,
@@ -2488,7 +2492,7 @@ typedef $$FocusSessionsTableCreateCompanionBuilder = FocusSessionsCompanion
   required DateTime updatedAt,
   Value<int> rowid,
 });
-typedef $$FocusSessionsTableUpdateCompanionBuilder = FocusSessionsCompanion
+typedef $$_FocusSessionsTableUpdateCompanionBuilder = _FocusSessionsCompanion
     Function({
   Value<String> accountId,
   Value<String> recordId,
@@ -2499,9 +2503,9 @@ typedef $$FocusSessionsTableUpdateCompanionBuilder = FocusSessionsCompanion
   Value<int> rowid,
 });
 
-class $$FocusSessionsTableFilterComposer
-    extends Composer<_$AppDatabase, $FocusSessionsTable> {
-  $$FocusSessionsTableFilterComposer({
+class $$_FocusSessionsTableFilterComposer
+    extends Composer<_$_AccountDatabase, $_FocusSessionsTable> {
+  $$_FocusSessionsTableFilterComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -2528,9 +2532,9 @@ class $$FocusSessionsTableFilterComposer
       column: $table.updatedAt, builder: (column) => ColumnFilters(column));
 }
 
-class $$FocusSessionsTableOrderingComposer
-    extends Composer<_$AppDatabase, $FocusSessionsTable> {
-  $$FocusSessionsTableOrderingComposer({
+class $$_FocusSessionsTableOrderingComposer
+    extends Composer<_$_AccountDatabase, $_FocusSessionsTable> {
+  $$_FocusSessionsTableOrderingComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -2559,9 +2563,9 @@ class $$FocusSessionsTableOrderingComposer
       column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
 }
 
-class $$FocusSessionsTableAnnotationComposer
-    extends Composer<_$AppDatabase, $FocusSessionsTable> {
-  $$FocusSessionsTableAnnotationComposer({
+class $$_FocusSessionsTableAnnotationComposer
+    extends Composer<_$_AccountDatabase, $_FocusSessionsTable> {
+  $$_FocusSessionsTableAnnotationComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -2587,31 +2591,32 @@ class $$FocusSessionsTableAnnotationComposer
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 }
 
-class $$FocusSessionsTableTableManager extends RootTableManager<
-    _$AppDatabase,
-    $FocusSessionsTable,
-    FocusSession,
-    $$FocusSessionsTableFilterComposer,
-    $$FocusSessionsTableOrderingComposer,
-    $$FocusSessionsTableAnnotationComposer,
-    $$FocusSessionsTableCreateCompanionBuilder,
-    $$FocusSessionsTableUpdateCompanionBuilder,
+class $$_FocusSessionsTableTableManager extends RootTableManager<
+    _$_AccountDatabase,
+    $_FocusSessionsTable,
+    _FocusSession,
+    $$_FocusSessionsTableFilterComposer,
+    $$_FocusSessionsTableOrderingComposer,
+    $$_FocusSessionsTableAnnotationComposer,
+    $$_FocusSessionsTableCreateCompanionBuilder,
+    $$_FocusSessionsTableUpdateCompanionBuilder,
     (
-      FocusSession,
-      BaseReferences<_$AppDatabase, $FocusSessionsTable, FocusSession>
+      _FocusSession,
+      BaseReferences<_$_AccountDatabase, $_FocusSessionsTable, _FocusSession>
     ),
-    FocusSession,
+    _FocusSession,
     PrefetchHooks Function()> {
-  $$FocusSessionsTableTableManager(_$AppDatabase db, $FocusSessionsTable table)
+  $$_FocusSessionsTableTableManager(
+      _$_AccountDatabase db, $_FocusSessionsTable table)
       : super(TableManagerState(
           db: db,
           table: table,
           createFilteringComposer: () =>
-              $$FocusSessionsTableFilterComposer($db: db, $table: table),
+              $$_FocusSessionsTableFilterComposer($db: db, $table: table),
           createOrderingComposer: () =>
-              $$FocusSessionsTableOrderingComposer($db: db, $table: table),
+              $$_FocusSessionsTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
-              $$FocusSessionsTableAnnotationComposer($db: db, $table: table),
+              $$_FocusSessionsTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback: ({
             Value<String> accountId = const Value.absent(),
             Value<String> recordId = const Value.absent(),
@@ -2621,7 +2626,7 @@ class $$FocusSessionsTableTableManager extends RootTableManager<
             Value<DateTime> updatedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
-              FocusSessionsCompanion(
+              _FocusSessionsCompanion(
             accountId: accountId,
             recordId: recordId,
             schemaVersion: schemaVersion,
@@ -2639,7 +2644,7 @@ class $$FocusSessionsTableTableManager extends RootTableManager<
             required DateTime updatedAt,
             Value<int> rowid = const Value.absent(),
           }) =>
-              FocusSessionsCompanion.insert(
+              _FocusSessionsCompanion.insert(
             accountId: accountId,
             recordId: recordId,
             schemaVersion: schemaVersion,
@@ -2655,22 +2660,22 @@ class $$FocusSessionsTableTableManager extends RootTableManager<
         ));
 }
 
-typedef $$FocusSessionsTableProcessedTableManager = ProcessedTableManager<
-    _$AppDatabase,
-    $FocusSessionsTable,
-    FocusSession,
-    $$FocusSessionsTableFilterComposer,
-    $$FocusSessionsTableOrderingComposer,
-    $$FocusSessionsTableAnnotationComposer,
-    $$FocusSessionsTableCreateCompanionBuilder,
-    $$FocusSessionsTableUpdateCompanionBuilder,
+typedef $$_FocusSessionsTableProcessedTableManager = ProcessedTableManager<
+    _$_AccountDatabase,
+    $_FocusSessionsTable,
+    _FocusSession,
+    $$_FocusSessionsTableFilterComposer,
+    $$_FocusSessionsTableOrderingComposer,
+    $$_FocusSessionsTableAnnotationComposer,
+    $$_FocusSessionsTableCreateCompanionBuilder,
+    $$_FocusSessionsTableUpdateCompanionBuilder,
     (
-      FocusSession,
-      BaseReferences<_$AppDatabase, $FocusSessionsTable, FocusSession>
+      _FocusSession,
+      BaseReferences<_$_AccountDatabase, $_FocusSessionsTable, _FocusSession>
     ),
-    FocusSession,
+    _FocusSession,
     PrefetchHooks Function()>;
-typedef $$CheckInsTableCreateCompanionBuilder = CheckInsCompanion Function({
+typedef $$_CheckInsTableCreateCompanionBuilder = _CheckInsCompanion Function({
   required String accountId,
   required String recordId,
   required int schemaVersion,
@@ -2679,7 +2684,7 @@ typedef $$CheckInsTableCreateCompanionBuilder = CheckInsCompanion Function({
   required DateTime updatedAt,
   Value<int> rowid,
 });
-typedef $$CheckInsTableUpdateCompanionBuilder = CheckInsCompanion Function({
+typedef $$_CheckInsTableUpdateCompanionBuilder = _CheckInsCompanion Function({
   Value<String> accountId,
   Value<String> recordId,
   Value<int> schemaVersion,
@@ -2689,9 +2694,9 @@ typedef $$CheckInsTableUpdateCompanionBuilder = CheckInsCompanion Function({
   Value<int> rowid,
 });
 
-class $$CheckInsTableFilterComposer
-    extends Composer<_$AppDatabase, $CheckInsTable> {
-  $$CheckInsTableFilterComposer({
+class $$_CheckInsTableFilterComposer
+    extends Composer<_$_AccountDatabase, $_CheckInsTable> {
+  $$_CheckInsTableFilterComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -2718,9 +2723,9 @@ class $$CheckInsTableFilterComposer
       column: $table.updatedAt, builder: (column) => ColumnFilters(column));
 }
 
-class $$CheckInsTableOrderingComposer
-    extends Composer<_$AppDatabase, $CheckInsTable> {
-  $$CheckInsTableOrderingComposer({
+class $$_CheckInsTableOrderingComposer
+    extends Composer<_$_AccountDatabase, $_CheckInsTable> {
+  $$_CheckInsTableOrderingComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -2749,9 +2754,9 @@ class $$CheckInsTableOrderingComposer
       column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
 }
 
-class $$CheckInsTableAnnotationComposer
-    extends Composer<_$AppDatabase, $CheckInsTable> {
-  $$CheckInsTableAnnotationComposer({
+class $$_CheckInsTableAnnotationComposer
+    extends Composer<_$_AccountDatabase, $_CheckInsTable> {
+  $$_CheckInsTableAnnotationComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -2777,28 +2782,28 @@ class $$CheckInsTableAnnotationComposer
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 }
 
-class $$CheckInsTableTableManager extends RootTableManager<
-    _$AppDatabase,
-    $CheckInsTable,
-    CheckIn,
-    $$CheckInsTableFilterComposer,
-    $$CheckInsTableOrderingComposer,
-    $$CheckInsTableAnnotationComposer,
-    $$CheckInsTableCreateCompanionBuilder,
-    $$CheckInsTableUpdateCompanionBuilder,
-    (CheckIn, BaseReferences<_$AppDatabase, $CheckInsTable, CheckIn>),
-    CheckIn,
+class $$_CheckInsTableTableManager extends RootTableManager<
+    _$_AccountDatabase,
+    $_CheckInsTable,
+    _CheckIn,
+    $$_CheckInsTableFilterComposer,
+    $$_CheckInsTableOrderingComposer,
+    $$_CheckInsTableAnnotationComposer,
+    $$_CheckInsTableCreateCompanionBuilder,
+    $$_CheckInsTableUpdateCompanionBuilder,
+    (_CheckIn, BaseReferences<_$_AccountDatabase, $_CheckInsTable, _CheckIn>),
+    _CheckIn,
     PrefetchHooks Function()> {
-  $$CheckInsTableTableManager(_$AppDatabase db, $CheckInsTable table)
+  $$_CheckInsTableTableManager(_$_AccountDatabase db, $_CheckInsTable table)
       : super(TableManagerState(
           db: db,
           table: table,
           createFilteringComposer: () =>
-              $$CheckInsTableFilterComposer($db: db, $table: table),
+              $$_CheckInsTableFilterComposer($db: db, $table: table),
           createOrderingComposer: () =>
-              $$CheckInsTableOrderingComposer($db: db, $table: table),
+              $$_CheckInsTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
-              $$CheckInsTableAnnotationComposer($db: db, $table: table),
+              $$_CheckInsTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback: ({
             Value<String> accountId = const Value.absent(),
             Value<String> recordId = const Value.absent(),
@@ -2808,7 +2813,7 @@ class $$CheckInsTableTableManager extends RootTableManager<
             Value<DateTime> updatedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
-              CheckInsCompanion(
+              _CheckInsCompanion(
             accountId: accountId,
             recordId: recordId,
             schemaVersion: schemaVersion,
@@ -2826,7 +2831,7 @@ class $$CheckInsTableTableManager extends RootTableManager<
             required DateTime updatedAt,
             Value<int> rowid = const Value.absent(),
           }) =>
-              CheckInsCompanion.insert(
+              _CheckInsCompanion.insert(
             accountId: accountId,
             recordId: recordId,
             schemaVersion: schemaVersion,
@@ -2842,20 +2847,20 @@ class $$CheckInsTableTableManager extends RootTableManager<
         ));
 }
 
-typedef $$CheckInsTableProcessedTableManager = ProcessedTableManager<
-    _$AppDatabase,
-    $CheckInsTable,
-    CheckIn,
-    $$CheckInsTableFilterComposer,
-    $$CheckInsTableOrderingComposer,
-    $$CheckInsTableAnnotationComposer,
-    $$CheckInsTableCreateCompanionBuilder,
-    $$CheckInsTableUpdateCompanionBuilder,
-    (CheckIn, BaseReferences<_$AppDatabase, $CheckInsTable, CheckIn>),
-    CheckIn,
+typedef $$_CheckInsTableProcessedTableManager = ProcessedTableManager<
+    _$_AccountDatabase,
+    $_CheckInsTable,
+    _CheckIn,
+    $$_CheckInsTableFilterComposer,
+    $$_CheckInsTableOrderingComposer,
+    $$_CheckInsTableAnnotationComposer,
+    $$_CheckInsTableCreateCompanionBuilder,
+    $$_CheckInsTableUpdateCompanionBuilder,
+    (_CheckIn, BaseReferences<_$_AccountDatabase, $_CheckInsTable, _CheckIn>),
+    _CheckIn,
     PrefetchHooks Function()>;
-typedef $$PendingOperationsTableCreateCompanionBuilder
-    = PendingOperationsCompanion Function({
+typedef $$_PendingOperationsTableCreateCompanionBuilder
+    = _PendingOperationsCompanion Function({
   required String accountId,
   required String operationId,
   required String recordId,
@@ -2869,8 +2874,8 @@ typedef $$PendingOperationsTableCreateCompanionBuilder
   Value<DateTime> enqueuedAt,
   Value<int> rowid,
 });
-typedef $$PendingOperationsTableUpdateCompanionBuilder
-    = PendingOperationsCompanion Function({
+typedef $$_PendingOperationsTableUpdateCompanionBuilder
+    = _PendingOperationsCompanion Function({
   Value<String> accountId,
   Value<String> operationId,
   Value<String> recordId,
@@ -2885,9 +2890,9 @@ typedef $$PendingOperationsTableUpdateCompanionBuilder
   Value<int> rowid,
 });
 
-class $$PendingOperationsTableFilterComposer
-    extends Composer<_$AppDatabase, $PendingOperationsTable> {
-  $$PendingOperationsTableFilterComposer({
+class $$_PendingOperationsTableFilterComposer
+    extends Composer<_$_AccountDatabase, $_PendingOperationsTable> {
+  $$_PendingOperationsTableFilterComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -2929,9 +2934,9 @@ class $$PendingOperationsTableFilterComposer
       column: $table.enqueuedAt, builder: (column) => ColumnFilters(column));
 }
 
-class $$PendingOperationsTableOrderingComposer
-    extends Composer<_$AppDatabase, $PendingOperationsTable> {
-  $$PendingOperationsTableOrderingComposer({
+class $$_PendingOperationsTableOrderingComposer
+    extends Composer<_$_AccountDatabase, $_PendingOperationsTable> {
+  $$_PendingOperationsTableOrderingComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -2976,9 +2981,9 @@ class $$PendingOperationsTableOrderingComposer
       column: $table.enqueuedAt, builder: (column) => ColumnOrderings(column));
 }
 
-class $$PendingOperationsTableAnnotationComposer
-    extends Composer<_$AppDatabase, $PendingOperationsTable> {
-  $$PendingOperationsTableAnnotationComposer({
+class $$_PendingOperationsTableAnnotationComposer
+    extends Composer<_$_AccountDatabase, $_PendingOperationsTable> {
+  $$_PendingOperationsTableAnnotationComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -3019,32 +3024,33 @@ class $$PendingOperationsTableAnnotationComposer
       column: $table.enqueuedAt, builder: (column) => column);
 }
 
-class $$PendingOperationsTableTableManager extends RootTableManager<
-    _$AppDatabase,
-    $PendingOperationsTable,
-    PendingOperation,
-    $$PendingOperationsTableFilterComposer,
-    $$PendingOperationsTableOrderingComposer,
-    $$PendingOperationsTableAnnotationComposer,
-    $$PendingOperationsTableCreateCompanionBuilder,
-    $$PendingOperationsTableUpdateCompanionBuilder,
+class $$_PendingOperationsTableTableManager extends RootTableManager<
+    _$_AccountDatabase,
+    $_PendingOperationsTable,
+    _PendingOperation,
+    $$_PendingOperationsTableFilterComposer,
+    $$_PendingOperationsTableOrderingComposer,
+    $$_PendingOperationsTableAnnotationComposer,
+    $$_PendingOperationsTableCreateCompanionBuilder,
+    $$_PendingOperationsTableUpdateCompanionBuilder,
     (
-      PendingOperation,
-      BaseReferences<_$AppDatabase, $PendingOperationsTable, PendingOperation>
+      _PendingOperation,
+      BaseReferences<_$_AccountDatabase, $_PendingOperationsTable,
+          _PendingOperation>
     ),
-    PendingOperation,
+    _PendingOperation,
     PrefetchHooks Function()> {
-  $$PendingOperationsTableTableManager(
-      _$AppDatabase db, $PendingOperationsTable table)
+  $$_PendingOperationsTableTableManager(
+      _$_AccountDatabase db, $_PendingOperationsTable table)
       : super(TableManagerState(
           db: db,
           table: table,
           createFilteringComposer: () =>
-              $$PendingOperationsTableFilterComposer($db: db, $table: table),
+              $$_PendingOperationsTableFilterComposer($db: db, $table: table),
           createOrderingComposer: () =>
-              $$PendingOperationsTableOrderingComposer($db: db, $table: table),
+              $$_PendingOperationsTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
-              $$PendingOperationsTableAnnotationComposer(
+              $$_PendingOperationsTableAnnotationComposer(
                   $db: db, $table: table),
           updateCompanionCallback: ({
             Value<String> accountId = const Value.absent(),
@@ -3060,7 +3066,7 @@ class $$PendingOperationsTableTableManager extends RootTableManager<
             Value<DateTime> enqueuedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
-              PendingOperationsCompanion(
+              _PendingOperationsCompanion(
             accountId: accountId,
             operationId: operationId,
             recordId: recordId,
@@ -3088,7 +3094,7 @@ class $$PendingOperationsTableTableManager extends RootTableManager<
             Value<DateTime> enqueuedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
-              PendingOperationsCompanion.insert(
+              _PendingOperationsCompanion.insert(
             accountId: accountId,
             operationId: operationId,
             recordId: recordId,
@@ -3109,33 +3115,34 @@ class $$PendingOperationsTableTableManager extends RootTableManager<
         ));
 }
 
-typedef $$PendingOperationsTableProcessedTableManager = ProcessedTableManager<
-    _$AppDatabase,
-    $PendingOperationsTable,
-    PendingOperation,
-    $$PendingOperationsTableFilterComposer,
-    $$PendingOperationsTableOrderingComposer,
-    $$PendingOperationsTableAnnotationComposer,
-    $$PendingOperationsTableCreateCompanionBuilder,
-    $$PendingOperationsTableUpdateCompanionBuilder,
+typedef $$_PendingOperationsTableProcessedTableManager = ProcessedTableManager<
+    _$_AccountDatabase,
+    $_PendingOperationsTable,
+    _PendingOperation,
+    $$_PendingOperationsTableFilterComposer,
+    $$_PendingOperationsTableOrderingComposer,
+    $$_PendingOperationsTableAnnotationComposer,
+    $$_PendingOperationsTableCreateCompanionBuilder,
+    $$_PendingOperationsTableUpdateCompanionBuilder,
     (
-      PendingOperation,
-      BaseReferences<_$AppDatabase, $PendingOperationsTable, PendingOperation>
+      _PendingOperation,
+      BaseReferences<_$_AccountDatabase, $_PendingOperationsTable,
+          _PendingOperation>
     ),
-    PendingOperation,
+    _PendingOperation,
     PrefetchHooks Function()>;
 
-class $AppDatabaseManager {
-  final _$AppDatabase _db;
-  $AppDatabaseManager(this._db);
-  $$TasksTableTableManager get tasks =>
-      $$TasksTableTableManager(_db, _db.tasks);
-  $$ScheduleBlocksTableTableManager get scheduleBlocks =>
-      $$ScheduleBlocksTableTableManager(_db, _db.scheduleBlocks);
-  $$FocusSessionsTableTableManager get focusSessions =>
-      $$FocusSessionsTableTableManager(_db, _db.focusSessions);
-  $$CheckInsTableTableManager get checkIns =>
-      $$CheckInsTableTableManager(_db, _db.checkIns);
-  $$PendingOperationsTableTableManager get pendingOperations =>
-      $$PendingOperationsTableTableManager(_db, _db.pendingOperations);
+class $_AccountDatabaseManager {
+  final _$_AccountDatabase _db;
+  $_AccountDatabaseManager(this._db);
+  $$_TasksTableTableManager get tasks =>
+      $$_TasksTableTableManager(_db, _db.tasks);
+  $$_ScheduleBlocksTableTableManager get scheduleBlocks =>
+      $$_ScheduleBlocksTableTableManager(_db, _db.scheduleBlocks);
+  $$_FocusSessionsTableTableManager get focusSessions =>
+      $$_FocusSessionsTableTableManager(_db, _db.focusSessions);
+  $$_CheckInsTableTableManager get checkIns =>
+      $$_CheckInsTableTableManager(_db, _db.checkIns);
+  $$_PendingOperationsTableTableManager get pendingOperations =>
+      $$_PendingOperationsTableTableManager(_db, _db.pendingOperations);
 }
