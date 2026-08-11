@@ -56,6 +56,32 @@ void main() {
     expect(await store.operations.pending(10), hasLength(1));
   });
 
+  test('different bytes for a duplicate operation id are rejected', () async {
+    final store = await openStore(keyManager, temporaryDirectory);
+    addTearDown(store.close);
+    final original = operation(accountId: accountA);
+    final conflicting = EncryptedOperation(
+      accountId: original.accountId,
+      operationId: original.operationId,
+      recordId: original.recordId,
+      deviceId: original.deviceId,
+      logicalClock: original.logicalClock,
+      entityType: original.entityType,
+      payloadNonce: original.payloadNonce,
+      payloadCiphertext: <int>[...original.payloadCiphertext]..[0] ^= 1,
+      isTombstone: original.isTombstone,
+      schemaVersion: original.schemaVersion,
+    );
+
+    await store.operations.enqueue(original);
+
+    await expectLater(
+      store.operations.enqueue(conflicting),
+      throwsA(isA<OperationIdCollisionException>()),
+    );
+    expect(await store.operations.pending(10), <EncryptedOperation>[original]);
+  });
+
   test('encrypted operation does not expose mutable cryptographic buffers', () {
     final encryptedOperation = operation(accountId: accountA);
 

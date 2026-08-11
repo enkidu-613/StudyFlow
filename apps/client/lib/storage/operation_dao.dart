@@ -104,28 +104,8 @@ class OperationDao {
   final _AccountDatabase _database;
 
   Future<void> enqueue(EncryptedOperation operation) async {
-    if (operation.accountId != _database.activeAccountId) {
-      throw const OperationAccountScopeException(
-        'Operation account does not match the active account.',
-      );
-    }
-
     await _database.transaction(() async {
-      await _database.into(_database.pendingOperations).insert(
-            _PendingOperationsCompanion.insert(
-              accountId: operation.accountId,
-              operationId: operation.operationId,
-              recordId: operation.recordId,
-              deviceId: operation.deviceId,
-              logicalClock: operation.logicalClock,
-              entityType: operation.entityType,
-              payloadNonce: operation.payloadNonce,
-              payloadCiphertext: operation.payloadCiphertext,
-              isTombstone: operation.isTombstone,
-              schemaVersion: operation.schemaVersion,
-            ),
-            mode: InsertMode.insertOrIgnore,
-          );
+      await AccountScopedTransaction._(_database).enqueue(operation);
     });
   }
 
@@ -172,6 +152,17 @@ class OperationAccountScopeException implements Exception {
 
   @override
   String toString() => 'OperationAccountScopeException: $message';
+}
+
+class OperationIdCollisionException implements Exception {
+  const OperationIdCollisionException(this.operationId);
+
+  final String operationId;
+
+  @override
+  String toString() =>
+      'OperationIdCollisionException: operation id is already used by '
+      'different operation bytes: $operationId';
 }
 
 const Set<String> _entityTypes = <String>{

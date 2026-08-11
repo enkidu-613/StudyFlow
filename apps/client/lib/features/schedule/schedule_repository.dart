@@ -36,22 +36,23 @@ final class ScheduleRepository {
       payloadCiphertext: encrypted.ciphertext,
       updatedAt: (updatedAt ?? DateTime.now()).toUtc(),
     );
-
-    await _store.records(EncryptedEntityType.scheduleBlock).put(record);
-    await _store.operations.enqueue(
-      EncryptedOperation(
-        accountId: _store.activeAccountId,
-        operationId: write.operationId,
-        recordId: block.id,
-        deviceId: write.deviceId,
-        logicalClock: write.logicalClock,
-        entityType: EncryptedEntityType.scheduleBlock.wireName,
-        payloadNonce: encrypted.nonce,
-        payloadCiphertext: encrypted.ciphertext,
-        isTombstone: false,
-        schemaVersion: _schemaVersion,
-      ),
+    final operation = EncryptedOperation(
+      accountId: _store.activeAccountId,
+      operationId: write.operationId,
+      recordId: block.id,
+      deviceId: write.deviceId,
+      logicalClock: write.logicalClock,
+      entityType: EncryptedEntityType.scheduleBlock.wireName,
+      payloadNonce: encrypted.nonce,
+      payloadCiphertext: encrypted.ciphertext,
+      isTombstone: false,
+      schemaVersion: _schemaVersion,
     );
+
+    await _store.transaction((transaction) async {
+      await transaction.putRecord(record);
+      await transaction.enqueue(operation);
+    });
   }
 
   Future<ScheduleBlock?> get(String blockId) async {

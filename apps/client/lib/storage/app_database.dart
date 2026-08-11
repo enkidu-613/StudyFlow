@@ -147,8 +147,11 @@ class _AccountDatabase extends _$_AccountDatabase {
 }
 
 class AccountScopedStore {
-  AccountScopedStore._(_AccountDatabase database)
-      : _database = database,
+  AccountScopedStore._(
+    _AccountDatabase database, {
+    Future<void> Function()? transactionFailureInjector,
+  })  : _transactionFailureInjector = transactionFailureInjector,
+        _database = database,
         activeAccountId = database.activeAccountId,
         operations = OperationDao._(database);
 
@@ -168,17 +171,20 @@ class AccountScopedStore {
     required String activeAccountId,
     required KeyManager keyManager,
     required Directory baseDirectory,
+    Future<void> Function()? transactionFailureInjector,
   }) =>
       _open(
         activeAccountId: activeAccountId,
         keyManager: keyManager,
         opener: _EncryptedDatabaseOpener(baseDirectory: baseDirectory),
+        transactionFailureInjector: transactionFailureInjector,
       );
 
   static Future<AccountScopedStore> _open({
     required String activeAccountId,
     required KeyManager keyManager,
     required _DatabaseOpener opener,
+    Future<void> Function()? transactionFailureInjector,
   }) async {
     final normalizedAccountId = _normalizedAccountId(activeAccountId);
     if (keyManager.accountId != normalizedAccountId) {
@@ -199,15 +205,27 @@ class AccountScopedStore {
         databaseKey: databaseKey,
         opener: opener,
       ),
+      transactionFailureInjector: transactionFailureInjector,
     );
   }
 
   final _AccountDatabase _database;
+  final Future<void> Function()? _transactionFailureInjector;
   final String activeAccountId;
   final OperationDao operations;
 
   EncryptedRecordRepository records(EncryptedEntityType entityType) =>
       EncryptedRecordRepository._(_database, entityType);
+
+  Future<T> transaction<T>(
+    Future<T> Function(AccountScopedTransaction transaction) action,
+  ) async {
+    return _database.transaction(() async {
+      final result = await action(AccountScopedTransaction._(_database));
+      await _transactionFailureInjector?.call();
+      return result;
+    });
+  }
 
   Future<void> close() => _database.close();
 }
@@ -294,6 +312,95 @@ class EncryptedLocalRecord {
       );
 }
 
+final class AccountScopedTransaction {
+  AccountScopedTransaction._(this._database);
+
+  final _AccountDatabase _database;
+
+  Future<void> putRecord(EncryptedLocalRecord record) async {
+    _checkAccount(record.accountId);
+
+    await _database.customStatement(
+      'INSERT INTO ${record.entityType.tableName} '
+      '(account_id, record_id, schema_version, payload_nonce, '
+      'payload_ciphertext, updated_at) VALUES (?, ?, ?, ?, ?, ?) '
+      'ON CONFLICT(account_id, record_id) DO UPDATE SET '
+      'schema_version = excluded.schema_version, '
+      'payload_nonce = excluded.payload_nonce, '
+      'payload_ciphertext = excluded.payload_ciphertext, '
+      'updated_at = excluded.updated_at',
+      <Object?>[
+        record.accountId,
+        record.recordId,
+        record.schemaVersion,
+        record.payloadNonce,
+        record.payloadCiphertext,
+        record.updatedAt.millisecondsSinceEpoch,
+      ],
+    );
+  }
+
+  Future<void> enqueue(EncryptedOperation operation) async {
+    if (operation.accountId != _database.activeAccountId) {
+      throw const OperationAccountScopeException(
+        'Operation account does not match the active account.',
+      );
+    }
+
+    final existingRow = await _database.customSelect(
+      'SELECT account_id, operation_id, record_id, device_id, logical_clock, '
+      'entity_type, payload_nonce, payload_ciphertext, is_tombstone, '
+      'schema_version FROM pending_operations '
+      'WHERE account_id = ? AND operation_id = ?',
+      variables: <Variable<Object>>[
+        Variable<String>(operation.accountId),
+        Variable<String>(operation.operationId),
+      ],
+    ).getSingleOrNull();
+    if (existingRow != null) {
+      final existing = EncryptedOperation(
+        accountId: existingRow.read<String>('account_id'),
+        operationId: existingRow.read<String>('operation_id'),
+        recordId: existingRow.read<String>('record_id'),
+        deviceId: existingRow.read<String>('device_id'),
+        logicalClock: existingRow.read<int>('logical_clock'),
+        entityType: existingRow.read<String>('entity_type'),
+        payloadNonce: existingRow.read<Uint8List>('payload_nonce'),
+        payloadCiphertext: existingRow.read<Uint8List>('payload_ciphertext'),
+        isTombstone: existingRow.read<bool>('is_tombstone'),
+        schemaVersion: existingRow.read<int>('schema_version'),
+      );
+      if (existing == operation) {
+        return;
+      }
+      throw OperationIdCollisionException(operation.operationId);
+    }
+
+    await _database.into(_database.pendingOperations).insert(
+          _PendingOperationsCompanion.insert(
+            accountId: operation.accountId,
+            operationId: operation.operationId,
+            recordId: operation.recordId,
+            deviceId: operation.deviceId,
+            logicalClock: operation.logicalClock,
+            entityType: operation.entityType,
+            payloadNonce: operation.payloadNonce,
+            payloadCiphertext: operation.payloadCiphertext,
+            isTombstone: operation.isTombstone,
+            schemaVersion: operation.schemaVersion,
+          ),
+        );
+  }
+
+  void _checkAccount(String accountId) {
+    if (accountId != _database.activeAccountId) {
+      throw const StorageAccountScopeException(
+        'Record account does not match the active account.',
+      );
+    }
+  }
+}
+
 class EncryptedRecordRepository {
   EncryptedRecordRepository._(this._database, this.entityType);
 
@@ -301,7 +408,6 @@ class EncryptedRecordRepository {
   final EncryptedEntityType entityType;
 
   Future<void> put(EncryptedLocalRecord record) async {
-    _checkAccount(record.accountId);
     if (record.entityType != entityType) {
       throw ArgumentError.value(
         record.entityType,
@@ -311,24 +417,7 @@ class EncryptedRecordRepository {
     }
 
     await _database.transaction(() async {
-      await _database.customStatement(
-        'INSERT INTO ${entityType.tableName} '
-        '(account_id, record_id, schema_version, payload_nonce, '
-        'payload_ciphertext, updated_at) VALUES (?, ?, ?, ?, ?, ?) '
-        'ON CONFLICT(account_id, record_id) DO UPDATE SET '
-        'schema_version = excluded.schema_version, '
-        'payload_nonce = excluded.payload_nonce, '
-        'payload_ciphertext = excluded.payload_ciphertext, '
-        'updated_at = excluded.updated_at',
-        <Object?>[
-          record.accountId,
-          record.recordId,
-          record.schemaVersion,
-          record.payloadNonce,
-          record.payloadCiphertext,
-          record.updatedAt.millisecondsSinceEpoch,
-        ],
-      );
+      await AccountScopedTransaction._(_database).putRecord(record);
     });
   }
 
