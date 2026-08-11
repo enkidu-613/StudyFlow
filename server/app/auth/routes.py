@@ -2,50 +2,35 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
-from server.app.auth.dependencies import (
-    get_account_context,
-    get_auth_service,
-)
-
+from server.app.auth.dependencies import get_auth_service, get_user_context
 from server.app.auth.models import (
     AuthResponse,
-    BootstrapRequest,
-    CreatePairingCodeRequest,
     LoginRequest,
-    PairDeviceRequest,
-    PairingCodeResponse,
+    LogoutRequest,
     RefreshRequest,
-    RevokeDeviceRequest,
+    RegisterRequest,
     SessionResponse,
 )
-from server.app.auth.service import AuthIdentity, AuthService, AuthServiceError
-from server.app.db.context import AccountContext
+from server.app.auth.service import AuthService, AuthServiceError
+from server.app.db.context import UserContext
 
 
 router = APIRouter()
 
 
 @router.post(
-    "/v1/auth/bootstrap",
+    "/v1/auth/register",
     response_model=AuthResponse,
     status_code=status.HTTP_201_CREATED,
 )
-async def bootstrap(
-    request: BootstrapRequest,
+async def register(
+    request: RegisterRequest,
     service: Annotated[AuthService, Depends(get_auth_service)],
-    bootstrap_token: Annotated[str, Header(alias="X-StudyFlow-Bootstrap-Token")],
 ) -> AuthResponse:
     try:
-        created = await service.bootstrap(
-            presented_bootstrap_token=bootstrap_token,
-            account_id=request.account_id,
-            password=request.password.get_secret_value(),
-            device_id=request.device_id,
-            public_key=request.device_public_key,
-            envelope=request.encrypted_account_data_key_envelope,
-        )
+        created = await service.register(request)
     except AuthServiceError as exc:
         raise _http_error(exc) from exc
     return AuthResponse.model_validate(created, from_attributes=True)
@@ -58,8 +43,8 @@ async def login(
 ) -> AuthResponse:
     try:
         authenticated = await service.login(
-            password=request.password.get_secret_value(),
-            device_id=request.device_id,
+            email=request.email,
+            password=request.password,
         )
     except AuthServiceError as exc:
         raise _http_error(exc) from exc
@@ -72,79 +57,29 @@ async def refresh(
     service: Annotated[AuthService, Depends(get_auth_service)],
 ) -> AuthResponse:
     try:
-        authenticated = await service.refresh(request.refresh_token.get_secret_value())
+        authenticated = await service.refresh(request.refresh_token)
     except AuthServiceError as exc:
         raise _http_error(exc) from exc
     return AuthResponse.model_validate(authenticated, from_attributes=True)
+
+
+@router.post("/v1/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(
+    request: LogoutRequest,
+    service: Annotated[AuthService, Depends(get_auth_service)],
+) -> Response:
+    try:
+        await service.logout(request.refresh_token)
+    except AuthServiceError as exc:
+        raise _http_error(exc) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/v1/auth/session", response_model=SessionResponse)
 async def session(
-    context: Annotated[AccountContext, Depends(get_account_context)],
+    context: Annotated[UserContext, Depends(get_user_context)],
 ) -> SessionResponse:
-    return SessionResponse(account_id=context.account_id, device_id=context.device_id)
-
-
-@router.post(
-    "/v1/devices/pairing-codes",
-    response_model=PairingCodeResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_pairing_code(
-    request: CreatePairingCodeRequest,
-    context: Annotated[AccountContext, Depends(get_account_context)],
-    service: Annotated[AuthService, Depends(get_auth_service)],
-) -> PairingCodeResponse:
-    try:
-        created = await service.create_pairing_code(
-            AuthIdentity(
-                account_id=context.account_id,
-                device_id=context.device_id,
-            ),
-            target_device_id=request.target_device_id,
-            target_device_public_key=request.target_device_public_key,
-            envelope=request.encrypted_account_data_key_envelope,
-        )
-    except AuthServiceError as exc:
-        raise _http_error(exc) from exc
-    return PairingCodeResponse.model_validate(created, from_attributes=True)
-
-
-@router.post("/v1/devices/pair", response_model=AuthResponse)
-async def pair_device(
-    payload: PairDeviceRequest,
-    request: Request,
-    service: Annotated[AuthService, Depends(get_auth_service)],
-) -> AuthResponse:
-    try:
-        authenticated = await service.pair(
-            code=payload.code,
-            device_id=payload.device_id,
-            device_public_key=payload.device_public_key,
-            source=request.client.host if request.client is not None else "unknown",
-        )
-    except AuthServiceError as exc:
-        raise _http_error(exc) from exc
-    return AuthResponse.model_validate(authenticated, from_attributes=True)
-
-
-@router.post("/v1/devices/revoke", status_code=status.HTTP_204_NO_CONTENT)
-async def revoke_device(
-    request: RevokeDeviceRequest,
-    context: Annotated[AccountContext, Depends(get_account_context)],
-    service: Annotated[AuthService, Depends(get_auth_service)],
-) -> Response:
-    try:
-        await service.revoke_device(
-            AuthIdentity(
-                account_id=context.account_id,
-                device_id=context.device_id,
-            ),
-            request.device_id,
-        )
-    except AuthServiceError as exc:
-        raise _http_error(exc) from exc
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return SessionResponse(user_id=context.user_id, email=context.email)
 
 
 def _http_error(exc: AuthServiceError) -> HTTPException:

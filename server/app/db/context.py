@@ -8,3 +8,9 @@ from uuid import UUID
 class AccountContext:
     account_id: UUID
     device_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class UserContext:
+    user_id: UUID
+    email: str

@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from typing import Annotated
-from uuid import UUID
 
-from fastapi import Depends, Header, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from server.app.auth.service import AuthIdentity, AuthService, AuthServiceError
-from server.app.db.context import AccountContext
+from server.app.auth.service import AuthService, AuthServiceError
+from server.app.db.context import AccountContext, UserContext
 
 
 bearer = HTTPBearer(auto_error=False)
@@ -23,10 +22,10 @@ def get_auth_service(request: Request) -> AuthService:
     return service
 
 
-async def get_auth_identity(
+async def get_user_context(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
     service: Annotated[AuthService, Depends(get_auth_service)],
-) -> AuthIdentity:
+) -> UserContext:
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -45,15 +44,9 @@ async def get_auth_identity(
 
 
 async def get_account_context(
-    identity: Annotated[AuthIdentity, Depends(get_auth_identity)],
-    device_id: Annotated[UUID, Header(alias="X-Device-Id")],
+    user_context: Annotated[UserContext, Depends(get_user_context)],
 ) -> AccountContext:
-    if device_id != identity.device_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Device identity is not authorized.",
-        )
     return AccountContext(
-        account_id=identity.account_id,
-        device_id=identity.device_id,
+        account_id=user_context.user_id,
+        device_id=user_context.user_id,
     )
