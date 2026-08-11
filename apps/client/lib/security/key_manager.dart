@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 enum StoredKeyName { device, deviceAgreementPrivate, accountData }
@@ -35,7 +36,9 @@ class FlutterSecureKeyStore implements SecureKeyStore {
               mOptions: MacOsOptions(
                 accessibility: KeychainAccessibility.unlocked_this_device,
                 synchronizable: false,
-                usesDataProtectionKeychain: true,
+                // Local macOS Debug builds are unsigned; Data Protection
+                // Keychain requires a provisioning profile.
+                usesDataProtectionKeychain: !kDebugMode,
               ),
             );
 

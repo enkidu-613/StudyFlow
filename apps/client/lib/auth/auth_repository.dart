@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
@@ -111,7 +112,9 @@ final class FlutterSecureAuthContextStore implements AuthContextStore {
               mOptions: MacOsOptions(
                 accessibility: KeychainAccessibility.unlocked_this_device,
                 synchronizable: false,
-                usesDataProtectionKeychain: true,
+                // Local macOS Debug builds are unsigned; Data Protection
+                // Keychain requires a provisioning profile.
+                usesDataProtectionKeychain: !kDebugMode,
               ),
             );
 

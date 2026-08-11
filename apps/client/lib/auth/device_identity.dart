@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../util/uuid.dart';
@@ -19,7 +20,9 @@ final class FlutterSecureDeviceIdentityStore implements DeviceIdentityStore {
               mOptions: MacOsOptions(
                 accessibility: KeychainAccessibility.unlocked_this_device,
                 synchronizable: false,
-                usesDataProtectionKeychain: true,
+                // Local macOS Debug builds are unsigned; Data Protection
+                // Keychain requires a provisioning profile.
+                usesDataProtectionKeychain: !kDebugMode,
               ),
             );
 
