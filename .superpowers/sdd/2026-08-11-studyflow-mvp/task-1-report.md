@@ -50,4 +50,72 @@ The required Flutter command and `flutter pub get` were attempted but could not 
 
 ## Concerns
 
-Flutter SDK/Dart are unavailable in the execution environment, so generated platform source and Dart dependency resolution could not be verified. The five platform directories and client manifests were created manually to preserve the requested paths; run the brief's generator and `flutter pub get` in a Flutter-enabled environment before relying on client compilation.
+At the initial implementation, Flutter was unavailable; this was resolved in the round-1 fix after Flutter became available locally.
+
+## Round 1 fixes and mise evidence
+
+Reviewer finding 1 was fixed by running the required command from `apps/client`:
+
+```text
+/opt/homebrew/bin/flutter create --project-name studyflow --org com.studyflow --platforms=android,ios,macos,windows,linux .
+Wrote 122 files.
+Got dependencies.
+```
+
+The generated Android, iOS, macOS, Windows, and Linux shell is now committed. The planned dependencies and `StudyFlowApp` entrypoint were preserved. The generated widget test was adapted to the preserved app name and passes.
+
+Reviewer finding 2 was fixed by changing Poetry packaging to:
+
+```toml
+packages = [{ include = "server", from = ".." }]
+```
+
+Required Python checks:
+
+```text
+poetry install
+Installing the current project: studyflow-server (0.1.0)
+poetry run python -c 'from server.app.main import app; print(app.title)'
+StudyFlow API
+poetry run pytest tests/test_health.py -q
+1 passed in 0.11s
+```
+
+Added root `mise.toml`:
+
+```toml
+[tools]
+python = "3.12.13"
+flutter = "3.44.9"
+```
+
+Version availability and mise checks:
+
+```text
+mise ls-remote python 3.12.13
+3.12.13
+mise ls-remote flutter 3.44.9
+3.44.9
+mise exec --no-deps python -- python --version
+Python 3.12.13
+mise exec --no-deps python -- poetry --version
+Poetry (version 2.3.4)
+mise exec --no-deps python -- poetry run pytest tests/test_health.py -q
+1 passed in 0.13s
+mise exec --no-deps python -- poetry run python -c 'from server.app.main import app; print(app.title)'
+StudyFlow API
+```
+
+`mise install`/automatic preparation reported `flutter@3.44.9` as missing in this environment despite the version being available remotely. The installed `/opt/homebrew/bin/flutter` was therefore used for the successful client checks:
+
+```text
+/opt/homebrew/bin/flutter pub get
+Got dependencies!
+/opt/homebrew/bin/flutter test
+00:00 +1: All tests passed!
+/opt/homebrew/bin/flutter analyze
+No issues found! (ran in 3.2s)
+git diff --check
+```
+
+README now documents `mise install` and `mise exec -- poetry ...` / `mise exec -- flutter ...` usage while keeping Poetry as the Python dependency manager.
