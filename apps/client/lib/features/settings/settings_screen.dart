@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:studyflow/app/studyflow_workspace.dart';
+import 'package:studyflow/features/ai/ai_repository.dart';
+import 'package:studyflow/features/ai/ai_settings_model.dart';
+import 'package:studyflow/features/ai/ai_settings_screen.dart';
 import 'package:studyflow/sync/sync_status.dart';
 import 'package:studyflow_platform_contract/platform_contract.dart';
 
@@ -112,6 +115,24 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                   trailing: Text(state.available ? 'available' : 'unavailable'),
                 ),
               ),
+            const SizedBox(height: 16),
+            Card(
+              child: ListTile(
+                key: const Key('open-ai-settings'),
+                leading: const Icon(Icons.auto_awesome_outlined),
+                title: const Text('AI 设置'),
+                subtitle: const Text('配置 Base URL、模型和 API Key'),
+                trailing: const Icon(Icons.arrow_forward),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => AiSettingsScreen(
+                      store: SecureAiSettingsStore(),
+                      repository: HttpAiRepository(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
             if (widget.onLogout != null) ...<Widget>[
               const SizedBox(height: 16),
               OutlinedButton.icon(

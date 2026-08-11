@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:studyflow/features/ai/ai_repository.dart';
 
-/// Displays L1 AI recommendations without ever mutating tasks or schedule
+/// Displays AI recommendations without ever mutating tasks or schedule
 /// blocks. Any applied change must go through the normal user-confirmed flow.
 final class RecommendationScreen extends StatefulWidget {
   const RecommendationScreen({
@@ -75,21 +75,6 @@ final class _RecommendationScreenState extends State<RecommendationScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      Row(
-                        children: <Widget>[
-                          Text(
-                            recommendation.permissionLevel,
-                            style: Theme.of(context).textTheme.labelLarge,
-                          ),
-                          const Spacer(),
-                          Text(
-                            'confidence '
-                            '${(recommendation.confidence * 100).round()}%',
-                            style: Theme.of(context).textTheme.labelMedium,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
                       Text(recommendation.summary),
                       if (recommendation.reasonCodes.isNotEmpty) ...<Widget>[
                         const SizedBox(height: 8),
