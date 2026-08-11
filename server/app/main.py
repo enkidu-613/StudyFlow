@@ -1,5 +1,8 @@
 from fastapi import FastAPI
 
+from server.app.ai.provider import UnconfiguredAiProvider
+from server.app.ai.routes import router as ai_router
+from server.app.ai.service import AiService, MemoryAiAuditStore
 from server.app.auth.routes import router as auth_router
 from server.app.auth.service import AuthService, AuthSettings
 from server.app.db.engine import (
@@ -26,12 +29,17 @@ def create_app() -> FastAPI:
         app.state.database_readiness = MissingDatabaseReadinessProbe(str(exc))
         app.state.auth_service = None
         app.state.sync_service = None
+        app.state.ai_service = None
     else:
         app.state.database_engine = database_engine
         app.state.database_readiness = DatabaseReadinessProbe(database_engine)
         session_factory = create_session_factory(database_engine)
         app.state.sync_service = SyncService(
             SyncOperationRepository(session_factory),
+        )
+        app.state.ai_service = AiService(
+            provider=UnconfiguredAiProvider(),
+            audit_store=MemoryAiAuditStore(),
         )
         try:
             auth_settings = AuthSettings.from_env()
@@ -51,6 +59,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(sync_router)
     app.include_router(scheduler_router)
+    app.include_router(ai_router)
     return app
 
 
