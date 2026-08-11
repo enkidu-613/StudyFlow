@@ -84,12 +84,12 @@ TTL：Auto
 Proxy status：先选择 DNS only（灰云）
 ~~~
 
-例如，如果你的 VPS 公网 IP 仍然是 YOUR_VPS_PUBLIC_IPV4，填写：
+例如，填写你的 VPS 当前公网 IPv4 地址：
 
 ~~~text
 Type: A
 Name: api
-IPv4 address: YOUR_VPS_PUBLIC_IPV4
+IPv4 address: 你的VPS公网IPv4地址
 TTL: Auto
 Proxy status: DNS only
 ~~~
