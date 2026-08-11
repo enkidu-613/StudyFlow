@@ -19,6 +19,48 @@ const lowOrderX25519PublicKey = 'AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
 
 void main() {
   group('AuthRepository', () {
+    test('bootstrap persists the first authenticated account context',
+        () async {
+      final api = FakeAuthApi()..nextContext = contextA();
+      final store = MemoryAuthContextStore();
+      final repository = AuthRepository(api: api, store: store);
+
+      final active = await repository.bootstrap(
+        bootstrapToken: 'bootstrap-token-used-once',
+        password: 'correct horse battery staple',
+        accountId: accountA,
+        deviceId: deviceA,
+        devicePublicKey: allZeroX25519PublicKey,
+        encryptedAccountDataKeyEnvelope: envelopeA,
+      );
+
+      expect(active, contextA());
+      expect(api.bootstrapCallCount, 1);
+      expect(api.lastBootstrapToken, 'bootstrap-token-used-once');
+      expect(store.readBack(), active);
+    });
+
+    test('bootstrap fails closed when the server changes account ownership',
+        () async {
+      final api = FakeAuthApi()
+        ..nextContext = contextA(accountId: accountB, deviceId: deviceA);
+      final store = MemoryAuthContextStore();
+      final repository = AuthRepository(api: api, store: store);
+
+      await expectLater(
+        repository.bootstrap(
+          bootstrapToken: 'bootstrap-token-used-once',
+          password: 'correct horse battery staple',
+          accountId: accountA,
+          deviceId: deviceA,
+          devicePublicKey: allZeroX25519PublicKey,
+          encryptedAccountDataKeyEnvelope: envelopeA,
+        ),
+        throwsA(isA<AuthScopeException>()),
+      );
+      expect(store.serialized, isNull);
+    });
+
     test('login persists one complete active-account context atomically',
         () async {
       final api = FakeAuthApi()..nextContext = contextA();
@@ -155,6 +197,37 @@ void main() {
   });
 
   group('device enrollment envelope', () {
+    test('device agreement key can be created before pairing reveals account',
+        () async {
+      final targetStore = MemorySecureKeyStore();
+      final targetBeforePairing = DeviceEnrollmentCrypto(
+        accountId: accountB,
+        keyStoreAccountId: deviceB,
+        store: targetStore,
+      );
+      final source = DeviceEnrollmentCrypto(
+        accountId: accountA,
+        store: MemorySecureKeyStore(),
+      );
+      final envelope = await source.sealAccountDataKey(
+        accountDataKey: SecretKey(List<int>.filled(32, 7)),
+        targetDeviceId: deviceB,
+        targetDevicePublicKey: await targetBeforePairing.publicKeyBase64(),
+      );
+
+      final targetAfterPairing = DeviceEnrollmentCrypto(
+        accountId: accountA,
+        keyStoreAccountId: deviceB,
+        store: targetStore,
+      );
+      final opened = await targetAfterPairing.openAccountDataKeyEnvelope(
+        envelope,
+        targetDeviceId: deviceB,
+      );
+
+      expect(await opened.extractBytes(), List<int>.filled(32, 7));
+    });
+
     test('envelope sealing rejects all-zero and low-order target public keys',
         () async {
       final source = DeviceEnrollmentCrypto(
@@ -347,10 +420,26 @@ class FakeAuthApi implements AuthApi {
   AuthContext? nextContext;
   AuthApiException? refreshError;
   AuthApiException? revokeError;
+  int bootstrapCallCount = 0;
+  String? lastBootstrapToken;
   int pairCallCount = 0;
   String? revokedDeviceId;
 
   AuthContext get _response => nextContext ?? contextA();
+
+  @override
+  Future<AuthContext> bootstrap({
+    required String bootstrapToken,
+    required String password,
+    required String accountId,
+    required String deviceId,
+    required String devicePublicKey,
+    required String encryptedAccountDataKeyEnvelope,
+  }) async {
+    bootstrapCallCount += 1;
+    lastBootstrapToken = bootstrapToken;
+    return _response;
+  }
 
   @override
   Future<AuthContext> login(

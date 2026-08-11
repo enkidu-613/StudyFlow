@@ -78,15 +78,18 @@ class AuthClient:
         self,
         *,
         bootstrap_token: str = BOOTSTRAP_TOKEN,
+        account_id: str | None = None,
         device_id: str | None = None,
         password: str = PASSWORD,
         device_public_key: str = FIRST_DEVICE_PUBLIC_KEY,
     ) -> Response:
+        selected_account_id = account_id or str(uuid4())
         selected_device_id = device_id or str(uuid4())
         response = await self.client.post(
             "/v1/auth/bootstrap",
             headers={"X-StudyFlow-Bootstrap-Token": bootstrap_token},
             json={
+                "account_id": selected_account_id,
                 "password": password,
                 "device_id": selected_device_id,
                 "device_public_key": device_public_key,
@@ -258,6 +261,18 @@ async def test_bootstrap_requires_server_token_and_can_run_only_once(auth_client
     assert account.password_hash.startswith("$argon2id$")
     assert device.account_id == account.account_id
     assert device.encrypted_account_data_key_envelope == ACCOUNT_ENVELOPE
+
+
+@pytest.mark.anyio
+async def test_bootstrap_binds_the_client_selected_account_id(
+    auth_client: AuthClient,
+) -> None:
+    selected_account_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+
+    response = await auth_client.bootstrap(account_id=selected_account_id)
+
+    assert response.status_code == 201
+    assert response.json()["account_id"] == selected_account_id
 
 
 @pytest.mark.anyio

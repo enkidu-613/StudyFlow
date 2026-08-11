@@ -2,6 +2,8 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:studyflow/auth/auth_repository.dart';
+import 'package:studyflow/auth/device_enrollment_crypto.dart';
 import 'package:studyflow/features/checkins/check_in_repository.dart';
 import 'package:studyflow/features/focus/focus_repository.dart';
 import 'package:studyflow/features/schedule/schedule_repository.dart';
@@ -16,6 +18,7 @@ final class StudyFlowWorkspace {
   StudyFlowWorkspace._({
     required this.accountId,
     required this.deviceId,
+    required this.keyManager,
     required this.store,
     required this.cipher,
     required this.tasks,
@@ -30,6 +33,7 @@ final class StudyFlowWorkspace {
 
   final String accountId;
   final String deviceId;
+  final KeyManager keyManager;
   final AccountScopedStore store;
   final PayloadCipher cipher;
   final TaskRepository tasks;
@@ -65,6 +69,43 @@ final class StudyFlowWorkspace {
     return _create(
       accountId: _localAccountId,
       deviceId: _localDeviceId,
+      keyManager: keyManager,
+      store: store,
+    );
+  }
+
+  static Future<StudyFlowWorkspace> openAuthenticated({
+    required AuthContext authContext,
+    SecureKeyStore? secureKeyStore,
+    String? deviceEnrollmentKeyNamespace,
+  }) async {
+    final keyStore = secureKeyStore ?? FlutterSecureKeyStore();
+    final keyManager = KeyManager(
+      accountId: authContext.accountId,
+      store: keyStore,
+    );
+    try {
+      await keyManager.loadAccountDataKey();
+    } on KeyRecoveryException {
+      final enrollment = DeviceEnrollmentCrypto(
+        accountId: authContext.accountId,
+        keyStoreAccountId: deviceEnrollmentKeyNamespace,
+        store: keyStore,
+      );
+      final accountDataKey = await enrollment.openAccountDataKeyEnvelope(
+        authContext.encryptedAccountDataKeyEnvelope,
+        targetDeviceId: authContext.deviceId,
+      );
+      await keyManager.restoreAccountDataKey(accountDataKey);
+    }
+
+    final store = await AccountScopedStore.open(
+      activeAccountId: authContext.accountId,
+      keyManager: keyManager,
+    );
+    return _create(
+      accountId: authContext.accountId,
+      deviceId: authContext.deviceId,
       keyManager: keyManager,
       store: store,
     );
@@ -111,6 +152,7 @@ final class StudyFlowWorkspace {
     return StudyFlowWorkspace._(
       accountId: accountId,
       deviceId: deviceId,
+      keyManager: keyManager,
       store: store,
       cipher: cipher,
       tasks: TaskRepository(store: store, cipher: cipher),

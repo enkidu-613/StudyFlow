@@ -121,6 +121,40 @@ final class KeyManager implements PayloadKeyProvider {
       _accountDataKeyFuture ??= _accountDataKeyBootstraps[accountId] ??
           _loadRequired(StoredKeyName.accountData);
 
+  Future<void> restoreAccountDataKey(SecretKey key) async {
+    final bytes = List<int>.from(await key.extractBytes());
+    if (bytes.length != 32) {
+      throw const KeyRecoveryException(
+        'The restored account encryption key has an invalid length.',
+      );
+    }
+
+    try {
+      final existing = await _read(StoredKeyName.accountData);
+      if (existing != null) {
+        final existingBytes = await existing.extractBytes();
+        if (!_constantTimeEqual(existingBytes, bytes)) {
+          throw const KeyRecoveryException(
+            'A different account encryption key already exists on this device.',
+          );
+        }
+        _accountDataKeyFuture = Future<SecretKey>.value(existing);
+        return;
+      }
+
+      await _persist(StoredKeyName.accountData, key);
+      final persisted = await _read(StoredKeyName.accountData);
+      if (persisted == null) {
+        throw const KeyRecoveryException(
+          'Secure key storage did not preserve the restored account key.',
+        );
+      }
+      _accountDataKeyFuture = Future<SecretKey>.value(persisted);
+    } finally {
+      bytes.fillRange(0, bytes.length, 0);
+    }
+  }
+
   Future<String> exportRecoveryKey() async {
     final keyBytes = await (await loadAccountDataKey()).extractBytes();
     if (keyBytes.length != 32) {
@@ -260,6 +294,17 @@ final class KeyManager implements PayloadKeyProvider {
         cause: error,
       );
     }
+  }
+
+  bool _constantTimeEqual(List<int> left, List<int> right) {
+    if (left.length != right.length) {
+      return false;
+    }
+    var difference = 0;
+    for (var index = 0; index < left.length; index += 1) {
+      difference |= left[index] ^ right[index];
+    }
+    return difference == 0;
   }
 }
 

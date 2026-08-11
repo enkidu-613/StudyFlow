@@ -145,6 +145,15 @@ final class FlutterSecureAuthContextStore implements AuthContextStore {
 }
 
 abstract interface class AuthApi {
+  Future<AuthContext> bootstrap({
+    required String bootstrapToken,
+    required String password,
+    required String accountId,
+    required String deviceId,
+    required String devicePublicKey,
+    required String encryptedAccountDataKeyEnvelope,
+  });
+
   Future<AuthContext> login({
     required String password,
     required String deviceId,
@@ -178,6 +187,31 @@ final class HttpAuthApi implements AuthApi {
 
   final Uri _baseUri;
   final http.Client _client;
+
+  @override
+  Future<AuthContext> bootstrap({
+    required String bootstrapToken,
+    required String password,
+    required String accountId,
+    required String deviceId,
+    required String devicePublicKey,
+    required String encryptedAccountDataKeyEnvelope,
+  }) async =>
+      AuthContext.fromApiJson(
+        await _post(
+          '/v1/auth/bootstrap',
+          <String, Object?>{
+            'password': password,
+            'account_id': _normalizedUuid(accountId, 'accountId'),
+            'device_id': _normalizedUuid(deviceId, 'deviceId'),
+            'device_public_key': devicePublicKey,
+            'encrypted_account_data_key_envelope':
+                encryptedAccountDataKeyEnvelope,
+          },
+          bootstrapToken: bootstrapToken,
+          acceptedStatusCodes: const <int>{201},
+        ),
+      );
 
   @override
   Future<AuthContext> login({
@@ -266,6 +300,7 @@ final class HttpAuthApi implements AuthApi {
     String path,
     Map<String, Object?> body, {
     String? accessToken,
+    String? bootstrapToken,
     Set<int> acceptedStatusCodes = const <int>{200},
   }) async {
     final response = await _client.post(
@@ -273,6 +308,8 @@ final class HttpAuthApi implements AuthApi {
       headers: <String, String>{
         'Content-Type': 'application/json',
         if (accessToken != null) 'Authorization': 'Bearer $accessToken',
+        if (bootstrapToken != null)
+          'X-StudyFlow-Bootstrap-Token': bootstrapToken,
       },
       body: jsonEncode(body),
     );
@@ -307,6 +344,32 @@ final class AuthRepository {
   AuthContext? _activeContext;
 
   AuthContext? get activeContext => _activeContext;
+
+  Future<AuthContext> bootstrap({
+    required String bootstrapToken,
+    required String password,
+    required String accountId,
+    required String deviceId,
+    required String devicePublicKey,
+    required String encryptedAccountDataKeyEnvelope,
+  }) async {
+    final normalizedDeviceId = _normalizedUuid(deviceId, 'deviceId');
+    final authenticated = await _api.bootstrap(
+      bootstrapToken: bootstrapToken,
+      password: password,
+      accountId: _normalizedUuid(accountId, 'accountId'),
+      deviceId: normalizedDeviceId,
+      devicePublicKey: devicePublicKey,
+      encryptedAccountDataKeyEnvelope: encryptedAccountDataKeyEnvelope,
+    );
+    if (authenticated.accountId != _normalizedUuid(accountId, 'accountId') ||
+        authenticated.deviceId != normalizedDeviceId) {
+      throw const AuthScopeException(
+        'Bootstrap response was bound to a different account or device.',
+      );
+    }
+    return _persist(authenticated);
+  }
 
   Future<AuthContext?> restoreActiveContext() async {
     _activeContext = await _store.read();

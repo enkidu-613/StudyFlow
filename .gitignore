@@ -16,6 +16,8 @@ poetry.lock
 **/.DS_Store
 .worktrees/
 artifacts/
+.tool-cache/
+.tool-cache-test.*
 .pytest_cache/
 .mypy_cache/
 server/.venv/

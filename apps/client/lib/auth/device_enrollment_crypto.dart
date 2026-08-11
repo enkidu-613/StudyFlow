@@ -9,10 +9,16 @@ final class DeviceEnrollmentCrypto {
   DeviceEnrollmentCrypto({
     required String accountId,
     required SecureKeyStore store,
+    String? keyStoreAccountId,
   })  : accountId = _normalizedUuid(accountId, 'accountId'),
+        _keyStoreAccountId = _normalizedUuid(
+          keyStoreAccountId ?? accountId,
+          'keyStoreAccountId',
+        ),
         _store = store;
 
   final String accountId;
+  final String _keyStoreAccountId;
   final SecureKeyStore _store;
   final X25519 _keyExchange = X25519();
   final Cipher _cipher = Xchacha20.poly1305Aead();
@@ -163,7 +169,7 @@ final class DeviceEnrollmentCrypto {
 
   Future<SimpleKeyPair> _loadOrCreateKeyPairOnce() async {
     final encoded = await _store.read(
-      accountId: accountId,
+      accountId: _keyStoreAccountId,
       keyName: StoredKeyName.deviceAgreementPrivate,
     );
     if (encoded != null) {
@@ -179,12 +185,12 @@ final class DeviceEnrollmentCrypto {
       );
     }
     await _store.write(
-      accountId: accountId,
+      accountId: _keyStoreAccountId,
       keyName: StoredKeyName.deviceAgreementPrivate,
       value: base64Encode(seed),
     );
     final persisted = await _store.read(
-      accountId: accountId,
+      accountId: _keyStoreAccountId,
       keyName: StoredKeyName.deviceAgreementPrivate,
     );
     if (persisted == null || persisted != base64Encode(seed)) {

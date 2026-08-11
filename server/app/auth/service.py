@@ -219,6 +219,7 @@ class AuthService:
         self,
         *,
         presented_bootstrap_token: str,
+        account_id: UUID,
         password: str,
         device_id: UUID,
         public_key: str,
@@ -231,7 +232,6 @@ class AuthService:
             raise AuthServiceError(403, "Bootstrap authorization failed.")
 
         now = self._now()
-        account_id = uuid4()
         try:
             async with self._session_factory() as session:
                 async with session.begin():

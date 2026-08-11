@@ -40,6 +40,7 @@ async def bootstrap(
     try:
         created = await service.bootstrap(
             presented_bootstrap_token=bootstrap_token,
+            account_id=request.account_id,
             password=request.password.get_secret_value(),
             device_id=request.device_id,
             public_key=request.device_public_key,

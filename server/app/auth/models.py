@@ -132,6 +132,7 @@ class StrictRequest(BaseModel):
 
 
 class BootstrapRequest(StrictRequest):
+    account_id: UUID
     password: SecretStr = Field(min_length=12, max_length=256)
     device_id: UUID
     device_public_key: OpaqueBase64

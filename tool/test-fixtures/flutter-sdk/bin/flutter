@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+[[ "${CI:-}" == "true" ]]
+[[ "${FLUTTER_SUPPRESS_ANALYTICS:-}" == "true" ]]
+[[ "${PUB_CACHE:-}" == */.tool-cache/pub-cache ]]
+printf 'fake flutter %s\n' "$*"
