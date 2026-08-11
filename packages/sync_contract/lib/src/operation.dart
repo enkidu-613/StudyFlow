@@ -12,16 +12,18 @@ const Set<String> supportedEntityTypes = <String>{
 
 class SyncOperationV1 {
   SyncOperationV1({
-    required this.operationId,
-    required this.recordId,
-    required this.deviceId,
+    required String operationId,
+    required String recordId,
+    required String deviceId,
     required this.logicalClock,
     required this.entityType,
     required this.payloadNonce,
     required this.payloadCiphertext,
     required this.isTombstone,
     required this.schemaVersion,
-  }) {
+  })  : operationId = operationId.toLowerCase(),
+        recordId = recordId.toLowerCase(),
+        deviceId = deviceId.toLowerCase() {
     _validate();
   }
 

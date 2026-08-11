@@ -38,3 +38,23 @@ This task defines and tests the contract only. It does not add sync route handle
 
 - The repository root is not itself a Flutter package, so the Dart checks must run from `packages/sync_contract`.
 - Integration tests remain skipped when `STUDYFLOW_TEST_DATABASE_URL` is not configured; this is unrelated to the contract tests.
+
+## Round 1 Fix Report
+
+### Reviewer finding 1: UUID wire normalization
+
+Root cause: Python serializes `UUID` values canonically, but Dart retained the input spelling in its final string fields and `toJson()` output. The original fixture UUIDs were numeric-only, so the first regression assertion was corrected to use valid UUIDs containing A–F characters.
+
+Fix: Dart now lowercases `operationId`, `recordId`, and `deviceId` in the constructor before validation and serialization. Python and Dart tests assert the same lowercase wire values for uppercase UUID input.
+
+### Reviewer finding 2: Dart validation coverage
+
+Added targeted Dart tests for unknown fields, invalid UUIDs, negative logical clocks, unsupported entity types, malformed base64, oversized decoded nonce/ciphertext, and invalid field types. Existing schema-version, fixture round-trip, entity allowlist, and opaque payload checks remain intact.
+
+### Round 1 verification
+
+- `mise exec -- poetry --directory server run pytest tests/test_sync_schemas.py -q`: 13 passed.
+- `mise exec -- poetry --directory server run pytest -q`: 19 passed, 6 skipped.
+- `mise exec -- flutter test test` from `packages/sync_contract`: 11 passed.
+- `mise exec -- dart analyze lib test` from `packages/sync_contract`: no issues found.
+- Schema v1, entity allowlist, 256 KiB decoded payload limit, opaque base64 payloads, and pull limit bounds were unchanged.

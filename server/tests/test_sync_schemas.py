@@ -39,6 +39,26 @@ def test_pull_fixture_serializes_to_the_same_wire_shape() -> None:
     assert operation.model_dump(mode="json", by_alias=True) == fixture["operations"][0]
 
 
+def test_uppercase_uuid_input_serializes_to_lowercase_wire_values() -> None:
+    operation = dict(_load_fixture("sync_push_v1.json")["operations"][0])
+    operation.update(
+        {
+            "operationId": "ABCDEFAB-CDEF-4ABC-8DEF-ABCDEFABCDEF",
+            "recordId": "FEDCBAFE-DCBA-4FED-8ABC-FEDCBAFEDCBA",
+            "deviceId": "ABCDEFAB-CDEF-4ABC-8DEF-ABCDEFABCDEA",
+        },
+    )
+
+    serialized = SyncOperationV1.model_validate(operation).model_dump(
+        mode="json",
+        by_alias=True,
+    )
+
+    assert serialized["operationId"] == "abcdefab-cdef-4abc-8def-abcdefabcdef"
+    assert serialized["recordId"] == "fedcbafe-dcba-4fed-8abc-fedcbafedcba"
+    assert serialized["deviceId"] == "abcdefab-cdef-4abc-8def-abcdefabcdea"
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
