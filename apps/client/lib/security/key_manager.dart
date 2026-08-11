@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-enum StoredKeyName { device, accountData }
+enum StoredKeyName { device, deviceAgreementPrivate, accountData }
 
 abstract interface class SecureKeyStore {
   Future<String?> read({
@@ -120,6 +120,75 @@ final class KeyManager implements PayloadKeyProvider {
   Future<SecretKey> loadAccountDataKey() =>
       _accountDataKeyFuture ??= _accountDataKeyBootstraps[accountId] ??
           _loadRequired(StoredKeyName.accountData);
+
+  Future<String> exportRecoveryKey() async {
+    final keyBytes = await (await loadAccountDataKey()).extractBytes();
+    if (keyBytes.length != 32) {
+      throw const KeyRecoveryException(
+        'The account encryption key has an invalid length.',
+      );
+    }
+    final payload = jsonEncode(<String, Object?>{
+      'version': 1,
+      'account_id': accountId,
+      'account_data_key': base64Encode(keyBytes),
+    });
+    return 'studyflow-recovery-v1:${base64UrlEncode(utf8.encode(payload))}';
+  }
+
+  Future<void> restoreRecoveryKey(String recoveryKey) async {
+    const prefix = 'studyflow-recovery-v1:';
+    if (!recoveryKey.startsWith(prefix)) {
+      throw const KeyRecoveryException('The recovery key format is invalid.');
+    }
+    try {
+      final encodedPayload = recoveryKey.substring(prefix.length);
+      final decoded = jsonDecode(utf8.decode(base64Url.decode(encodedPayload)));
+      if (decoded is! Map ||
+          decoded['version'] != 1 ||
+          decoded['account_id'] != accountId ||
+          decoded['account_data_key'] is! String) {
+        throw const FormatException('invalid recovery payload');
+      }
+      const expectedKeys = <String>{
+        'version',
+        'account_id',
+        'account_data_key',
+      };
+      final actualKeys = decoded.keys.cast<String>().toSet();
+      if (decoded.keys.any((key) => key is! String) ||
+          actualKeys.difference(expectedKeys).isNotEmpty ||
+          expectedKeys.difference(actualKeys).isNotEmpty) {
+        throw const FormatException('unexpected recovery fields');
+      }
+      final keyBytes = base64Decode(decoded['account_data_key'] as String);
+      if (keyBytes.length != 32 ||
+          base64Encode(keyBytes) != decoded['account_data_key']) {
+        throw const FormatException('invalid account key');
+      }
+      final existing = await _read(StoredKeyName.accountData);
+      if (existing != null) {
+        final existingBytes = await existing.extractBytes();
+        if (base64Encode(existingBytes) != base64Encode(keyBytes)) {
+          throw const KeyRecoveryException(
+            'A different account encryption key already exists on this device.',
+          );
+        }
+        _accountDataKeyFuture = Future<SecretKey>.value(existing);
+        return;
+      }
+      final restored = SecretKey(keyBytes);
+      await _persist(StoredKeyName.accountData, restored);
+      _accountDataKeyFuture = Future<SecretKey>.value(restored);
+    } on KeyRecoveryException {
+      rethrow;
+    } on Object catch (error) {
+      throw KeyRecoveryException(
+        'The recovery key is invalid or belongs to another account.',
+        cause: error,
+      );
+    }
+  }
 
   Future<SecretKey> _loadOrCreate(StoredKeyName keyName) async {
     final existing = await _read(keyName);
