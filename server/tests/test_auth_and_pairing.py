@@ -393,6 +393,62 @@ async def test_legitimate_first_refresh_replay_revokes_the_issued_replacement(
 
 
 @pytest.mark.anyio
+async def test_attacker_first_expired_parent_replay_revokes_live_replacement(
+    auth_client: AuthClient,
+) -> None:
+    await auth_client.bootstrap()
+    stolen_parent = auth_client.refresh_token
+    assert stolen_parent is not None
+    auth_client.clock.advance(timedelta(days=29))
+
+    attacker_rotation = await auth_client.client.post(
+        "/v1/auth/refresh",
+        json={"refresh_token": stolen_parent},
+    )
+    auth_client.clock.advance(timedelta(days=2))
+    legitimate_replay = await auth_client.client.post(
+        "/v1/auth/refresh",
+        json={"refresh_token": stolen_parent},
+    )
+    attacker_replacement = await auth_client.client.post(
+        "/v1/auth/refresh",
+        json={"refresh_token": attacker_rotation.json()["refresh_token"]},
+    )
+
+    assert attacker_rotation.status_code == 200
+    assert legitimate_replay.status_code == 401
+    assert attacker_replacement.status_code == 401
+
+
+@pytest.mark.anyio
+async def test_legitimate_first_expired_parent_replay_revokes_live_replacement(
+    auth_client: AuthClient,
+) -> None:
+    await auth_client.bootstrap()
+    shared_parent = auth_client.refresh_token
+    assert shared_parent is not None
+    auth_client.clock.advance(timedelta(days=29))
+
+    legitimate_rotation = await auth_client.client.post(
+        "/v1/auth/refresh",
+        json={"refresh_token": shared_parent},
+    )
+    auth_client.clock.advance(timedelta(days=2))
+    attacker_replay = await auth_client.client.post(
+        "/v1/auth/refresh",
+        json={"refresh_token": shared_parent},
+    )
+    legitimate_replacement = await auth_client.client.post(
+        "/v1/auth/refresh",
+        json={"refresh_token": legitimate_rotation.json()["refresh_token"]},
+    )
+
+    assert legitimate_rotation.status_code == 200
+    assert attacker_replay.status_code == 401
+    assert legitimate_replacement.status_code == 401
+
+
+@pytest.mark.anyio
 async def test_pairing_code_is_six_digits_hashed_at_rest_and_cannot_be_reused(
     auth_client: AuthClient,
 ) -> None:
@@ -468,6 +524,33 @@ async def test_pairing_code_attempt_cap_blocks_later_correct_use(
     correct_after_cap = await auth_client.pair(code, target_device_id)
 
     assert {response.status_code for response in failures} == {410}
+    assert correct_after_cap.status_code == 410
+    assert all(
+        response.json() == {"detail": "Pairing request denied."}
+        for response in [*failures, correct_after_cap]
+    )
+
+    async with auth_client.session_factory() as session:
+        pairing = (await session.execute(select(PairingCode))).scalar_one()
+    assert pairing.failed_attempts == 5
+    assert pairing.consumed_at is not None
+
+
+@pytest.mark.anyio
+async def test_five_wrong_pairing_codes_exhaust_target_pairing_budget(
+    auth_client: AuthClient,
+) -> None:
+    await auth_client.bootstrap()
+    created, target_device_id = await auth_client.create_pairing_code()
+    correct_code = created.json()["code"]
+
+    failures = [
+        await auth_client.pair(f"{800000 + offset:06d}", target_device_id)
+        for offset in range(5)
+    ]
+    correct_after_cap = await auth_client.pair(correct_code, target_device_id)
+
+    assert all(response.status_code == 410 for response in failures)
     assert correct_after_cap.status_code == 410
     assert all(
         response.json() == {"detail": "Pairing request denied."}

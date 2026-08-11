@@ -2,9 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
+from urllib.parse import unquote, urlsplit
 
 
 SESSION_POOLER_PORT = 6543
+FORBIDDEN_RUNTIME_DATABASE_ROLES = {
+    "anon",
+    "authenticated",
+    "postgres",
+    "service_role",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,4 +45,11 @@ def load_database_settings(database_url: str | None = None) -> DatabaseSettings:
         )
 
     normalized_url = normalize_database_url(raw_url)
+    username = urlsplit(normalized_url).username
+    role_name = unquote(username).split(".", 1)[0].casefold() if username else ""
+    if not role_name or role_name in FORBIDDEN_RUNTIME_DATABASE_ROLES:
+        raise ValueError(
+            "STUDYFLOW_DATABASE_URL must use a dedicated non-BYPASSRLS "
+            "application role, not postgres or a Supabase Data API role.",
+        )
     return DatabaseSettings(url=normalized_url)

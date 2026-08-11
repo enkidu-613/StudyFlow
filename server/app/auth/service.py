@@ -15,7 +15,7 @@ import jwt
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerifyMismatchError
 from argon2.low_level import Type
-from sqlalchemy import select, text, update
+from sqlalchemy import and_, case, or_, select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -307,7 +307,7 @@ class AuthService:
                     .where(RefreshSession.token_digest == digest)
                     .with_for_update(),
                 )
-                if refresh_session is None or _aware_utc(refresh_session.expires_at) <= now:
+                if refresh_session is None:
                     unauthorized = True
                 elif refresh_session.revoked_at is not None:
                     await _set_postgres_context(
@@ -320,6 +320,8 @@ class AuthService:
                         device_id=refresh_session.device_id,
                         revoked_at=now,
                     )
+                    unauthorized = True
+                elif _aware_utc(refresh_session.expires_at) <= now:
                     unauthorized = True
                 else:
                     await _set_postgres_context(session, account_id=refresh_session.account_id)
@@ -425,11 +427,29 @@ class AuthService:
         denied = False
         async with self._session_factory() as session:
             async with session.begin():
-                await _set_postgres_context(session, pairing_code_digest=digest)
+                await _set_postgres_context(
+                    session,
+                    device_id=device_id,
+                    device_public_key=device_public_key,
+                    pairing_code_digest=digest,
+                )
+                target_matches = and_(
+                    PairingCode.target_device_id == device_id,
+                    PairingCode.target_device_public_key == device_public_key,
+                )
                 pairing = await session.scalar(
                     select(PairingCode)
-                    .where(PairingCode.code_digest == digest)
-                    .order_by(PairingCode.created_at.desc(), PairingCode.pairing_id.desc())
+                    .where(
+                        or_(
+                            PairingCode.code_digest == digest,
+                            target_matches,
+                        ),
+                    )
+                    .order_by(
+                        case((target_matches, 0), else_=1),
+                        PairingCode.created_at.desc(),
+                        PairingCode.pairing_id.desc(),
+                    )
                     .limit(1)
                     .with_for_update(),
                 )
@@ -441,7 +461,8 @@ class AuthService:
                 ):
                     denied = True
                 elif (
-                    pairing.target_device_id != device_id
+                    not hmac.compare_digest(pairing.code_digest, digest)
+                    or pairing.target_device_id != device_id
                     or not hmac.compare_digest(
                         pairing.target_device_public_key,
                         device_public_key,
@@ -588,6 +609,7 @@ async def _set_postgres_context(
     *,
     account_id: UUID | None = None,
     device_id: UUID | None = None,
+    device_public_key: str | None = None,
     refresh_token_digest: bytes | None = None,
     pairing_code_digest: bytes | None = None,
 ) -> None:
@@ -603,6 +625,14 @@ async def _set_postgres_context(
         await session.execute(
             text("SELECT set_config('app.device_id', :device_id, true)"),
             {"device_id": str(device_id)},
+        )
+    if device_public_key is not None:
+        await session.execute(
+            text(
+                "SELECT set_config('app.device_public_key', "
+                ":device_public_key, true)",
+            ),
+            {"device_public_key": device_public_key},
         )
     if refresh_token_digest is not None:
         await session.execute(

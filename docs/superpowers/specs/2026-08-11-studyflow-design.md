@@ -92,7 +92,7 @@ flowchart LR
 
 - 仅使用 Supabase PostgreSQL，不让 Flutter 客户端直接访问 Supabase。
 - FastAPI 保存 Supabase 数据库连接凭据，凭据只存在 VPS secret 或受保护的环境配置中。
-- 运行时优先使用 Supavisor session pooler；如果 VPS 有 IPv6，可为迁移和备份使用 direct connection。
+- 运行时优先使用 Supavisor session pooler，并使用无 `BYPASSRLS` 的专用应用角色（禁止使用 `postgres`/Data API 角色）；如果 VPS 有 IPv6，可为迁移和备份使用 direct connection。
 - 不使用 transaction pooler 作为长期运行的 SQLAlchemy 连接，因为 transaction mode 不支持 prepared statements。
 - 对同步表启用 RLS 作为纵深防御，并使用权限受限的应用数据库角色。
 - 不在客户端暴露 `service_role`、数据库密码或其他管理密钥。

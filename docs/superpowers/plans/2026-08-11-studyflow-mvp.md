@@ -166,7 +166,7 @@ Create `sync_operations` with an opaque `bytea` nonce and ciphertext, `is_tombst
 
 - [ ] **Step 4: Implement readiness and verify against the real Supabase project**
 
-Use the Supabase session pooler URL and port for the long-lived FastAPI process. Run `poetry run alembic upgrade head`, then `poetry run pytest -m integration tests/test_db_schema.py -q`. Verify that `GET /health/ready` changes from 503 to 200 and that a database query cannot read another account's rows under the request context.
+Use the Supabase session pooler URL and port with a dedicated non-`BYPASSRLS` application role for the long-lived FastAPI process; never use the `postgres` owner or a Data API role. Run `poetry run alembic upgrade head`, then `poetry run pytest -m integration tests/test_db_schema.py -q`. Verify that `GET /health/ready` changes from 503 to 200 and that a database query cannot read another account's rows under the request context.
 
 - [ ] **Step 5: Commit the database foundation**
 

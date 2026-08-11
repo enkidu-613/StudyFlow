@@ -297,3 +297,72 @@ No database or production credentials were used.
 - Native Keychain/Keystore checks remain unavailable under the previously
   recorded environment constraints (no full Xcode toolchain or Android SDK);
   this round did not wait on or use those unavailable checks.
+
+## Scoped security re-review — 2026-08-11
+
+Only the three blocking findings from the scoped re-review were changed.
+
+### Fixes
+
+- Refresh replay detection now handles a rotated parent before applying its
+  expiry rejection. Replaying an expired, revoked parent therefore revokes all
+  still-active refresh sessions for the same account/device before returning
+  HTTP 401. Attacker-first and legitimate-first regressions rotate near the
+  parent expiry, replay after the parent expires while its replacement remains
+  live, and prove that replacement can no longer refresh.
+- Pairing lookup now uses either the submitted code digest or the submitted
+  target device-ID/public-key context, preferring the target context. A wrong
+  code against a pending target increments that pairing row's persistent
+  `failed_attempts` under row locking; five guesses consume it and prevent the
+  correct code from succeeding. All failure responses remain the same generic
+  HTTP 410 denial, and the existing source throttle, one-time consumption, and
+  ten-minute expiry remain in force. PostgreSQL RLS permits this lookup only
+  when both target device ID and target public key match request-local context.
+- The runtime URL example now uses `studyflow_server.<project-ref>` rather than
+  the Supabase `postgres` owner. Runtime configuration rejects missing,
+  `postgres`, `anon`, `authenticated`, and `service_role` usernames and directs
+  operators to a dedicated non-`BYPASSRLS` application role. The deployment
+  plan and design document state the same requirement.
+
+### TDD evidence
+
+Before implementation, the focused regression run produced eight expected
+failures: two expired-parent replacements returned HTTP 200, the correct
+pairing code still returned HTTP 200 after five wrong guesses, and five
+privileged/Data API role cases were accepted.
+
+After implementation:
+
+```text
+mise exec -- poetry --directory server run pytest -q \
+  tests/test_auth_and_pairing.py tests/test_db_config.py \
+  -k "expired_parent or five_wrong_pairing_codes or privileged_or_data_api"
+8 passed, 22 deselected in 0.17s
+```
+
+### Final verification
+
+```text
+mise exec -- poetry --directory server run pytest -q -rs
+44 passed, 8 skipped in 1.24s
+
+mise exec -- flutter test
+38 tests passed
+
+mise exec -- flutter analyze
+No issues found! (ran in 4.8s)
+
+mise exec -- poetry --directory server check
+Exit 0; only existing Poetry metadata deprecation warnings
+
+mise exec -- poetry --directory server run alembic heads
+002_auth_devices (head)
+
+git diff --check
+No output
+```
+
+The eight skips remain isolated PostgreSQL integration tests because
+`STUDYFLOW_TEST_DATABASE_URL` is not configured. No database or production
+credentials were used; the amended RLS policy still requires execution against
+an isolated PostgreSQL database before deployment.

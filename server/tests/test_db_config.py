@@ -22,6 +22,22 @@ def test_create_engine_rejects_sqlite_urls() -> None:
         create_engine_from_env("sqlite+aiosqlite:///tmp/studyflow.db")
 
 
+@pytest.mark.parametrize(
+    "runtime_role",
+    ["postgres", "postgres.project-ref", "anon", "authenticated", "service_role"],
+)
+def test_create_engine_rejects_privileged_or_data_api_runtime_roles(
+    runtime_role: str,
+) -> None:
+    with pytest.raises(
+        DatabaseConfigurationError,
+        match="dedicated non-BYPASSRLS application role",
+    ):
+        create_engine_from_env(
+            f"postgresql://{runtime_role}:password@pooler.example.test:6543/postgres",
+        )
+
+
 @pytest.mark.anyio
 @pytest.mark.integration
 async def test_async_engine_connects_and_disposes_with_test_database_url(

@@ -13,6 +13,9 @@ depends_on = None
 
 ACCOUNT_ID_RLS_EXPRESSION = "NULLIF(current_setting('app.account_id', true), '')::uuid"
 DEVICE_ID_RLS_EXPRESSION = "NULLIF(current_setting('app.device_id', true), '')::uuid"
+DEVICE_PUBLIC_KEY_RLS_EXPRESSION = (
+    "NULLIF(current_setting('app.device_public_key', true), '')"
+)
 REFRESH_DIGEST_RLS_EXPRESSION = (
     "decode(NULLIF(current_setting('app.refresh_token_digest', true), ''), 'hex')"
 )
@@ -178,6 +181,10 @@ def upgrade() -> None:
             USING (
                 account_id = {ACCOUNT_ID_RLS_EXPRESSION}
                 OR code_digest = {PAIRING_DIGEST_RLS_EXPRESSION}
+                OR (
+                    target_device_id = {DEVICE_ID_RLS_EXPRESSION}
+                    AND target_device_public_key = {DEVICE_PUBLIC_KEY_RLS_EXPRESSION}
+                )
             )
             """,
         ),
