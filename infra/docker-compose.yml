@@ -1,0 +1,48 @@
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: infra/api.Dockerfile
+    restart: unless-stopped
+    ports: []
+    expose:
+      - "8000"
+    networks:
+      - studyflow
+    environment:
+      STUDYFLOW_DATABASE_URL: ${STUDYFLOW_DATABASE_URL}
+      STUDYFLOW_BOOTSTRAP_TOKEN: ${STUDYFLOW_BOOTSTRAP_TOKEN}
+      STUDYFLOW_TOKEN_SIGNING_KEY: ${STUDYFLOW_TOKEN_SIGNING_KEY}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  caddy:
+    image: caddy:2.9-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - studyflow
+    environment:
+      STUDYFLOW_API_HOST: ${STUDYFLOW_API_HOST}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+networks:
+  studyflow:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
