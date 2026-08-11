@@ -4,8 +4,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
-from server.app.auth.dependencies import get_account_context
-from server.app.db.context import AccountContext
+from server.app.auth.dependencies import get_user_context
+from server.app.db.context import UserContext
 from server.app.sync.schemas import (
     SyncPullResponse,
     SyncPushRequest,
@@ -34,7 +34,7 @@ def get_sync_service(request: Request) -> SyncService:
 @router.post("/push", response_model=SyncPushResponse)
 async def push(
     request: SyncPushRequest,
-    context: Annotated[AccountContext, Depends(get_account_context)],
+    context: Annotated[UserContext, Depends(get_user_context)],
     service: Annotated[SyncService, Depends(get_sync_service)],
 ) -> SyncPushResponse:
     try:
@@ -44,14 +44,14 @@ async def push(
     except SyncConflictError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Operation ID conflicts with stored ciphertext.",
+            detail="Operation ID conflicts with stored payload.",
         ) from exc
     return SyncPushResponse.model_validate(result, from_attributes=True)
 
 
 @router.get("/pull", response_model=SyncPullResponse)
 async def pull(
-    context: Annotated[AccountContext, Depends(get_account_context)],
+    context: Annotated[UserContext, Depends(get_user_context)],
     service: Annotated[SyncService, Depends(get_sync_service)],
     after: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
@@ -69,5 +69,5 @@ async def pull(
 def _access_denied() -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
-        detail="Device identity is not authorized.",
+        detail="User identity is not authorized.",
     )

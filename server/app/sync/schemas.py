@@ -1,39 +1,16 @@
 from __future__ import annotations
 
-import base64
-import binascii
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 EntityType = Literal["task", "schedule_block", "focus_session", "check_in"]
 MAX_PAYLOAD_BYTES = 256 * 1024
 
 
-def _decode_base64(value: object, field_name: str) -> bytes:
-    if not isinstance(value, str) or not value:
-        raise ValueError(f"{field_name} must be a non-empty base64 string")
-    try:
-        decoded = base64.b64decode(value, validate=True)
-    except (binascii.Error, ValueError) as exc:
-        raise ValueError(f"{field_name} must be valid base64") from exc
-    if base64.b64encode(decoded).decode("ascii") != value:
-        raise ValueError(f"{field_name} must use canonical base64")
-    return decoded
-
-
-def _validate_uuid(value: object, field_name: str) -> UUID:
-    if not isinstance(value, str) or not value:
-        raise ValueError(f"{field_name} must be a non-empty UUID")
-    try:
-        return UUID(value)
-    except ValueError as exc:
-        raise ValueError(f"{field_name} must be a valid UUID") from exc
-
-
-class SyncOperationV1(BaseModel):
+class SyncOperationV2(BaseModel):
     model_config = ConfigDict(
         alias_generator=None,
         extra="forbid",
@@ -42,15 +19,13 @@ class SyncOperationV1(BaseModel):
 
     operation_id: UUID = Field(alias="operationId")
     record_id: UUID = Field(alias="recordId")
-    device_id: UUID = Field(alias="deviceId")
     logical_clock: int = Field(alias="logicalClock", ge=0)
     entity_type: EntityType = Field(alias="entityType")
-    payload_nonce: bytes = Field(alias="payloadNonce", min_length=1)
-    payload_ciphertext: bytes = Field(alias="payloadCiphertext", min_length=1)
+    payload: dict[str, object] = Field(alias="payload")
     is_tombstone: bool = Field(alias="isTombstone")
     schema_version: Literal[1] = Field(alias="schemaVersion")
 
-    @field_validator("operation_id", "record_id", "device_id", mode="before")
+    @field_validator("operation_id", "record_id", mode="before")
     @classmethod
     def validate_ids(cls, value: object, info) -> UUID:
         return _validate_uuid(value, info.field_name)
@@ -69,23 +44,33 @@ class SyncOperationV1(BaseModel):
             raise ValueError("is_tombstone must be a boolean")
         return value
 
-    @field_validator("payload_nonce", "payload_ciphertext", mode="before")
+    @field_validator("payload")
     @classmethod
-    def validate_payload_encoding(cls, value: object, info) -> bytes:
-        decoded = _decode_base64(value, info.field_name)
-        if len(decoded) > MAX_PAYLOAD_BYTES:
-            raise ValueError(f"{info.field_name} must be at most 256 KiB")
-        return decoded
+    def validate_payload_type(cls, value: object) -> dict[str, object]:
+        if not isinstance(value, dict):
+            raise ValueError("payload must be a JSON object")
+        return value
 
-    @field_serializer("payload_nonce", "payload_ciphertext")
-    def serialize_payload(self, value: bytes) -> str:
-        return base64.b64encode(value).decode("ascii")
+    @model_validator(mode="after")
+    def validate_payload_nonempty(self) -> SyncOperationV2:
+        if not self.payload and self.is_tombstone is not True:
+            raise ValueError("payload must not be empty for non-tombstone operations")
+        return self
+
+
+def _validate_uuid(value: object, field_name: str) -> UUID:
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{field_name} must be a non-empty UUID")
+    try:
+        return UUID(value)
+    except ValueError as exc:
+        raise ValueError(f"{field_name} must be a valid UUID") from exc
 
 
 class SyncPushRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    operations: list[SyncOperationV1]
+    operations: list[SyncOperationV2]
 
 
 class SyncPushResponse(BaseModel):
@@ -100,7 +85,7 @@ class SyncPullResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     next_cursor: Annotated[int, Field(ge=0)]
-    operations: list[SyncOperationV1]
+    operations: list[SyncOperationV2]
 
 
 class SyncPullQuery(BaseModel):

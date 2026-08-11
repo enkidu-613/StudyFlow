@@ -1,18 +1,16 @@
 from __future__ import annotations
 
-import base64
 from dataclasses import dataclass
 from typing import Sequence
 from uuid import UUID
 
-from server.app.db.context import AccountContext
+from server.app.db.context import UserContext
 from server.app.sync.repository import (
-    DeviceAccessDeniedError,
-    OperationCiphertextConflictError,
+    OperationPayloadConflictError,
     StoredSyncOperation,
     SyncOperationRepository,
 )
-from server.app.sync.schemas import SyncOperationV1
+from server.app.sync.schemas import SyncOperationV2
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,7 +24,7 @@ class PushResult:
 class PulledOperation:
     server_sequence: int
     operation_id: UUID
-    operation: SyncOperationV1
+    operation: SyncOperationV2
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,7 +40,7 @@ class SyncAccessDeniedError(RuntimeError):
 class SyncConflictError(RuntimeError):
     def __init__(self, operation_id: UUID) -> None:
         self.operation_id = operation_id
-        super().__init__("Operation ID conflicts with stored ciphertext.")
+        super().__init__("Operation ID conflicts with stored payload.")
 
 
 class SyncService:
@@ -51,16 +49,12 @@ class SyncService:
 
     async def push(
         self,
-        context: AccountContext,
-        operations: Sequence[SyncOperationV1],
+        context: UserContext,
+        operations: Sequence[SyncOperationV2],
     ) -> PushResult:
-        if any(operation.device_id != context.device_id for operation in operations):
-            raise SyncAccessDeniedError("Device identity is not authorized.")
         try:
             result = await self._repository.push_batch(context, operations)
-        except DeviceAccessDeniedError as exc:
-            raise SyncAccessDeniedError("Device identity is not authorized.") from exc
-        except OperationCiphertextConflictError as exc:
+        except OperationPayloadConflictError as exc:
             raise SyncConflictError(exc.operation_id) from exc
         return PushResult(
             accepted=result.accepted,
@@ -70,7 +64,7 @@ class SyncService:
 
     async def pull(
         self,
-        context: AccountContext,
+        context: UserContext,
         *,
         after: int,
         limit: int,
@@ -80,14 +74,11 @@ class SyncService:
         if limit < 1:
             raise ValueError("limit must be positive")
         page_limit = min(limit, 200)
-        try:
-            stored_operations = await self._repository.pull(
-                context,
-                after=after,
-                limit=page_limit,
-            )
-        except DeviceAccessDeniedError as exc:
-            raise SyncAccessDeniedError("Device identity is not authorized.") from exc
+        stored_operations = await self._repository.pull(
+            context,
+            after=after,
+            limit=page_limit,
+        )
 
         operations = [_to_pulled_operation(item) for item in stored_operations]
         next_cursor = operations[-1].server_sequence if operations else after
@@ -95,17 +86,13 @@ class SyncService:
 
 
 def _to_pulled_operation(stored: StoredSyncOperation) -> PulledOperation:
-    operation = SyncOperationV1.model_validate(
+    operation = SyncOperationV2.model_validate(
         {
             "operationId": str(stored.operation_id),
             "recordId": str(stored.record_id),
-            "deviceId": str(stored.device_id),
             "logicalClock": stored.logical_clock,
             "entityType": stored.entity_type,
-            "payloadNonce": base64.b64encode(stored.payload_nonce).decode("ascii"),
-            "payloadCiphertext": base64.b64encode(
-                stored.payload_ciphertext,
-            ).decode("ascii"),
+            "payload": stored.payload,
             "isTombstone": stored.is_tombstone,
             "schemaVersion": stored.schema_version,
         },
