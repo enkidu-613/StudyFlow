@@ -10,6 +10,16 @@ import 'package:studyflow/sync/sync_status.dart';
 import 'package:studyflow_domain/domain.dart';
 import 'package:studyflow_sync_contract/sync_contract.dart';
 
+const Set<String> _taskFields = <String>{
+  'title',
+  'description',
+  'estimatedMinutes',
+  'priority',
+  'status',
+  'tags',
+  'repeatRule',
+};
+
 final class SyncEngine {
   SyncEngine({
     required SyncApi api,
@@ -53,6 +63,7 @@ final class SyncEngine {
     try {
       final pending = await _store.operations.pending(batchSize);
       if (pending.isNotEmpty) {
+        final taskFieldsByOperation = await _taskFieldsByOperation(pending);
         final pushResult = await _api.push(
           authContext: _authContext,
           operations: pending.map(_toContract).toList(growable: false),
@@ -61,12 +72,16 @@ final class SyncEngine {
           ...pushResult.accepted,
           ...pushResult.duplicates,
         };
+        _validatePushAcknowledgement(pending, pushResult);
         if (pushResult.rejected.isNotEmpty) {
           throw const SyncSchemaFailure(
             'The server rejected one or more encrypted operations.',
           );
         }
-        await _store.operations.removeAcknowledged(acknowledged);
+        await _store.operations.removeAcknowledged(
+          acknowledged,
+          taskFieldsByOperation: taskFieldsByOperation,
+        );
         pushedCount = acknowledged.length;
       }
 
@@ -111,6 +126,20 @@ final class SyncEngine {
         pushedCount,
         cursor,
       );
+    } on SyncConflictFailure {
+      return _failureResult(
+        SyncStatusKind.failed,
+        SyncFailureCategory.protocol,
+        pushedCount,
+        cursor,
+      );
+    } on SyncProtocolFailure {
+      return _failureResult(
+        SyncStatusKind.failed,
+        SyncFailureCategory.protocol,
+        pushedCount,
+        cursor,
+      );
     } on SyncSchemaFailure {
       return _failureResult(
         SyncStatusKind.failed,
@@ -126,6 +155,50 @@ final class SyncEngine {
         cursor,
       );
     }
+  }
+
+  void _validatePushAcknowledgement(
+    List<EncryptedOperation> pending,
+    SyncPushResult result,
+  ) {
+    final pendingIds =
+        pending.map((operation) => operation.operationId).toSet();
+    final accepted = result.accepted.toSet();
+    final duplicates = result.duplicates.toSet();
+    final rejected = result.rejected.toSet();
+    final acknowledged = <String>{...accepted, ...duplicates};
+    if (accepted.intersection(duplicates).isNotEmpty ||
+        accepted.intersection(rejected).isNotEmpty ||
+        duplicates.intersection(rejected).isNotEmpty ||
+        !pendingIds.containsAll(<String>{...acknowledged, ...rejected})) {
+      throw const SyncProtocolFailure(
+        'Synchronization acknowledgement does not match the pending queue.',
+      );
+    }
+  }
+
+  Future<Map<String, Set<String>>> _taskFieldsByOperation(
+    List<EncryptedOperation> operations,
+  ) async {
+    final result = <String, Set<String>>{};
+    for (final operation in operations) {
+      if (operation.entityType != EncryptedEntityType.task.wireName) {
+        continue;
+      }
+      final snapshot = await _store.operations.snapshotFor(operation);
+      final previous = snapshot.previousVersion;
+      if (previous == null) {
+        result[operation.operationId] = Set<String>.from(_taskFields);
+        continue;
+      }
+      final currentJson = _jsonObject(await _decryptOperation(operation));
+      final previousJson = _jsonObject(await _decryptOperation(previous));
+      result[operation.operationId] = <String>{
+        for (final field in _taskFields)
+          if (!_jsonValueEquals(currentJson[field], previousJson[field])) field,
+      };
+    }
+    return result;
   }
 
   Future<SyncRunResult> _failureResult(
@@ -269,28 +342,38 @@ final class SyncEngine {
   Future<SyncRecordMutation> _mergeTask(
     EncryptedOperation remoteOperation,
     SyncRecordSnapshot snapshot,
-    Map<String, Object?> remoteJson,
+    Map<String, Object?> remotePayload,
   ) async {
     final localTask = Task.fromJson(await _decryptRecordJson(snapshot.record!));
-    final remoteTask = Task.fromJson(remoteJson);
-    Map<String, Object?> mergedJson = remoteTask.toJson();
-    final localVersion = snapshot.currentVersion;
-    final baseVersion = snapshot.previousVersion;
-    if (localVersion != null &&
-        baseVersion != null &&
-        localVersion.deviceId != remoteOperation.deviceId &&
-        localVersion.logicalClock == remoteOperation.logicalClock) {
-      mergedJson = _threeWayTaskMerge(
-        base: Task.fromJson(
-          _jsonObject(await _decryptOperation(baseVersion)),
-        ).toJson(),
-        local: localTask.toJson(),
-        remote: remoteTask.toJson(),
-        remoteWinsTie: _compareStamp(remoteOperation, localVersion) > 0,
-      );
-    } else if (localVersion != null &&
-        _compareStamp(remoteOperation, localVersion) < 0) {
-      mergedJson = localTask.toJson();
+    final remoteTask = Task.fromJson(remotePayload);
+    final localJson = localTask.toJson();
+    final remoteJson = remoteTask.toJson();
+    final baseJson = snapshot.previousVersion == null
+        ? null
+        : _jsonObject(await _decryptOperation(snapshot.previousVersion!));
+    final mergedJson = <String, Object?>{'id': localJson['id']};
+    final acceptedFields = <String>{};
+    for (final field in _taskFields) {
+      final remoteChanged = baseJson == null ||
+          !_jsonValueEquals(remoteJson[field], baseJson[field]);
+      final currentStamp = snapshot.taskFieldVersions[field] ??
+          (snapshot.currentVersion == null
+              ? null
+              : SyncFieldVersion(
+                  logicalClock: snapshot.currentVersion!.logicalClock,
+                  deviceId: snapshot.currentVersion!.deviceId,
+                  operationId: snapshot.currentVersion!.operationId,
+                ));
+      if (remoteChanged &&
+          _compareTaskFieldStamp(remoteOperation, currentStamp) > 0) {
+        mergedJson[field] = remoteJson[field];
+        acceptedFields.add(field);
+      } else {
+        mergedJson[field] = localJson[field];
+      }
+    }
+    if (acceptedFields.isEmpty) {
+      return SyncRecordMutation(recordIncomingVersion: false);
     }
 
     final encrypted = await _cipher.encrypt(
@@ -312,6 +395,7 @@ final class SyncEngine {
     return SyncRecordMutation(
       recordsToPut: <EncryptedLocalRecord>[_localRecord(canonicalVersion)],
       versionOperation: canonicalVersion,
+      taskFieldsToStamp: acceptedFields,
     );
   }
 
@@ -417,36 +501,22 @@ final class SyncEngine {
     );
   }
 
-  Map<String, Object?> _threeWayTaskMerge({
-    required Map<String, Object?> base,
-    required Map<String, Object?> local,
-    required Map<String, Object?> remote,
-    required bool remoteWinsTie,
-  }) {
-    final merged = <String, Object?>{'id': local['id']};
-    for (final field in <String>[
-      'title',
-      'description',
-      'estimatedMinutes',
-      'priority',
-      'status',
-      'tags',
-      'repeatRule',
-    ]) {
-      final localChanged = !_jsonValueEquals(local[field], base[field]);
-      final remoteChanged = !_jsonValueEquals(remote[field], base[field]);
-      merged[field] = switch ((localChanged, remoteChanged)) {
-        (true, false) => local[field],
-        (false, true) => remote[field],
-        (true, true) => remoteWinsTie ? remote[field] : local[field],
-        (false, false) => base[field],
-      };
-    }
-    return merged;
-  }
-
   bool _jsonValueEquals(Object? left, Object? right) =>
       jsonEncode(left) == jsonEncode(right);
+
+  int _compareTaskFieldStamp(
+    EncryptedOperation incoming,
+    SyncFieldVersion? current,
+  ) {
+    if (current == null) {
+      return 1;
+    }
+    final clockComparison =
+        incoming.logicalClock.compareTo(current.logicalClock);
+    return clockComparison == 0
+        ? incoming.deviceId.compareTo(current.deviceId)
+        : clockComparison;
+  }
 
   int _compareStamp(EncryptedOperation left, EncryptedOperation right) {
     final clockComparison = left.logicalClock.compareTo(right.logicalClock);

@@ -113,6 +113,68 @@ void main() {
     expect(merged.status, TaskStatus.completed);
   });
 
+  test('stale task pulls never regress the payload or field stamp', () async {
+    final api = PagedSyncApi();
+    final fixture = await testEngine(api: api, seedPendingTask: false);
+    await fixture.taskRepository.save(
+      testTask(title: 'Local clock 10'),
+      write: EncryptedWrite(
+        operationId: '16161616-1616-4616-8616-161616161616',
+        deviceId: _deviceId,
+        logicalClock: 10,
+      ),
+    );
+    await fixture.engine.runOnce();
+
+    api.pages = <List<SyncOperationV1>>[
+      <SyncOperationV1>[
+        await fixture.encryptOperation(
+          operationId: '17171717-1717-4717-8717-171717171717',
+          recordId: _taskId,
+          deviceId: '66666666-6666-4666-8666-666666666666',
+          logicalClock: 5,
+          entityType: 'task',
+          payload: testTask(title: 'Remote clock 5').toJson(),
+        ),
+      ],
+      <SyncOperationV1>[
+        await fixture.encryptOperation(
+          operationId: '18181818-1818-4818-8818-181818181818',
+          recordId: _taskId,
+          deviceId: '66666666-6666-4666-8666-666666666666',
+          logicalClock: 7,
+          entityType: 'task',
+          payload: testTask(title: 'Remote clock 7').toJson(),
+        ),
+      ],
+    ];
+
+    await fixture.engine.runOnce();
+    await fixture.engine.runOnce();
+
+    expect(
+        (await fixture.taskRepository.get(_taskId))!.title, 'Local clock 10');
+    final stamp = await fixture.store.operations.taskFieldVersion(
+      _taskId,
+      'title',
+    );
+    expect(stamp!.logicalClock, 10);
+    expect(stamp.deviceId, _deviceId);
+  });
+
+  test(
+      'malformed push acknowledgement retains queue and exposes protocol retry',
+      () async {
+    final fixture = await testEngine(api: MalformedAckApi());
+
+    final result = await fixture.engine.runOnce();
+
+    expect(result.failureCategory, SyncFailureCategory.protocol);
+    expect(fixture.engine.status.value.kind, SyncStatusKind.failed);
+    expect(fixture.engine.status.value.retry, isNotNull);
+    expect(await fixture.engine.pendingCount(), 1);
+  });
+
   test('simultaneous schedule edits preserve a conflict copy', () async {
     const blockId = '99999999-9999-4999-8999-999999999999';
     const conflictOperationId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -315,6 +377,26 @@ void main() {
     expect(requestCount, 2);
   });
 
+  test('HTTP 409 and 422 are typed protocol/schema failures', () async {
+    final responses = <http.Response>[
+      http.Response('{}', 409),
+      http.Response('{}', 422),
+    ];
+    final api = HttpSyncApi(
+      baseUri: Uri.parse('https://api.studyflow.test'),
+      client: MockClient((_) async => responses.removeAt(0)),
+    );
+
+    await expectLater(
+      api.push(authContext: testAuthContext(), operations: const []),
+      throwsA(isA<SyncConflictFailure>()),
+    );
+    await expectLater(
+      api.push(authContext: testAuthContext(), operations: const []),
+      throwsA(isA<SyncSchemaFailure>()),
+    );
+  });
+
   test('app providers expose a usable engine and its status', () async {
     final api = ScriptedSyncApi();
     final fixture = await testEngine(api: api, seedPendingTask: false);
@@ -410,6 +492,81 @@ void main() {
     expect(result.failureCategory, SyncFailureCategory.schema);
     expect(await fixture.store.operations.lastCommittedCursor(), 0);
   });
+
+  test('invalid later pull rolls back an earlier record write and cursor',
+      () async {
+    final api = ScriptedSyncApi();
+    final fixture = await testEngine(api: api, seedPendingTask: false);
+    api
+      ..nextCursor = 9
+      ..pulledOperations = <SyncOperationV1>[
+        await fixture.encryptOperation(
+          operationId: '19191919-1919-4919-8919-191919191919',
+          recordId: _taskId,
+          deviceId: '66666666-6666-4666-8666-666666666666',
+          logicalClock: 1,
+          entityType: 'task',
+          payload: testTask(title: 'Should roll back').toJson(),
+        ),
+        await fixture.encryptOperation(
+          operationId: '20202020-2020-4020-8020-202020202020',
+          recordId: '21212121-2121-4121-8121-212121212121',
+          deviceId: '66666666-6666-4666-8666-666666666666',
+          logicalClock: 2,
+          entityType: 'check_in',
+          payload: const <String, Object?>{
+            'id': '21212121-2121-4121-8121-212121212121',
+          },
+        ),
+      ];
+
+    final result = await fixture.engine.runOnce();
+
+    expect(result.failureCategory, SyncFailureCategory.schema);
+    expect(await fixture.taskRepository.get(_taskId), isNull);
+    expect(await fixture.store.operations.lastCommittedCursor(), 0);
+  });
+
+  test('push success then pull failure removes acked queue but not cursor',
+      () async {
+    final fixture = await testEngine(api: PushThenPullFailureApi());
+
+    final result = await fixture.engine.runOnce();
+
+    expect(result.failureCategory, SyncFailureCategory.network);
+    expect(result.pushedCount, 1);
+    expect(await fixture.engine.pendingCount(), 0);
+    expect(await fixture.store.operations.lastCommittedCursor(), 0);
+    expect(fixture.engine.status.value.kind, SyncStatusKind.failed);
+    expect(fixture.engine.status.value.retry, isNotNull);
+  });
+
+  test('cursor state is isolated between account stores', () async {
+    final accountAStore = await openAccountStore(_accountId);
+    const accountB = '23232323-2323-4323-8323-232323232323';
+    final accountBStore = await openAccountStore(accountB);
+
+    await accountAStore.operations.commitCursor(11);
+    expect(await accountAStore.operations.lastCommittedCursor(), 11);
+    expect(await accountBStore.operations.lastCommittedCursor(), 0);
+
+    await accountBStore.operations.commitCursor(22);
+    expect(await accountBStore.operations.lastCommittedCursor(), 22);
+    expect(await accountAStore.operations.lastCommittedCursor(), 11);
+  });
+
+  test('captured pushed payload contains ciphertext and no plaintext fields',
+      () async {
+    final api = ScriptedSyncApi();
+    final fixture = await testEngine(api: api);
+
+    await fixture.engine.runOnce();
+
+    final captured = jsonEncode(api.capturedPushes.single.toJson());
+    expect(captured, contains('payloadCiphertext'));
+    expect(captured, isNot(contains('Algebra')));
+    expect(captured, isNot(contains('Chapter 1')));
+  });
 }
 
 Future<void> expectFailureRetainsQueue(
@@ -465,6 +622,35 @@ final class FailingSyncApi implements SyncApi {
 final class ScriptedSyncApi implements SyncApi {
   List<SyncOperationV1> pulledOperations = <SyncOperationV1>[];
   int nextCursor = 0;
+  final List<SyncOperationV1> capturedPushes = <SyncOperationV1>[];
+
+  @override
+  Future<SyncPushResult> push({
+    required AuthContext authContext,
+    required List<SyncOperationV1> operations,
+  }) async {
+    capturedPushes.addAll(operations);
+    return SyncPushResult(
+      accepted: operations.map((operation) => operation.operationId).toList(),
+      duplicates: const <String>[],
+      rejected: const <String>[],
+    );
+  }
+
+  @override
+  Future<SyncPullResult> pull({
+    required AuthContext authContext,
+    required int after,
+    int limit = 50,
+  }) async =>
+      SyncPullResult(
+        nextCursor: nextCursor,
+        operations: pulledOperations,
+      );
+}
+
+final class PagedSyncApi implements SyncApi {
+  List<List<SyncOperationV1>> pages = <List<SyncOperationV1>>[];
 
   @override
   Future<SyncPushResult> push({
@@ -482,11 +668,54 @@ final class ScriptedSyncApi implements SyncApi {
     required AuthContext authContext,
     required int after,
     int limit = 50,
+  }) async {
+    final operations = pages.isEmpty ? <SyncOperationV1>[] : pages.removeAt(0);
+    return SyncPullResult(
+        nextCursor: operations.isEmpty ? after : after + 1,
+        operations: operations);
+  }
+}
+
+final class MalformedAckApi implements SyncApi {
+  @override
+  Future<SyncPushResult> push({
+    required AuthContext authContext,
+    required List<SyncOperationV1> operations,
   }) async =>
-      SyncPullResult(
-        nextCursor: nextCursor,
-        operations: pulledOperations,
+      SyncPushResult(
+        accepted: const <String>['not-a-uuid'],
+        duplicates: const <String>[],
+        rejected: const <String>[],
       );
+
+  @override
+  Future<SyncPullResult> pull({
+    required AuthContext authContext,
+    required int after,
+    int limit = 50,
+  }) async =>
+      SyncPullResult(nextCursor: after, operations: const []);
+}
+
+final class PushThenPullFailureApi implements SyncApi {
+  @override
+  Future<SyncPushResult> push({
+    required AuthContext authContext,
+    required List<SyncOperationV1> operations,
+  }) async =>
+      SyncPushResult(
+        accepted: operations.map((operation) => operation.operationId).toList(),
+        duplicates: const <String>[],
+        rejected: const <String>[],
+      );
+
+  @override
+  Future<SyncPullResult> pull({
+    required AuthContext authContext,
+    required int after,
+    int limit = 50,
+  }) async =>
+      throw const SyncNetworkFailure('pull unavailable');
 }
 
 final class AlwaysFailingSyncApi implements SyncApi {
@@ -558,6 +787,26 @@ Future<TestEngineFixture> testEngine({
     cipher: cipher,
     taskRepository: taskRepository,
   );
+}
+
+Future<AccountScopedStore> openAccountStore(String accountId) async {
+  final directory =
+      await Directory.systemTemp.createTemp('studyflow-account-scope-');
+  final keyManager = KeyManager(
+    accountId: accountId,
+    store: MemorySecureKeyStore(),
+  );
+  await keyManager.createAccountDataKey();
+  final store = await AccountScopedStore.openForTesting(
+    activeAccountId: accountId,
+    keyManager: keyManager,
+    baseDirectory: directory,
+  );
+  addTearDown(() async {
+    await store.close();
+    await directory.delete(recursive: true);
+  });
+  return store;
 }
 
 AuthContext testAuthContext() => AuthContext(

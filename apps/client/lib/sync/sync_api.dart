@@ -118,6 +118,16 @@ final class HttpSyncApi implements SyncApi {
           'Synchronization credentials were rejected.',
         );
       }
+      if (response.statusCode == 409) {
+        throw const SyncConflictFailure(
+          'Synchronization operation conflicts with server state.',
+        );
+      }
+      if (response.statusCode == 422) {
+        throw const SyncSchemaFailure(
+          'Synchronization request violated the server contract.',
+        );
+      }
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw SyncNetworkFailure(
           'Synchronization server returned HTTP ${response.statusCode}.',
@@ -160,7 +170,20 @@ final class SyncPushResult {
     required Iterable<String> rejected,
   })  : accepted = List<String>.unmodifiable(accepted),
         duplicates = List<String>.unmodifiable(duplicates),
-        rejected = List<String>.unmodifiable(rejected);
+        rejected = List<String>.unmodifiable(rejected) {
+    for (final operationId in <String>[
+      ...this.accepted,
+      ...this.duplicates,
+      ...this.rejected,
+    ]) {
+      if (!_canonicalUuidPattern.hasMatch(operationId)) {
+        throw const SyncProtocolFailure(
+          'Synchronization acknowledgement contains a non-canonical '
+          'operation ID.',
+        );
+      }
+    }
+  }
 
   final List<String> accepted;
   final List<String> duplicates;
@@ -205,9 +228,21 @@ final class SyncSchemaFailure extends SyncApiFailure {
   const SyncSchemaFailure(super.message, {super.cause});
 }
 
+class SyncProtocolFailure extends SyncApiFailure {
+  const SyncProtocolFailure(super.message, {super.cause});
+}
+
+final class SyncConflictFailure extends SyncProtocolFailure {
+  const SyncConflictFailure(super.message, {super.cause});
+}
+
 final class SyncDecryptionFailure extends SyncApiFailure {
   const SyncDecryptionFailure(super.message, {super.cause});
 }
+
+final RegExp _canonicalUuidPattern = RegExp(
+  r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+);
 
 Uri _validateBaseUri(Uri uri) {
   final loopback =

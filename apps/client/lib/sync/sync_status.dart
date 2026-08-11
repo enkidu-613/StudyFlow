@@ -2,7 +2,13 @@ import 'package:flutter/foundation.dart';
 
 enum SyncStatusKind { idle, syncing, offline, failed }
 
-enum SyncFailureCategory { network, authentication, decryption, schema }
+enum SyncFailureCategory {
+  network,
+  authentication,
+  decryption,
+  schema,
+  protocol,
+}
 
 enum SyncRunOutcome { succeeded, failed }
 

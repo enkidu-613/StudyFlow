@@ -154,7 +154,11 @@ class OperationDao {
     return (await query.getSingle()).read(count) ?? 0;
   }
 
-  Future<void> removeAcknowledged(Set<String> operationIds) async {
+  Future<void> removeAcknowledged(
+    Set<String> operationIds, {
+    Map<String, Set<String>> taskFieldsByOperation =
+        const <String, Set<String>>{},
+  }) async {
     if (operationIds.isEmpty) {
       return;
     }
@@ -164,6 +168,7 @@ class OperationDao {
     await _database.transaction(() async {
       await _ensureAppliedOperationsTable();
       await _ensureRecordVersionsTable();
+      await _ensureTaskFieldVersionsTable();
       final acknowledgedRows = await (_database.select(
         _database.pendingOperations,
       )
@@ -196,6 +201,7 @@ class OperationDao {
             isTombstone: row.isTombstone,
             schemaVersion: row.schemaVersion,
           ),
+          taskFields: taskFieldsByOperation[row.operationId],
         );
       }
       await (_database.delete(_database.pendingOperations)
@@ -231,6 +237,48 @@ class OperationDao {
       ],
     ).getSingle();
     return row.read<int>('tombstone_count');
+  }
+
+  Future<SyncFieldVersion?> taskFieldVersion(
+    String recordId,
+    String fieldName,
+  ) async {
+    final normalizedRecordId = _normalizedUuid(recordId, 'recordId');
+    if (!_taskFields.contains(fieldName)) {
+      throw ArgumentError.value(fieldName, 'fieldName', 'is not a task field');
+    }
+    await _ensureTaskFieldVersionsTable();
+    final row = await _database.customSelect(
+      'SELECT logical_clock, device_id, operation_id '
+      'FROM sync_task_field_versions '
+      'WHERE account_id = ? AND record_id = ? AND field_name = ?',
+      variables: <Variable<Object>>[
+        Variable<String>(_database.activeAccountId),
+        Variable<String>(normalizedRecordId),
+        Variable<String>(fieldName),
+      ],
+    ).getSingleOrNull();
+    if (row == null) {
+      return null;
+    }
+    return SyncFieldVersion(
+      logicalClock: row.read<int>('logical_clock'),
+      deviceId: row.read<String>('device_id'),
+      operationId: row.read<String>('operation_id'),
+    );
+  }
+
+  Future<SyncRecordSnapshot> snapshotFor(EncryptedOperation operation) async {
+    await _ensureRecordVersionsTable();
+    await _ensureTaskFieldVersionsTable();
+    final entityType = _entityTypeFor(operation.entityType);
+    final versions = await _readVersions(operation.recordId);
+    return SyncRecordSnapshot(
+      record: await _readRecord(entityType, operation.recordId),
+      currentVersion: versions.isEmpty ? null : versions.first,
+      previousVersion: versions.length < 2 ? null : versions[1],
+      taskFieldVersions: await _readTaskFieldVersions(operation.recordId),
+    );
   }
 
   Future<void> commitCursor(int cursor) async {
@@ -274,6 +322,7 @@ class OperationDao {
       await _ensureRecordVersionsTable();
       await _ensureTombstonesTable();
       await _ensureSyncCursorTable();
+      await _ensureTaskFieldVersionsTable();
       var appliedCount = 0;
       for (final operation in operations) {
         if (operation.accountId != _database.activeAccountId) {
@@ -299,6 +348,7 @@ class OperationDao {
           record: await _readRecord(entityType, operation.recordId),
           currentVersion: versions.isEmpty ? null : versions.first,
           previousVersion: versions.length < 2 ? null : versions[1],
+          taskFieldVersions: await _readTaskFieldVersions(operation.recordId),
         );
         final mutation = await resolve(operation, snapshot);
         for (final record in mutation.recordsToPut) {
@@ -312,7 +362,10 @@ class OperationDao {
           );
         }
         if (mutation.recordIncomingVersion) {
-          await _recordVersion(mutation.versionOperation ?? operation);
+          await _recordVersion(
+            mutation.versionOperation ?? operation,
+            taskFields: mutation.taskFieldsToStamp,
+          );
         }
         if (operation.isTombstone) {
           await _retainTombstone(operation);
@@ -389,25 +442,98 @@ class OperationDao {
         .toList(growable: false);
   }
 
-  Future<void> _recordVersion(EncryptedOperation operation) =>
-      _database.customStatement(
-        'INSERT OR IGNORE INTO sync_record_versions '
-        '(account_id, operation_id, record_id, device_id, logical_clock, '
-        'entity_type, payload_nonce, payload_ciphertext, is_tombstone, '
-        'schema_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        <Object?>[
-          operation.accountId,
-          operation.operationId,
-          operation.recordId,
-          operation.deviceId,
-          operation.logicalClock,
-          operation.entityType,
-          operation.payloadNonce,
-          operation.payloadCiphertext,
-          operation.isTombstone,
-          operation.schemaVersion,
-        ],
-      );
+  Future<Map<String, SyncFieldVersion>> _readTaskFieldVersions(
+    String recordId,
+  ) async {
+    final rows = await _database.customSelect(
+      'SELECT field_name, logical_clock, device_id, operation_id '
+      'FROM sync_task_field_versions '
+      'WHERE account_id = ? AND record_id = ?',
+      variables: <Variable<Object>>[
+        Variable<String>(_database.activeAccountId),
+        Variable<String>(recordId),
+      ],
+    ).get();
+    return <String, SyncFieldVersion>{
+      for (final row in rows)
+        row.read<String>('field_name'): SyncFieldVersion(
+          logicalClock: row.read<int>('logical_clock'),
+          deviceId: row.read<String>('device_id'),
+          operationId: row.read<String>('operation_id'),
+        ),
+    };
+  }
+
+  Future<void> _recordVersion(
+    EncryptedOperation operation, {
+    Set<String>? taskFields,
+  }) async {
+    await _database.customStatement(
+      'INSERT OR IGNORE INTO sync_record_versions '
+      '(account_id, operation_id, record_id, device_id, logical_clock, '
+      'entity_type, payload_nonce, payload_ciphertext, is_tombstone, '
+      'schema_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      <Object?>[
+        operation.accountId,
+        operation.operationId,
+        operation.recordId,
+        operation.deviceId,
+        operation.logicalClock,
+        operation.entityType,
+        operation.payloadNonce,
+        operation.payloadCiphertext,
+        operation.isTombstone,
+        operation.schemaVersion,
+      ],
+    );
+    if (operation.entityType == 'task') {
+      final fields = taskFields ?? _taskFields;
+      for (final fieldName in fields) {
+        if (!_taskFields.contains(fieldName)) {
+          throw ArgumentError.value(
+            fieldName,
+            'taskFields',
+            'is not a supported task field',
+          );
+        }
+        final current = await _database.customSelect(
+          'SELECT logical_clock, device_id FROM sync_task_field_versions '
+          'WHERE account_id = ? AND record_id = ? AND field_name = ?',
+          variables: <Variable<Object>>[
+            Variable<String>(operation.accountId),
+            Variable<String>(operation.recordId),
+            Variable<String>(fieldName),
+          ],
+        ).getSingleOrNull();
+        if (current != null &&
+            _compareFieldStamp(
+                  operation.logicalClock,
+                  operation.deviceId,
+                  current.read<int>('logical_clock'),
+                  current.read<String>('device_id'),
+                ) <=
+                0) {
+          continue;
+        }
+        await _database.customStatement(
+          'INSERT INTO sync_task_field_versions '
+          '(account_id, record_id, field_name, logical_clock, device_id, '
+          'operation_id) VALUES (?, ?, ?, ?, ?, ?) '
+          'ON CONFLICT(account_id, record_id, field_name) DO UPDATE SET '
+          'logical_clock = excluded.logical_clock, '
+          'device_id = excluded.device_id, operation_id = excluded.operation_id',
+          <Object?>[
+            operation.accountId,
+            operation.recordId,
+            fieldName,
+            operation.logicalClock,
+            operation.deviceId,
+            operation.operationId,
+          ],
+        );
+      }
+    }
+  }
 
   Future<void> _retainTombstone(EncryptedOperation operation) =>
       _database.customStatement(
@@ -478,6 +604,26 @@ class OperationDao {
         'schema_version INTEGER NOT NULL, '
         'PRIMARY KEY(account_id, operation_id))',
       );
+
+  Future<void> _ensureTaskFieldVersionsTable() => _database.customStatement(
+        'CREATE TABLE IF NOT EXISTS sync_task_field_versions ('
+        'account_id TEXT NOT NULL, record_id TEXT NOT NULL, '
+        'field_name TEXT NOT NULL, logical_clock INTEGER NOT NULL, '
+        'device_id TEXT NOT NULL, operation_id TEXT NOT NULL, '
+        'PRIMARY KEY(account_id, record_id, field_name))',
+      );
+}
+
+final class SyncFieldVersion {
+  const SyncFieldVersion({
+    required this.logicalClock,
+    required this.deviceId,
+    required this.operationId,
+  });
+
+  final int logicalClock;
+  final String deviceId;
+  final String operationId;
 }
 
 final class SyncRecordSnapshot {
@@ -485,11 +631,13 @@ final class SyncRecordSnapshot {
     required this.record,
     required this.currentVersion,
     required this.previousVersion,
+    required this.taskFieldVersions,
   });
 
   final EncryptedLocalRecord? record;
   final EncryptedOperation? currentVersion;
   final EncryptedOperation? previousVersion;
+  final Map<String, SyncFieldVersion> taskFieldVersions;
 }
 
 final class SyncRecordMutation {
@@ -499,6 +647,7 @@ final class SyncRecordMutation {
     Iterable<String> recordIdsToDelete = const <String>[],
     this.recordIncomingVersion = true,
     this.versionOperation,
+    this.taskFieldsToStamp,
   })  : recordsToPut = List<EncryptedLocalRecord>.unmodifiable(recordsToPut),
         recordIdsToDelete = List<String>.unmodifiable(recordIdsToDelete);
 
@@ -506,6 +655,7 @@ final class SyncRecordMutation {
   final List<String> recordIdsToDelete;
   final bool recordIncomingVersion;
   final EncryptedOperation? versionOperation;
+  final Set<String>? taskFieldsToStamp;
 }
 
 final class SyncPullApplyResult {
@@ -550,6 +700,28 @@ const Set<String> _entityTypes = <String>{
   'focus_session',
   'check_in',
 };
+
+const Set<String> _taskFields = <String>{
+  'title',
+  'description',
+  'estimatedMinutes',
+  'priority',
+  'status',
+  'tags',
+  'repeatRule',
+};
+
+int _compareFieldStamp(
+  int leftClock,
+  String leftDevice,
+  int rightClock,
+  String rightDevice,
+) {
+  final clockComparison = leftClock.compareTo(rightClock);
+  return clockComparison == 0
+      ? leftDevice.compareTo(rightDevice)
+      : clockComparison;
+}
 
 String _normalizedUuid(String value, String fieldName) {
   final normalized = value.toLowerCase();
