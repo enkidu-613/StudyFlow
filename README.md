@@ -75,6 +75,16 @@ cd apps/client && bash ../../tool/flutter run \
 Device acceptance matrices: `tests/device/android-originos6-matrix.md`
 (iQOO Z9 Turbo) and `tests/device/macos-matrix.md`.
 
+## 技术地图
+
+| 层 | 本项目实际采用 | 负责什么 | 不负责什么 |
+|---|---|---|---|
+| 客户端 | Flutter（Dart、Riverpod、GoRouter、Drift/SQLite） | 页面、设备能力、本地安全存储（token/AI Key） | 不保存服务端密钥、不做数据库管理 |
+| API | FastAPI（Pydantic v2、SQLAlchemy Async、PyJWT、Argon2id） | 邮箱认证、JSON 同步、日程策略 | 不保存 AI Key、不执行定时 AI 任务 |
+| 数据库 | PostgreSQL 16（VPS Docker 内网，JSONB） | 用户、会话、任务、日程和同步数据 | 不存明文密码（仅 Argon2id 哈希） |
+| 反向代理 | Caddy（Docker 内网，仅发布 80/443） | HTTPS、域名转发、自动证书 | 不负责业务认证 |
+| DNS/CDN | Cloudflare（A 记录 + 可选代理） | 域名解析、边缘加速 | 不负责数据库端口转发 |
+
 ## 部署
 
 完整的 Debian 12、Docker、Caddy、Cloudflare、防火墙和加密备份步骤请阅读

@@ -192,6 +192,35 @@ void main() {
     expect(find.text('连接失败：API Key 无效，请检查后重试。'), findsOneWidget);
   });
 
+  testWidgets('clear removes the saved configuration after confirmation',
+      (tester) async {
+    final store = MemoryAiSettingsStore(
+      initial: const AiSettings(
+        baseUrl: 'https://api.openai.com/v1',
+        model: 'gpt-4o-mini',
+        apiKey: 'sk-secret',
+        enabled: true,
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AiSettingsScreen(store: store, repository: RecordingAiRepository()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('ai-clear-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('ai-clear-confirm-button')));
+    await tester.pumpAndSettle();
+
+    expect(store.initial.baseUrl, isEmpty);
+    expect(store.initial.model, isEmpty);
+    expect(store.initial.apiKey, isEmpty);
+    expect(store.initial.enabled, isFalse);
+    expect(find.text('已清除'), findsOneWidget);
+  });
+
   test('AiSettings.toString never contains the API key', () {
     const settings = AiSettings(
       baseUrl: 'https://api.openai.com/v1',

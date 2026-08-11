@@ -117,6 +117,48 @@ final class _AiSettingsScreenState extends State<AiSettingsScreen> {
     }
   }
 
+  Future<void> _clear() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('清除 AI 配置'),
+        content: const Text('将删除本机的 Base URL、模型和 API Key，确定吗？'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            key: const Key('ai-clear-confirm-button'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('清除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) {
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await widget.store.clear();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _baseUrlController.clear();
+        _modelController.clear();
+        _apiKeyController.clear();
+        _enabled = false;
+        _testResult = '已清除';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -197,6 +239,16 @@ final class _AiSettingsScreenState extends State<AiSettingsScreen> {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    key: const Key('ai-clear-button'),
+                    onPressed: _saving ? null : _clear,
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('清除配置'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                    ),
                   ),
                   if (_testResult != null) ...<Widget>[
                     const SizedBox(height: 12),
