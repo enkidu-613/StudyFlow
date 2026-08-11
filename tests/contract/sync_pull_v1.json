@@ -1,0 +1,16 @@
+{
+  "next_cursor": 8,
+  "operations": [
+    {
+      "operationId": "44444444-4444-4444-8444-444444444444",
+      "recordId": "55555555-5555-4555-8555-555555555555",
+      "deviceId": "66666666-6666-4666-8666-666666666666",
+      "logicalClock": 8,
+      "entityType": "focus_session",
+      "payloadNonce": "bm9uY2UtdjE=",
+      "payloadCiphertext": "ZW5jcnlwdGVkLWZvY3VzLXBheWxvYWQ=",
+      "isTombstone": false,
+      "schemaVersion": 1
+    }
+  ]
+}
