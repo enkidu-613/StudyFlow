@@ -464,7 +464,7 @@ git commit -m "feat: add offline-first client synchronization"
 - The first UI routes are `/today`, `/tasks`, `/schedule`, `/focus`, and `/settings`.
 - `platform_bridge_test.dart` defines `UnsupportedPlatform` and a minimal valid `rule` fixture; both are test-only.
 
-- [ ] **Step 1: Write platform fallback and navigation tests**
+- [x] **Step 1: Write platform fallback and navigation tests**
 
 ```dart
 test('unsupported restriction capability is explicit', () async {
@@ -475,17 +475,17 @@ test('unsupported restriction capability is explicit', () async {
 });
 ```
 
-- [ ] **Step 2: Run platform tests before native adapters exist**
+- [x] **Step 2: Run platform tests before native adapters exist**
 
 Run: `flutter test apps/client/test/platform/platform_bridge_test.dart`
 
 Expected: FAIL because the platform contract, bridge, and fallback implementation are missing.
 
-- [ ] **Step 3: Implement the shared Flutter shell and native channels**
+- [x] **Step 3: Implement the shared Flutter shell and native channels**
 
 Implement task creation, schedule-block creation, manual completion, focus start/pause/finish, check-in entry, pending-sync count, and explicit permission health status. Android must request notification and exact-alarm status without assuming background survival. macOS must expose UserNotifications authorization and a visible menu-bar/background-running status. Usage summaries and restrictions return `unsupported` until their separate authorization work is completed.
 
-- [ ] **Step 4: Run the client test suite and launch both targets**
+- [x] **Step 4: Run the client test suite and launch both targets**
 
 Run: `flutter test apps/client/test packages/domain/test packages/sync_contract/test`
 
@@ -495,7 +495,7 @@ Run `flutter devices`, select the listed iQOO device identifier, and launch `app
 
 Expected: task creation and focus recording work offline on both targets; the UI displays an explicit offline/pending-sync state.
 
-- [ ] **Step 5: Commit the first usable client loop**
+- [x] **Step 5: Commit the first usable client loop**
 
 ```bash
 git add packages/platform_contract apps/client

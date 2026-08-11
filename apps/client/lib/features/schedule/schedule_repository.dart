@@ -63,18 +63,34 @@ final class ScheduleRepository {
     if (record == null) {
       return null;
     }
+    return _read(record);
+  }
+
+  Future<List<ScheduleBlock>> list() async {
+    final records = await _store
+        .records(EncryptedEntityType.scheduleBlock)
+        .list(accountId: _store.activeAccountId);
+    final blocks = <ScheduleBlock>[];
+    for (final record in records) {
+      blocks.add(await _read(record));
+    }
+    blocks.sort((left, right) => left.start.compareTo(right.start));
+    return blocks;
+  }
+
+  Future<ScheduleBlock> _read(EncryptedLocalRecord record) async {
     final plaintext = await _cipher.decrypt(
       EncryptedPayload(
         nonce: record.payloadNonce,
         ciphertext: record.payloadCiphertext,
       ),
-      _associatedData(blockId),
+      _associatedData(record.recordId),
     );
     final block = ScheduleBlock.fromJson(
       (jsonDecode(utf8.decode(plaintext)) as Map<String, dynamic>)
           .cast<String, Object?>(),
     );
-    if (block.id != blockId) {
+    if (block.id != record.recordId) {
       throw const FormatException(
         'Encrypted schedule record id does not match payload id.',
       );

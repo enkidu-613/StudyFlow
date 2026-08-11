@@ -457,6 +457,38 @@ class EncryptedRecordRepository {
     });
   }
 
+  Future<List<EncryptedLocalRecord>> list({required String accountId}) async {
+    final normalizedAccountId = _normalizedUuid(accountId, 'accountId');
+    _checkAccount(normalizedAccountId);
+
+    return _database.transaction(() async {
+      final rows = await _database.customSelect(
+        'SELECT account_id, record_id, schema_version, payload_nonce, '
+        'payload_ciphertext, updated_at FROM ${entityType.tableName} '
+        'WHERE account_id = ? ORDER BY updated_at ASC',
+        variables: <Variable<Object>>[
+          Variable<String>(normalizedAccountId),
+        ],
+      ).get();
+      return rows
+          .map(
+            (row) => EncryptedLocalRecord(
+              accountId: row.read<String>('account_id'),
+              recordId: row.read<String>('record_id'),
+              entityType: entityType,
+              schemaVersion: row.read<int>('schema_version'),
+              payloadNonce: row.read<Uint8List>('payload_nonce'),
+              payloadCiphertext: row.read<Uint8List>('payload_ciphertext'),
+              updatedAt: DateTime.fromMillisecondsSinceEpoch(
+                row.read<int>('updated_at'),
+                isUtc: true,
+              ),
+            ),
+          )
+          .toList(growable: false);
+    });
+  }
+
   void _checkAccount(String accountId) {
     if (accountId != _database.activeAccountId) {
       throw const StorageAccountScopeException(

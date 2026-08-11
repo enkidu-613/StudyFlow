@@ -1,28 +1,12 @@
 import 'dart:convert';
 
+import 'package:studyflow/features/tasks/task_repository.dart';
 import 'package:studyflow/security/payload_cipher.dart';
 import 'package:studyflow/storage/app_database.dart';
 import 'package:studyflow_domain/domain.dart';
 
-final class EncryptedWrite {
-  EncryptedWrite({
-    required this.operationId,
-    required this.deviceId,
-    required this.logicalClock,
-  }) {
-    if (logicalClock < 0) {
-      throw ArgumentError.value(
-          logicalClock, 'logicalClock', 'must be non-negative');
-    }
-  }
-
-  final String operationId;
-  final String deviceId;
-  final int logicalClock;
-}
-
-final class TaskRepository {
-  TaskRepository({
+final class FocusRepository {
+  FocusRepository({
     required AccountScopedStore store,
     required PayloadCipher cipher,
   })  : _store = store,
@@ -34,19 +18,19 @@ final class TaskRepository {
   final PayloadCipher _cipher;
 
   Future<void> save(
-    Task task, {
+    FocusSession session, {
     required EncryptedWrite write,
     DateTime? updatedAt,
   }) async {
-    final associatedData = _associatedData(task.id);
+    final associatedData = _associatedData(session.id);
     final encrypted = await _cipher.encrypt(
-      utf8.encode(jsonEncode(task.toJson())),
+      utf8.encode(jsonEncode(session.toJson())),
       associatedData,
     );
     final record = EncryptedLocalRecord(
       accountId: _store.activeAccountId,
-      recordId: task.id,
-      entityType: EncryptedEntityType.task,
+      recordId: session.id,
+      entityType: EncryptedEntityType.focusSession,
       schemaVersion: _schemaVersion,
       payloadNonce: encrypted.nonce,
       payloadCiphertext: encrypted.ciphertext,
@@ -55,10 +39,10 @@ final class TaskRepository {
     final operation = EncryptedOperation(
       accountId: _store.activeAccountId,
       operationId: write.operationId,
-      recordId: task.id,
+      recordId: session.id,
       deviceId: write.deviceId,
       logicalClock: write.logicalClock,
-      entityType: EncryptedEntityType.task.wireName,
+      entityType: EncryptedEntityType.focusSession.wireName,
       payloadNonce: encrypted.nonce,
       payloadCiphertext: encrypted.ciphertext,
       isTombstone: false,
@@ -71,10 +55,10 @@ final class TaskRepository {
     });
   }
 
-  Future<Task?> get(String taskId) async {
-    final record = await _store.records(EncryptedEntityType.task).get(
+  Future<FocusSession?> get(String sessionId) async {
+    final record = await _store.records(EncryptedEntityType.focusSession).get(
           accountId: _store.activeAccountId,
-          recordId: taskId,
+          recordId: sessionId,
         );
     if (record == null) {
       return null;
@@ -82,19 +66,19 @@ final class TaskRepository {
     return _read(record);
   }
 
-  Future<List<Task>> list() async {
+  Future<List<FocusSession>> list() async {
     final records = await _store
-        .records(EncryptedEntityType.task)
+        .records(EncryptedEntityType.focusSession)
         .list(accountId: _store.activeAccountId);
-    final tasks = <Task>[];
+    final sessions = <FocusSession>[];
     for (final record in records) {
-      tasks.add(await _read(record));
+      sessions.add(await _read(record));
     }
-    tasks.sort((left, right) => left.title.compareTo(right.title));
-    return tasks;
+    sessions.sort((left, right) => right.startedAt.compareTo(left.startedAt));
+    return sessions;
   }
 
-  Future<Task> _read(EncryptedLocalRecord record) async {
+  Future<FocusSession> _read(EncryptedLocalRecord record) async {
     final plaintext = await _cipher.decrypt(
       EncryptedPayload(
         nonce: record.payloadNonce,
@@ -102,15 +86,16 @@ final class TaskRepository {
       ),
       _associatedData(record.recordId),
     );
-    final task = Task.fromJson(
+    final session = FocusSession.fromJson(
       (jsonDecode(utf8.decode(plaintext)) as Map<String, dynamic>)
           .cast<String, Object?>(),
     );
-    if (task.id != record.recordId) {
+    if (session.id != record.recordId) {
       throw const FormatException(
-          'Encrypted task record id does not match payload id.');
+        'Encrypted focus record id does not match payload id.',
+      );
     }
-    return task;
+    return session;
   }
 
   PayloadAssociatedData _associatedData(String recordId) =>
@@ -118,6 +103,6 @@ final class TaskRepository {
         accountId: _store.activeAccountId,
         recordId: recordId,
         schemaVersion: _schemaVersion,
-        entityType: EncryptedEntityType.task.wireName,
+        entityType: EncryptedEntityType.focusSession.wireName,
       );
 }
