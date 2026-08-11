@@ -1,22 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:studyflow/app/studyflow_workspace.dart';
-import 'package:studyflow/auth/recovery_key_screen.dart';
 import 'package:studyflow/sync/sync_status.dart';
 import 'package:studyflow_platform_contract/platform_contract.dart';
 
 final class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
     required this.workspace,
-    this.recoveryController,
     this.syncStatus,
     this.onSync,
+    this.onLogout,
     super.key,
   });
 
   final StudyFlowWorkspace workspace;
-  final RecoveryKeyController? recoveryController;
   final SyncStatusListenable? syncStatus;
   final Future<SyncRunResult?> Function()? onSync;
+  final Future<void> Function()? onLogout;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -83,28 +82,6 @@ final class _SettingsScreenState extends State<SettingsScreen> {
               status: widget.syncStatus,
               onSync: widget.onSync == null ? null : _syncNow,
             ),
-            if (widget.recoveryController != null)
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.key_outlined),
-                  title: const Text('Account recovery key'),
-                  subtitle: const Text(
-                    'Export it once and store it offline in a private place.',
-                  ),
-                  trailing: IconButton(
-                    key: const Key('open-recovery-screen'),
-                    tooltip: 'Open recovery key',
-                    icon: const Icon(Icons.arrow_forward),
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => RecoveryKeyScreen(
-                          controller: widget.recoveryController!,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
             if (_usageResult != null)
               Card(
                 child: ListTile(
@@ -135,10 +112,36 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                   trailing: Text(state.available ? 'available' : 'unavailable'),
                 ),
               ),
+            if (widget.onLogout != null) ...<Widget>[
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                key: const Key('sign-out-button'),
+                onPressed: _busyLogout ? null : _signOut,
+                icon: const Icon(Icons.logout),
+                label: const Text('Sign out'),
+              ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  bool _busyLogout = false;
+
+  Future<void> _signOut() async {
+    final onLogout = widget.onLogout;
+    if (onLogout == null || _busyLogout) {
+      return;
+    }
+    setState(() => _busyLogout = true);
+    try {
+      await onLogout();
+    } finally {
+      if (mounted) {
+        setState(() => _busyLogout = false);
+      }
+    }
   }
 }
 

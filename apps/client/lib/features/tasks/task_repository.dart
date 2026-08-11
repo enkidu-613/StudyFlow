@@ -1,13 +1,11 @@
 import 'dart:convert';
 
-import 'package:studyflow/security/payload_cipher.dart';
 import 'package:studyflow/storage/app_database.dart';
 import 'package:studyflow_domain/domain.dart';
 
-final class EncryptedWrite {
-  EncryptedWrite({
+final class Write {
+  Write({
     required this.operationId,
-    required this.deviceId,
     required this.logicalClock,
   }) {
     if (logicalClock < 0) {
@@ -17,50 +15,37 @@ final class EncryptedWrite {
   }
 
   final String operationId;
-  final String deviceId;
   final int logicalClock;
 }
 
 final class TaskRepository {
-  TaskRepository({
-    required AccountScopedStore store,
-    required PayloadCipher cipher,
-  })  : _store = store,
-        _cipher = cipher;
+  TaskRepository({required AccountScopedStore store}) : _store = store;
 
   static const int _schemaVersion = 1;
 
   final AccountScopedStore _store;
-  final PayloadCipher _cipher;
 
   Future<void> save(
     Task task, {
-    required EncryptedWrite write,
+    required Write write,
     DateTime? updatedAt,
   }) async {
-    final associatedData = _associatedData(task.id);
-    final encrypted = await _cipher.encrypt(
-      utf8.encode(jsonEncode(task.toJson())),
-      associatedData,
-    );
-    final record = EncryptedLocalRecord(
+    final payload = task.toJson();
+    final record = LocalRecord(
       accountId: _store.activeAccountId,
       recordId: task.id,
-      entityType: EncryptedEntityType.task,
+      entityType: EntityType.task,
       schemaVersion: _schemaVersion,
-      payloadNonce: encrypted.nonce,
-      payloadCiphertext: encrypted.ciphertext,
+      payload: jsonEncode(payload),
       updatedAt: (updatedAt ?? DateTime.now()).toUtc(),
     );
-    final operation = EncryptedOperation(
+    final operation = Operation(
       accountId: _store.activeAccountId,
       operationId: write.operationId,
       recordId: task.id,
-      deviceId: write.deviceId,
       logicalClock: write.logicalClock,
-      entityType: EncryptedEntityType.task.wireName,
-      payloadNonce: encrypted.nonce,
-      payloadCiphertext: encrypted.ciphertext,
+      entityType: EntityType.task.wireName,
+      payload: payload,
       isTombstone: false,
       schemaVersion: _schemaVersion,
     );
@@ -72,7 +57,7 @@ final class TaskRepository {
   }
 
   Future<Task?> get(String taskId) async {
-    final record = await _store.records(EncryptedEntityType.task).get(
+    final record = await _store.records(EntityType.task).get(
           accountId: _store.activeAccountId,
           recordId: taskId,
         );
@@ -84,40 +69,24 @@ final class TaskRepository {
 
   Future<List<Task>> list() async {
     final records = await _store
-        .records(EncryptedEntityType.task)
+        .records(EntityType.task)
         .list(accountId: _store.activeAccountId);
     final tasks = <Task>[];
     for (final record in records) {
-      tasks.add(await _read(record));
+      tasks.add(_read(record));
     }
     tasks.sort((left, right) => left.title.compareTo(right.title));
     return tasks;
   }
 
-  Future<Task> _read(EncryptedLocalRecord record) async {
-    final plaintext = await _cipher.decrypt(
-      EncryptedPayload(
-        nonce: record.payloadNonce,
-        ciphertext: record.payloadCiphertext,
-      ),
-      _associatedData(record.recordId),
-    );
+  Task _read(LocalRecord record) {
     final task = Task.fromJson(
-      (jsonDecode(utf8.decode(plaintext)) as Map<String, dynamic>)
+      (jsonDecode(record.payload) as Map<String, dynamic>)
           .cast<String, Object?>(),
     );
     if (task.id != record.recordId) {
-      throw const FormatException(
-          'Encrypted task record id does not match payload id.');
+      throw const FormatException('Task record id does not match payload id.');
     }
     return task;
   }
-
-  PayloadAssociatedData _associatedData(String recordId) =>
-      PayloadAssociatedData(
-        accountId: _store.activeAccountId,
-        recordId: recordId,
-        schemaVersion: _schemaVersion,
-        entityType: EncryptedEntityType.task.wireName,
-      );
 }

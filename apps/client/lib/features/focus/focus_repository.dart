@@ -1,50 +1,37 @@
 import 'dart:convert';
 
 import 'package:studyflow/features/tasks/task_repository.dart';
-import 'package:studyflow/security/payload_cipher.dart';
 import 'package:studyflow/storage/app_database.dart';
 import 'package:studyflow_domain/domain.dart';
 
 final class FocusRepository {
-  FocusRepository({
-    required AccountScopedStore store,
-    required PayloadCipher cipher,
-  })  : _store = store,
-        _cipher = cipher;
+  FocusRepository({required AccountScopedStore store}) : _store = store;
 
   static const int _schemaVersion = 1;
 
   final AccountScopedStore _store;
-  final PayloadCipher _cipher;
 
   Future<void> save(
     FocusSession session, {
-    required EncryptedWrite write,
+    required Write write,
     DateTime? updatedAt,
   }) async {
-    final associatedData = _associatedData(session.id);
-    final encrypted = await _cipher.encrypt(
-      utf8.encode(jsonEncode(session.toJson())),
-      associatedData,
-    );
-    final record = EncryptedLocalRecord(
+    final payload = session.toJson();
+    final record = LocalRecord(
       accountId: _store.activeAccountId,
       recordId: session.id,
-      entityType: EncryptedEntityType.focusSession,
+      entityType: EntityType.focusSession,
       schemaVersion: _schemaVersion,
-      payloadNonce: encrypted.nonce,
-      payloadCiphertext: encrypted.ciphertext,
+      payload: jsonEncode(payload),
       updatedAt: (updatedAt ?? DateTime.now()).toUtc(),
     );
-    final operation = EncryptedOperation(
+    final operation = Operation(
       accountId: _store.activeAccountId,
       operationId: write.operationId,
       recordId: session.id,
-      deviceId: write.deviceId,
       logicalClock: write.logicalClock,
-      entityType: EncryptedEntityType.focusSession.wireName,
-      payloadNonce: encrypted.nonce,
-      payloadCiphertext: encrypted.ciphertext,
+      entityType: EntityType.focusSession.wireName,
+      payload: payload,
       isTombstone: false,
       schemaVersion: _schemaVersion,
     );
@@ -56,7 +43,7 @@ final class FocusRepository {
   }
 
   Future<FocusSession?> get(String sessionId) async {
-    final record = await _store.records(EncryptedEntityType.focusSession).get(
+    final record = await _store.records(EntityType.focusSession).get(
           accountId: _store.activeAccountId,
           recordId: sessionId,
         );
@@ -68,41 +55,26 @@ final class FocusRepository {
 
   Future<List<FocusSession>> list() async {
     final records = await _store
-        .records(EncryptedEntityType.focusSession)
+        .records(EntityType.focusSession)
         .list(accountId: _store.activeAccountId);
     final sessions = <FocusSession>[];
     for (final record in records) {
-      sessions.add(await _read(record));
+      sessions.add(_read(record));
     }
     sessions.sort((left, right) => right.startedAt.compareTo(left.startedAt));
     return sessions;
   }
 
-  Future<FocusSession> _read(EncryptedLocalRecord record) async {
-    final plaintext = await _cipher.decrypt(
-      EncryptedPayload(
-        nonce: record.payloadNonce,
-        ciphertext: record.payloadCiphertext,
-      ),
-      _associatedData(record.recordId),
-    );
+  FocusSession _read(LocalRecord record) {
     final session = FocusSession.fromJson(
-      (jsonDecode(utf8.decode(plaintext)) as Map<String, dynamic>)
+      (jsonDecode(record.payload) as Map<String, dynamic>)
           .cast<String, Object?>(),
     );
     if (session.id != record.recordId) {
       throw const FormatException(
-        'Encrypted focus record id does not match payload id.',
+        'Focus record id does not match payload id.',
       );
     }
     return session;
   }
-
-  PayloadAssociatedData _associatedData(String recordId) =>
-      PayloadAssociatedData(
-        accountId: _store.activeAccountId,
-        recordId: recordId,
-        schemaVersion: _schemaVersion,
-        entityType: EncryptedEntityType.focusSession.wireName,
-      );
 }

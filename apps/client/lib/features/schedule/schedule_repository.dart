@@ -1,50 +1,37 @@
 import 'dart:convert';
 
 import 'package:studyflow/features/tasks/task_repository.dart';
-import 'package:studyflow/security/payload_cipher.dart';
 import 'package:studyflow/storage/app_database.dart';
 import 'package:studyflow_domain/domain.dart';
 
 final class ScheduleRepository {
-  ScheduleRepository({
-    required AccountScopedStore store,
-    required PayloadCipher cipher,
-  })  : _store = store,
-        _cipher = cipher;
+  ScheduleRepository({required AccountScopedStore store}) : _store = store;
 
   static const int _schemaVersion = 1;
 
   final AccountScopedStore _store;
-  final PayloadCipher _cipher;
 
   Future<void> save(
     ScheduleBlock block, {
-    required EncryptedWrite write,
+    required Write write,
     DateTime? updatedAt,
   }) async {
-    final associatedData = _associatedData(block.id);
-    final encrypted = await _cipher.encrypt(
-      utf8.encode(jsonEncode(block.toJson())),
-      associatedData,
-    );
-    final record = EncryptedLocalRecord(
+    final payload = block.toJson();
+    final record = LocalRecord(
       accountId: _store.activeAccountId,
       recordId: block.id,
-      entityType: EncryptedEntityType.scheduleBlock,
+      entityType: EntityType.scheduleBlock,
       schemaVersion: _schemaVersion,
-      payloadNonce: encrypted.nonce,
-      payloadCiphertext: encrypted.ciphertext,
+      payload: jsonEncode(payload),
       updatedAt: (updatedAt ?? DateTime.now()).toUtc(),
     );
-    final operation = EncryptedOperation(
+    final operation = Operation(
       accountId: _store.activeAccountId,
       operationId: write.operationId,
       recordId: block.id,
-      deviceId: write.deviceId,
       logicalClock: write.logicalClock,
-      entityType: EncryptedEntityType.scheduleBlock.wireName,
-      payloadNonce: encrypted.nonce,
-      payloadCiphertext: encrypted.ciphertext,
+      entityType: EntityType.scheduleBlock.wireName,
+      payload: payload,
       isTombstone: false,
       schemaVersion: _schemaVersion,
     );
@@ -56,7 +43,7 @@ final class ScheduleRepository {
   }
 
   Future<ScheduleBlock?> get(String blockId) async {
-    final record = await _store.records(EncryptedEntityType.scheduleBlock).get(
+    final record = await _store.records(EntityType.scheduleBlock).get(
           accountId: _store.activeAccountId,
           recordId: blockId,
         );
@@ -68,41 +55,26 @@ final class ScheduleRepository {
 
   Future<List<ScheduleBlock>> list() async {
     final records = await _store
-        .records(EncryptedEntityType.scheduleBlock)
+        .records(EntityType.scheduleBlock)
         .list(accountId: _store.activeAccountId);
     final blocks = <ScheduleBlock>[];
     for (final record in records) {
-      blocks.add(await _read(record));
+      blocks.add(_read(record));
     }
     blocks.sort((left, right) => left.start.compareTo(right.start));
     return blocks;
   }
 
-  Future<ScheduleBlock> _read(EncryptedLocalRecord record) async {
-    final plaintext = await _cipher.decrypt(
-      EncryptedPayload(
-        nonce: record.payloadNonce,
-        ciphertext: record.payloadCiphertext,
-      ),
-      _associatedData(record.recordId),
-    );
+  ScheduleBlock _read(LocalRecord record) {
     final block = ScheduleBlock.fromJson(
-      (jsonDecode(utf8.decode(plaintext)) as Map<String, dynamic>)
+      (jsonDecode(record.payload) as Map<String, dynamic>)
           .cast<String, Object?>(),
     );
     if (block.id != record.recordId) {
       throw const FormatException(
-        'Encrypted schedule record id does not match payload id.',
+        'Schedule record id does not match payload id.',
       );
     }
     return block;
   }
-
-  PayloadAssociatedData _associatedData(String recordId) =>
-      PayloadAssociatedData(
-        accountId: _store.activeAccountId,
-        recordId: recordId,
-        schemaVersion: _schemaVersion,
-        entityType: EncryptedEntityType.scheduleBlock.wireName,
-      );
 }

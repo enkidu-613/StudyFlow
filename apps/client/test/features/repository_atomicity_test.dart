@@ -3,26 +3,18 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studyflow/features/schedule/schedule_repository.dart';
 import 'package:studyflow/features/tasks/task_repository.dart';
-import 'package:studyflow/security/key_manager.dart';
-import 'package:studyflow/security/payload_cipher.dart';
 import 'package:studyflow/storage/app_database.dart';
 import 'package:studyflow_domain/domain.dart';
 
 const _accountId = '11111111-1111-4111-8111-111111111111';
-const _deviceId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const _operationId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
 void main() {
   late Directory temporaryDirectory;
-  late MemorySecureKeyStore keyStore;
-  late KeyManager keyManager;
 
   setUp(() async {
     temporaryDirectory =
         await Directory.systemTemp.createTemp('studyflow-repository-');
-    keyStore = MemorySecureKeyStore();
-    keyManager = KeyManager(accountId: _accountId, store: keyStore);
-    await keyManager.createAccountDataKey();
   });
 
   tearDown(() async {
@@ -33,7 +25,6 @@ void main() {
       () async {
     var injectFailure = true;
     final store = await openStore(
-      keyManager,
       temporaryDirectory,
       transactionFailureInjector: () async {
         if (injectFailure) {
@@ -45,7 +36,6 @@ void main() {
     addTearDown(store.close);
     final repository = TaskRepository(
       store: store,
-      cipher: PayloadCipher(keyManager),
     );
 
     await expectLater(
@@ -57,7 +47,7 @@ void main() {
     );
 
     expect(
-      await store.records(EncryptedEntityType.task).get(
+      await store.records(EntityType.task).get(
             accountId: _accountId,
             recordId: '10000000-0000-4000-8000-000000000001',
           ),
@@ -70,7 +60,6 @@ void main() {
       () async {
     var injectFailure = true;
     final store = await openStore(
-      keyManager,
       temporaryDirectory,
       transactionFailureInjector: () async {
         if (injectFailure) {
@@ -82,7 +71,6 @@ void main() {
     addTearDown(store.close);
     final repository = ScheduleRepository(
       store: store,
-      cipher: PayloadCipher(keyManager),
     );
 
     await expectLater(
@@ -94,7 +82,7 @@ void main() {
     );
 
     expect(
-      await store.records(EncryptedEntityType.scheduleBlock).get(
+      await store.records(EntityType.scheduleBlock).get(
             accountId: _accountId,
             recordId: '20000000-0000-4000-8000-000000000001',
           ),
@@ -105,11 +93,10 @@ void main() {
 
   test('task operation collision rolls back B instead of splitting B and A',
       () async {
-    final store = await openStore(keyManager, temporaryDirectory);
+    final store = await openStore(temporaryDirectory);
     addTearDown(store.close);
     final repository = TaskRepository(
       store: store,
-      cipher: PayloadCipher(keyManager),
     );
     final taskA = task('30000000-0000-4000-8000-000000000001', title: 'A');
     final taskB = task('30000000-0000-4000-8000-000000000002', title: 'B');
@@ -132,13 +119,11 @@ void main() {
 }
 
 Future<AccountScopedStore> openStore(
-  KeyManager keyManager,
   Directory baseDirectory, {
   Future<void> Function()? transactionFailureInjector,
 }) =>
     AccountScopedStore.openForTesting(
       activeAccountId: _accountId,
-      keyManager: keyManager,
       baseDirectory: baseDirectory,
       transactionFailureInjector: transactionFailureInjector,
     );
@@ -164,28 +149,7 @@ ScheduleBlock scheduleBlock(String id) => ScheduleBlock(
       isLocked: false,
     );
 
-EncryptedWrite write() => EncryptedWrite(
+Write write() => Write(
       operationId: _operationId,
-      deviceId: _deviceId,
       logicalClock: 1,
     );
-
-class MemorySecureKeyStore implements SecureKeyStore {
-  final Map<String, String> _values = <String, String>{};
-
-  @override
-  Future<String?> read({
-    required String accountId,
-    required StoredKeyName keyName,
-  }) async =>
-      _values['$accountId:${keyName.name}'];
-
-  @override
-  Future<void> write({
-    required String accountId,
-    required StoredKeyName keyName,
-    required String value,
-  }) async {
-    _values['$accountId:${keyName.name}'] = value;
-  }
-}

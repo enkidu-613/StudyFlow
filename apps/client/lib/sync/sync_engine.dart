@@ -1,9 +1,7 @@
 import 'dart:convert';
 
-import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
 import 'package:studyflow/auth/auth_repository.dart';
-import 'package:studyflow/security/payload_cipher.dart';
 import 'package:studyflow/storage/app_database.dart';
 import 'package:studyflow/sync/sync_api.dart';
 import 'package:studyflow/sync/sync_logger.dart';
@@ -28,17 +26,15 @@ final class SyncEngine {
     required SyncApi api,
     required AuthContext authContext,
     required AccountScopedStore store,
-    required PayloadCipher cipher,
     SyncLogger? logger,
     this.batchSize = 50,
   })  : _api = api,
         _authContext = authContext,
         _store = store,
-        _cipher = cipher,
         _logger = logger ?? const NoopSyncLogger(),
         _status =
             ValueNotifier<SyncStatus>(const SyncStatus.idle(pendingCount: 0)) {
-    if (store.activeAccountId != authContext.accountId) {
+    if (store.activeAccountId != authContext.userId) {
       throw const AuthScopeException(
         'Sync storage does not match the authenticated account.',
       );
@@ -52,7 +48,6 @@ final class SyncEngine {
   final SyncApi _api;
   final AuthContext _authContext;
   final AccountScopedStore _store;
-  final PayloadCipher _cipher;
   final SyncLogger _logger;
   final int batchSize;
   final ValueNotifier<SyncStatus> _status;
@@ -87,7 +82,7 @@ final class SyncEngine {
         _validatePushAcknowledgement(pending, pushResult);
         if (pushResult.rejected.isNotEmpty) {
           throw const SyncSchemaFailure(
-            'The server rejected one or more encrypted operations.',
+            'The server rejected one or more operations.',
           );
         }
         await _store.operations.removeAcknowledged(
@@ -173,18 +168,11 @@ final class SyncEngine {
         pushedCount,
         cursor,
       );
-    } on SyncDecryptionFailure {
-      return _failureResult(
-        SyncStatusKind.failed,
-        SyncFailureCategory.decryption,
-        pushedCount,
-        cursor,
-      );
     }
   }
 
   void _validatePushAcknowledgement(
-    List<EncryptedOperation> pending,
+    List<Operation> pending,
     SyncPushResult result,
   ) {
     final pendingIds =
@@ -208,11 +196,11 @@ final class SyncEngine {
   }
 
   Future<Map<String, Set<String>>> _taskFieldsByOperation(
-    List<EncryptedOperation> operations,
+    List<Operation> operations,
   ) async {
     final result = <String, Set<String>>{};
     for (final operation in operations) {
-      if (operation.entityType != EncryptedEntityType.task.wireName) {
+      if (operation.entityType != EntityType.task.wireName) {
         continue;
       }
       final snapshot = await _store.operations.snapshotFor(operation);
@@ -221,8 +209,8 @@ final class SyncEngine {
         result[operation.operationId] = Set<String>.from(_taskFields);
         continue;
       }
-      final currentJson = _jsonObject(await _decryptOperation(operation));
-      final baseJson = _jsonObject(await _decryptOperation(baseVersion));
+      final currentJson = operation.payload;
+      final baseJson = baseVersion.payload;
       result[operation.operationId] = <String>{
         for (final field in _taskFields)
           if (!_jsonValueEquals(currentJson[field], baseJson[field])) field,
@@ -260,21 +248,18 @@ final class SyncEngine {
     );
   }
 
-  SyncOperationV1 _toContract(EncryptedOperation operation) {
-    if (operation.accountId != _authContext.accountId ||
-        operation.deviceId != _authContext.deviceId) {
+  SyncOperationV2 _toContract(Operation operation) {
+    if (operation.accountId != _authContext.userId) {
       throw const SyncAuthenticationFailure(
-        'Queued operation does not match the active account and device.',
+        'Queued operation does not match the active account.',
       );
     }
-    return SyncOperationV1(
+    return SyncOperationV2(
       operationId: operation.operationId,
       recordId: operation.recordId,
-      deviceId: operation.deviceId,
       logicalClock: operation.logicalClock,
       entityType: operation.entityType,
-      payloadNonce: base64Encode(operation.payloadNonce),
-      payloadCiphertext: base64Encode(operation.payloadCiphertext),
+      payload: operation.payload,
       isTombstone: operation.isTombstone,
       schemaVersion: operation.schemaVersion,
     );
@@ -302,17 +287,15 @@ final class SyncEngine {
     );
   }
 
-  EncryptedOperation _fromContract(SyncOperationV1 operation) {
+  Operation _fromContract(SyncOperationV2 operation) {
     try {
-      return EncryptedOperation(
-        accountId: _authContext.accountId,
+      return Operation(
+        accountId: _authContext.userId,
         operationId: operation.operationId,
         recordId: operation.recordId,
-        deviceId: operation.deviceId,
         logicalClock: operation.logicalClock,
         entityType: operation.entityType,
-        payloadNonce: base64Decode(operation.payloadNonce),
-        payloadCiphertext: base64Decode(operation.payloadCiphertext),
+        payload: operation.payload,
         isTombstone: operation.isTombstone,
         schemaVersion: operation.schemaVersion,
       );
@@ -322,49 +305,40 @@ final class SyncEngine {
   }
 
   Future<SyncRecordMutation> _resolvePull(
-    EncryptedOperation operation,
+    Operation operation,
     SyncRecordSnapshot snapshot,
   ) async {
     late final Map<String, Object?> remoteJson;
     try {
-      final payload =
-          jsonDecode(utf8.decode(await _decryptOperation(operation)));
-      if (payload is! Map) {
-        throw const FormatException('Payload must be an object.');
-      }
-      remoteJson = payload.cast<String, Object?>();
-      if (operation.entityType == EncryptedEntityType.task.wireName) {
+      remoteJson = operation.payload;
+      if (operation.entityType == EntityType.task.wireName) {
         final task = Task.fromJson(remoteJson);
         if (task.id != operation.recordId) {
           throw const FormatException('Task id does not match record id.');
         }
-      } else if (operation.entityType ==
-          EncryptedEntityType.scheduleBlock.wireName) {
+      } else if (operation.entityType == EntityType.scheduleBlock.wireName) {
         final block = ScheduleBlock.fromJson(remoteJson);
         if (block.id != operation.recordId) {
           throw const FormatException(
             'Schedule block id does not match record id.',
           );
         }
-      } else if (operation.entityType ==
-          EncryptedEntityType.focusSession.wireName) {
+      } else if (operation.entityType == EntityType.focusSession.wireName) {
         final session = FocusSession.fromJson(remoteJson);
         if (session.id != operation.recordId) {
           throw const FormatException(
             'Focus session id does not match record id.',
           );
         }
-      } else if (operation.entityType == EncryptedEntityType.checkIn.wireName) {
+      } else if (operation.entityType == EntityType.checkIn.wireName) {
         final checkIn = CheckIn.fromJson(remoteJson);
         if (checkIn.id != operation.recordId) {
           throw const FormatException('Check-in id does not match record id.');
         }
       }
-    } on SyncDecryptionFailure {
-      rethrow;
     } on Object catch (error) {
       throw SyncSchemaFailure(
-        'Decrypted operation did not match the supported schema.',
+        'Pulled operation did not match the supported schema.',
         cause: error,
       );
     }
@@ -380,36 +354,34 @@ final class SyncEngine {
       );
     }
 
-    if (operation.entityType == EncryptedEntityType.task.wireName &&
+    if (operation.entityType == EntityType.task.wireName &&
         snapshot.record != null) {
       return _mergeTask(operation, snapshot, remoteJson);
     }
-    if (operation.entityType == EncryptedEntityType.scheduleBlock.wireName &&
+    if (operation.entityType == EntityType.scheduleBlock.wireName &&
         snapshot.record != null) {
       return _mergeSchedule(operation, snapshot, remoteJson);
     }
-    if (operation.entityType == EncryptedEntityType.focusSession.wireName &&
+    if (operation.entityType == EntityType.focusSession.wireName &&
         snapshot.record != null) {
       return _mergeFocusSession(operation, snapshot, remoteJson);
     }
 
     return SyncRecordMutation(
-      recordsToPut: <EncryptedLocalRecord>[_localRecord(operation)],
+      recordsToPut: <LocalRecord>[_localRecord(operation)],
     );
   }
 
   Future<SyncRecordMutation> _mergeTask(
-    EncryptedOperation remoteOperation,
+    Operation remoteOperation,
     SyncRecordSnapshot snapshot,
     Map<String, Object?> remotePayload,
   ) async {
-    final localTask = Task.fromJson(await _decryptRecordJson(snapshot.record!));
+    final localTask = Task.fromJson(_recordJson(snapshot.record!));
     final remoteTask = Task.fromJson(remotePayload);
     final localJson = localTask.toJson();
     final remoteJson = remoteTask.toJson();
-    final baseJson = snapshot.previousVersion == null
-        ? null
-        : _jsonObject(await _decryptOperation(snapshot.previousVersion!));
+    final baseJson = snapshot.previousVersion?.payload;
     final mergedJson = <String, Object?>{'id': localJson['id']};
     final acceptedFields = <String>{};
     for (final field in _taskFields) {
@@ -420,7 +392,6 @@ final class SyncEngine {
               ? null
               : SyncFieldVersion(
                   logicalClock: snapshot.currentVersion!.logicalClock,
-                  deviceId: snapshot.currentVersion!.deviceId,
                   operationId: snapshot.currentVersion!.operationId,
                 ));
       if (remoteChanged &&
@@ -435,71 +406,51 @@ final class SyncEngine {
       return SyncRecordMutation(recordIncomingVersion: false);
     }
 
-    final encrypted = await _cipher.encrypt(
-      utf8.encode(jsonEncode(Task.fromJson(mergedJson).toJson())),
-      _associatedData(remoteOperation),
-    );
-    final canonicalVersion = EncryptedOperation(
+    final canonicalVersion = Operation(
       accountId: remoteOperation.accountId,
       operationId: remoteOperation.operationId,
       recordId: remoteOperation.recordId,
-      deviceId: remoteOperation.deviceId,
       logicalClock: remoteOperation.logicalClock,
       entityType: remoteOperation.entityType,
-      payloadNonce: encrypted.nonce,
-      payloadCiphertext: encrypted.ciphertext,
+      payload: Task.fromJson(mergedJson).toJson(),
       isTombstone: false,
       schemaVersion: remoteOperation.schemaVersion,
     );
     return SyncRecordMutation(
-      recordsToPut: <EncryptedLocalRecord>[_localRecord(canonicalVersion)],
+      recordsToPut: <LocalRecord>[_localRecord(canonicalVersion)],
       versionOperation: canonicalVersion,
       taskFieldsToStamp: acceptedFields,
     );
   }
 
   Future<SyncRecordMutation> _mergeSchedule(
-    EncryptedOperation remoteOperation,
+    Operation remoteOperation,
     SyncRecordSnapshot snapshot,
     Map<String, Object?> remoteJson,
   ) async {
-    final localBlock = ScheduleBlock.fromJson(
-      await _decryptRecordJson(snapshot.record!),
-    );
+    final localBlock = ScheduleBlock.fromJson(_recordJson(snapshot.record!));
     final remoteBlock = ScheduleBlock.fromJson(remoteJson);
     final localVersion = snapshot.currentVersion;
     final isSimultaneous = localVersion != null &&
-        localVersion.deviceId != remoteOperation.deviceId &&
-        localVersion.logicalClock == remoteOperation.logicalClock;
+        localVersion.logicalClock == remoteOperation.logicalClock &&
+        localVersion.operationId != remoteOperation.operationId;
     if (isSimultaneous &&
         !_jsonValueEquals(localBlock.toJson(), remoteBlock.toJson())) {
       final conflictJson = Map<String, Object?>.from(remoteBlock.toJson())
         ..['id'] = remoteOperation.operationId;
       final conflictBlock = ScheduleBlock.fromJson(conflictJson);
-      final conflictAssociatedData = PayloadAssociatedData(
-        accountId: remoteOperation.accountId,
-        recordId: conflictBlock.id,
-        schemaVersion: remoteOperation.schemaVersion,
-        entityType: remoteOperation.entityType,
-      );
-      final encrypted = await _cipher.encrypt(
-        utf8.encode(jsonEncode(conflictBlock.toJson())),
-        conflictAssociatedData,
-      );
-      final conflictVersion = EncryptedOperation(
+      final conflictVersion = Operation(
         accountId: remoteOperation.accountId,
         operationId: remoteOperation.operationId,
         recordId: conflictBlock.id,
-        deviceId: remoteOperation.deviceId,
         logicalClock: remoteOperation.logicalClock,
         entityType: remoteOperation.entityType,
-        payloadNonce: encrypted.nonce,
-        payloadCiphertext: encrypted.ciphertext,
+        payload: conflictBlock.toJson(),
         isTombstone: false,
         schemaVersion: remoteOperation.schemaVersion,
       );
       return SyncRecordMutation(
-        recordsToPut: <EncryptedLocalRecord>[_localRecord(conflictVersion)],
+        recordsToPut: <LocalRecord>[_localRecord(conflictVersion)],
         versionOperation: conflictVersion,
       );
     }
@@ -508,22 +459,20 @@ final class SyncEngine {
       return SyncRecordMutation();
     }
     return SyncRecordMutation(
-      recordsToPut: <EncryptedLocalRecord>[_localRecord(remoteOperation)],
+      recordsToPut: <LocalRecord>[_localRecord(remoteOperation)],
     );
   }
 
   Future<SyncRecordMutation> _mergeFocusSession(
-    EncryptedOperation remoteOperation,
+    Operation remoteOperation,
     SyncRecordSnapshot snapshot,
     Map<String, Object?> remoteJson,
   ) async {
-    final localSession = FocusSession.fromJson(
-      await _decryptRecordJson(snapshot.record!),
-    );
+    final localSession = FocusSession.fromJson(_recordJson(snapshot.record!));
     final remoteSession = FocusSession.fromJson(remoteJson);
     if (!localSession.isFinished) {
       return SyncRecordMutation(
-        recordsToPut: <EncryptedLocalRecord>[_localRecord(remoteOperation)],
+        recordsToPut: <LocalRecord>[_localRecord(remoteOperation)],
       );
     }
     if (_jsonValueEquals(localSession.toJson(), remoteSession.toJson())) {
@@ -533,29 +482,18 @@ final class SyncEngine {
     final conflictJson = Map<String, Object?>.from(remoteSession.toJson())
       ..['id'] = remoteOperation.operationId;
     final conflictSession = FocusSession.fromJson(conflictJson);
-    final encrypted = await _cipher.encrypt(
-      utf8.encode(jsonEncode(conflictSession.toJson())),
-      PayloadAssociatedData(
-        accountId: remoteOperation.accountId,
-        recordId: conflictSession.id,
-        schemaVersion: remoteOperation.schemaVersion,
-        entityType: remoteOperation.entityType,
-      ),
-    );
-    final conflictVersion = EncryptedOperation(
+    final conflictVersion = Operation(
       accountId: remoteOperation.accountId,
       operationId: remoteOperation.operationId,
       recordId: conflictSession.id,
-      deviceId: remoteOperation.deviceId,
       logicalClock: remoteOperation.logicalClock,
       entityType: remoteOperation.entityType,
-      payloadNonce: encrypted.nonce,
-      payloadCiphertext: encrypted.ciphertext,
+      payload: conflictSession.toJson(),
       isTombstone: false,
       schemaVersion: remoteOperation.schemaVersion,
     );
     return SyncRecordMutation(
-      recordsToPut: <EncryptedLocalRecord>[_localRecord(conflictVersion)],
+      recordsToPut: <LocalRecord>[_localRecord(conflictVersion)],
       versionOperation: conflictVersion,
     );
   }
@@ -563,110 +501,49 @@ final class SyncEngine {
   bool _jsonValueEquals(Object? left, Object? right) =>
       jsonEncode(left) == jsonEncode(right);
 
-  int _compareTaskFieldStamp(
-    EncryptedOperation incoming,
-    SyncFieldVersion? current,
-  ) {
+  int _compareTaskFieldStamp(Operation incoming, SyncFieldVersion? current) {
     if (current == null) {
       return 1;
     }
     final clockComparison =
         incoming.logicalClock.compareTo(current.logicalClock);
     return clockComparison == 0
-        ? incoming.deviceId.compareTo(current.deviceId)
+        ? incoming.operationId.compareTo(current.operationId)
         : clockComparison;
   }
 
-  int _compareStamp(EncryptedOperation left, EncryptedOperation right) {
+  int _compareStamp(Operation left, Operation right) {
     final clockComparison = left.logicalClock.compareTo(right.logicalClock);
     return clockComparison != 0
         ? clockComparison
-        : left.deviceId.compareTo(right.deviceId);
+        : left.operationId.compareTo(right.operationId);
   }
 
-  Future<List<int>> _decryptOperation(EncryptedOperation operation) => _decrypt(
-        EncryptedPayload(
-          nonce: operation.payloadNonce,
-          ciphertext: operation.payloadCiphertext,
-        ),
-        _associatedData(operation),
-      );
-
-  Future<Map<String, Object?>> _decryptRecordJson(
-    EncryptedLocalRecord record,
-  ) async =>
-      _jsonObject(
-        await _decrypt(
-          EncryptedPayload(
-            nonce: record.payloadNonce,
-            ciphertext: record.payloadCiphertext,
-          ),
-          PayloadAssociatedData(
-            accountId: record.accountId,
-            recordId: record.recordId,
-            schemaVersion: record.schemaVersion,
-            entityType: record.entityType.wireName,
-          ),
-        ),
-      );
-
-  Future<List<int>> _decrypt(
-    EncryptedPayload payload,
-    PayloadAssociatedData associatedData,
-  ) async {
+  Map<String, Object?> _recordJson(LocalRecord record) {
     try {
-      return await _cipher.decrypt(payload, associatedData);
-    } on SecretBoxAuthenticationError catch (error) {
-      throw SyncDecryptionFailure(
-        'Pulled encrypted payload could not be authenticated.',
-        cause: error,
-      );
-    } on FormatException catch (error) {
-      throw SyncDecryptionFailure(
-        'Pulled encrypted payload was malformed.',
-        cause: error,
-      );
-    }
-  }
-
-  Map<String, Object?> _jsonObject(List<int> plaintext) {
-    try {
-      final payload = jsonDecode(utf8.decode(plaintext));
+      final payload = jsonDecode(record.payload);
       if (payload is! Map) {
         throw const FormatException('Payload must be an object.');
       }
       return payload.cast<String, Object?>();
-    } on SyncSchemaFailure {
-      rethrow;
     } on Object catch (error) {
       throw SyncSchemaFailure(
-        'Decrypted operation did not match the supported schema.',
+        'Local record did not match the supported schema.',
         cause: error,
       );
     }
   }
 
-  PayloadAssociatedData _associatedData(EncryptedOperation operation) =>
-      PayloadAssociatedData(
-        accountId: operation.accountId,
-        recordId: operation.recordId,
-        schemaVersion: operation.schemaVersion,
-        entityType: operation.entityType,
-      );
-
-  EncryptedLocalRecord _localRecord(EncryptedOperation operation) =>
-      EncryptedLocalRecord(
+  LocalRecord _localRecord(Operation operation) => LocalRecord(
         accountId: operation.accountId,
         recordId: operation.recordId,
         entityType: _entityType(operation.entityType),
         schemaVersion: operation.schemaVersion,
-        payloadNonce: operation.payloadNonce,
-        payloadCiphertext: operation.payloadCiphertext,
+        payload: jsonEncode(operation.payload),
         updatedAt: DateTime.now().toUtc(),
       );
 
-  EncryptedEntityType _entityType(String wireName) =>
-      EncryptedEntityType.values.singleWhere(
+  EntityType _entityType(String wireName) => EntityType.values.singleWhere(
         (entityType) => entityType.wireName == wireName,
       );
 

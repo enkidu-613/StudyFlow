@@ -1,12 +1,9 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studyflow/app/studyflow_workspace.dart';
-import 'package:studyflow/auth/recovery_key_screen.dart';
 import 'package:studyflow/features/settings/settings_screen.dart';
-import 'package:studyflow/security/key_manager.dart';
 import 'package:studyflow/sync/sync_status.dart';
 
 void main() {
@@ -16,10 +13,7 @@ void main() {
   setUp(() async {
     directory = await Directory.systemTemp.createTemp('studyflow-settings-');
     workspace = await StudyFlowWorkspace.openForTesting(
-      keyManager: KeyManager(
-        accountId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-        store: MemorySecureKeyStore(),
-      ),
+      accountId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       baseDirectory: directory,
     );
   });
@@ -62,44 +56,16 @@ void main() {
     status.dispose();
   });
 
-  testWidgets('settings opens the account recovery key screen', (tester) async {
+  testWidgets('settings no longer offers a recovery key export',
+      (tester) async {
     await tester.pumpWidget(
       MaterialApp(
-        home: SettingsScreen(
-          workspace: workspace,
-          recoveryController:
-              KeyManagerRecoveryKeyController(workspace.keyManager),
-        ),
+        home: SettingsScreen(workspace: workspace),
       ),
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('open-recovery-screen')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Recovery key'), findsOneWidget);
-    expect(find.text('Show recovery key once'), findsOneWidget);
+    expect(find.text('Account recovery key'), findsNothing);
+    expect(find.byKey(const Key('open-recovery-screen')), findsNothing);
   });
-}
-
-final class MemorySecureKeyStore implements SecureKeyStore {
-  final Map<String, String> values = <String, String>{};
-
-  @override
-  Future<String?> read({
-    required String accountId,
-    required StoredKeyName keyName,
-  }) async {
-    final value = values['$accountId:${keyName.name}'];
-    return value == null ? null : utf8.decode(base64Decode(value));
-  }
-
-  @override
-  Future<void> write({
-    required String accountId,
-    required StoredKeyName keyName,
-    required String value,
-  }) async {
-    values['$accountId:${keyName.name}'] = base64Encode(utf8.encode(value));
-  }
 }

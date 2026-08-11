@@ -90,7 +90,6 @@ final class CandidateScheduleChange {
 abstract interface class AiRepository {
   Future<AiRecommendation> requestRecommendation({
     required String accessToken,
-    required String deviceId,
     required String permissionLevel,
     required List<String> taskTitles,
     required Map<String, double> scheduleMetrics,
@@ -110,7 +109,6 @@ final class HttpAiRepository implements AiRepository {
   @override
   Future<AiRecommendation> requestRecommendation({
     required String accessToken,
-    required String deviceId,
     required String permissionLevel,
     required List<String> taskTitles,
     required Map<String, double> scheduleMetrics,
@@ -123,7 +121,6 @@ final class HttpAiRepository implements AiRepository {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $accessToken',
-        'X-Device-Id': deviceId,
       },
       body: jsonEncode(<String, Object?>{
         'summary': <String, Object?>{

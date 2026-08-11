@@ -1,23 +1,19 @@
 part of 'app_database.dart';
 
-class EncryptedOperation {
-  EncryptedOperation({
+class Operation {
+  Operation({
     required String accountId,
     required String operationId,
     required String recordId,
-    required String deviceId,
     required this.logicalClock,
     required this.entityType,
-    required List<int> payloadNonce,
-    required List<int> payloadCiphertext,
+    required Map<String, Object?> payload,
     required this.isTombstone,
     required this.schemaVersion,
   })  : accountId = _normalizedUuid(accountId, 'accountId'),
         operationId = _normalizedUuid(operationId, 'operationId'),
         recordId = _normalizedUuid(recordId, 'recordId'),
-        deviceId = _normalizedUuid(deviceId, 'deviceId'),
-        _payloadNonce = Uint8List.fromList(payloadNonce),
-        _payloadCiphertext = Uint8List.fromList(payloadCiphertext) {
+        _payload = Map<String, Object?>.unmodifiable(payload) {
     if (logicalClock < 0) {
       throw ArgumentError.value(
         logicalClock,
@@ -29,21 +25,14 @@ class EncryptedOperation {
       throw ArgumentError.value(
         entityType,
         'entityType',
-        'must be a supported encrypted entity type',
+        'must be a supported entity type',
       );
     }
-    if (_payloadNonce.length != 24) {
+    if (_payload.isEmpty && !isTombstone) {
       throw ArgumentError.value(
-        payloadNonce.length,
-        'payloadNonce',
-        'must contain a 24-byte XChaCha20 nonce',
-      );
-    }
-    if (_payloadCiphertext.length < 16) {
-      throw ArgumentError.value(
-        payloadCiphertext.length,
-        'payloadCiphertext',
-        'must contain ciphertext and a Poly1305 tag',
+        payload,
+        'payload',
+        'must not be empty for non-tombstone operations',
       );
     }
     if (schemaVersion != 1) {
@@ -58,28 +47,23 @@ class EncryptedOperation {
   final String accountId;
   final String operationId;
   final String recordId;
-  final String deviceId;
   final int logicalClock;
   final String entityType;
-  final Uint8List _payloadNonce;
-  final Uint8List _payloadCiphertext;
+  final Map<String, Object?> _payload;
   final bool isTombstone;
   final int schemaVersion;
 
-  Uint8List get payloadNonce => Uint8List.fromList(_payloadNonce);
-  Uint8List get payloadCiphertext => Uint8List.fromList(_payloadCiphertext);
+  Map<String, Object?> get payload => Map<String, Object?>.unmodifiable(_payload);
 
   @override
   bool operator ==(Object other) =>
-      other is EncryptedOperation &&
+      other is Operation &&
       accountId == other.accountId &&
       operationId == other.operationId &&
       recordId == other.recordId &&
-      deviceId == other.deviceId &&
       logicalClock == other.logicalClock &&
       entityType == other.entityType &&
-      _bytesEqual(_payloadNonce, other._payloadNonce) &&
-      _bytesEqual(_payloadCiphertext, other._payloadCiphertext) &&
+      _encodePayload(_payload) == _encodePayload(other._payload) &&
       isTombstone == other.isTombstone &&
       schemaVersion == other.schemaVersion;
 
@@ -88,11 +72,9 @@ class EncryptedOperation {
         accountId,
         operationId,
         recordId,
-        deviceId,
         logicalClock,
         entityType,
-        Object.hashAll(_payloadNonce),
-        Object.hashAll(_payloadCiphertext),
+        _encodePayload(_payload),
         isTombstone,
         schemaVersion,
       );
@@ -103,13 +85,13 @@ class OperationDao {
 
   final _AccountDatabase _database;
 
-  Future<void> enqueue(EncryptedOperation operation) async {
+  Future<void> enqueue(Operation operation) async {
     await _database.transaction(() async {
       await AccountScopedTransaction._(_database).enqueue(operation);
     });
   }
 
-  Future<List<EncryptedOperation>> pending(int limit) async {
+  Future<List<Operation>> pending(int limit) async {
     if (limit <= 0) {
       throw ArgumentError.value(limit, 'limit', 'must be positive');
     }
@@ -127,16 +109,14 @@ class OperationDao {
       final rows = await query.get();
       return rows
           .map(
-            (row) => EncryptedOperation(
+            (row) => Operation(
               accountId: row.accountId,
               operationId: row.operationId,
               recordId: row.recordId,
-              deviceId: row.deviceId,
               logicalClock: row.logicalClock,
               entityType: row.entityType,
-              payloadNonce: row.payloadNonce,
-              payloadCiphertext: row.payloadCiphertext,
-              isTombstone: row.isTombstone,
+              payload: _decodePayload(row.payload),
+              isTombstone: row.isTombstone != 0,
               schemaVersion: row.schemaVersion,
             ),
           )
@@ -189,16 +169,14 @@ class OperationDao {
           <Object?>[row.accountId, row.operationId],
         );
         await _recordVersion(
-          EncryptedOperation(
+          Operation(
             accountId: row.accountId,
             operationId: row.operationId,
             recordId: row.recordId,
-            deviceId: row.deviceId,
             logicalClock: row.logicalClock,
             entityType: row.entityType,
-            payloadNonce: row.payloadNonce,
-            payloadCiphertext: row.payloadCiphertext,
-            isTombstone: row.isTombstone,
+            payload: _decodePayload(row.payload),
+            isTombstone: row.isTombstone != 0,
             schemaVersion: row.schemaVersion,
           ),
           taskFields: taskFieldsByOperation[row.operationId],
@@ -249,7 +227,7 @@ class OperationDao {
     }
     await _ensureTaskFieldVersionsTable();
     final row = await _database.customSelect(
-      'SELECT logical_clock, device_id, operation_id '
+      'SELECT logical_clock, operation_id '
       'FROM sync_task_field_versions '
       'WHERE account_id = ? AND record_id = ? AND field_name = ?',
       variables: <Variable<Object>>[
@@ -263,12 +241,11 @@ class OperationDao {
     }
     return SyncFieldVersion(
       logicalClock: row.read<int>('logical_clock'),
-      deviceId: row.read<String>('device_id'),
       operationId: row.read<String>('operation_id'),
     );
   }
 
-  Future<SyncRecordSnapshot> snapshotFor(EncryptedOperation operation) async {
+  Future<SyncRecordSnapshot> snapshotFor(Operation operation) async {
     await _ensureRecordVersionsTable();
     await _ensureTaskFieldVersionsTable();
     final entityType = _entityTypeFor(operation.entityType);
@@ -306,10 +283,10 @@ class OperationDao {
   }
 
   Future<SyncPullApplyResult> applyPullPage({
-    required List<EncryptedOperation> operations,
+    required List<Operation> operations,
     required int nextCursor,
     required Future<SyncRecordMutation> Function(
-      EncryptedOperation operation,
+      Operation operation,
       SyncRecordSnapshot snapshot,
     ) resolve,
   }) async {
@@ -382,13 +359,13 @@ class OperationDao {
     });
   }
 
-  Future<EncryptedLocalRecord?> _readRecord(
-    EncryptedEntityType entityType,
+  Future<LocalRecord?> _readRecord(
+    EntityType entityType,
     String recordId,
   ) async {
     final row = await _database.customSelect(
-      'SELECT account_id, record_id, schema_version, payload_nonce, '
-      'payload_ciphertext, updated_at FROM ${entityType.tableName} '
+      'SELECT account_id, record_id, schema_version, payload, updated_at '
+      'FROM ${entityType.tableName} '
       'WHERE account_id = ? AND record_id = ?',
       variables: <Variable<Object>>[
         Variable<String>(_database.activeAccountId),
@@ -398,13 +375,12 @@ class OperationDao {
     if (row == null) {
       return null;
     }
-    return EncryptedLocalRecord(
+    return LocalRecord(
       accountId: row.read<String>('account_id'),
       recordId: row.read<String>('record_id'),
       entityType: entityType,
       schemaVersion: row.read<int>('schema_version'),
-      payloadNonce: row.read<Uint8List>('payload_nonce'),
-      payloadCiphertext: row.read<Uint8List>('payload_ciphertext'),
+      payload: row.read<String>('payload'),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(
         row.read<int>('updated_at'),
         isUtc: true,
@@ -412,13 +388,13 @@ class OperationDao {
     );
   }
 
-  Future<List<EncryptedOperation>> _readVersions(String recordId) async {
+  Future<List<Operation>> _readVersions(String recordId) async {
     final rows = await _database.customSelect(
-      'SELECT account_id, operation_id, record_id, device_id, logical_clock, '
-      'entity_type, payload_nonce, payload_ciphertext, is_tombstone, '
-      'schema_version FROM sync_record_versions '
+      'SELECT account_id, operation_id, record_id, logical_clock, '
+      'entity_type, payload, is_tombstone, schema_version '
+      'FROM sync_record_versions '
       'WHERE account_id = ? AND record_id = ? '
-      'ORDER BY logical_clock DESC, device_id DESC, operation_id DESC LIMIT 2',
+      'ORDER BY logical_clock DESC, operation_id DESC LIMIT 2',
       variables: <Variable<Object>>[
         Variable<String>(_database.activeAccountId),
         Variable<String>(recordId),
@@ -426,16 +402,14 @@ class OperationDao {
     ).get();
     return rows
         .map(
-          (row) => EncryptedOperation(
+          (row) => Operation(
             accountId: row.read<String>('account_id'),
             operationId: row.read<String>('operation_id'),
             recordId: row.read<String>('record_id'),
-            deviceId: row.read<String>('device_id'),
             logicalClock: row.read<int>('logical_clock'),
             entityType: row.read<String>('entity_type'),
-            payloadNonce: row.read<Uint8List>('payload_nonce'),
-            payloadCiphertext: row.read<Uint8List>('payload_ciphertext'),
-            isTombstone: row.read<bool>('is_tombstone'),
+            payload: _decodePayload(row.read<String>('payload')),
+            isTombstone: row.read<int>('is_tombstone') != 0,
             schemaVersion: row.read<int>('schema_version'),
           ),
         )
@@ -446,7 +420,7 @@ class OperationDao {
     String recordId,
   ) async {
     final rows = await _database.customSelect(
-      'SELECT field_name, logical_clock, device_id, operation_id '
+      'SELECT field_name, logical_clock, operation_id '
       'FROM sync_task_field_versions '
       'WHERE account_id = ? AND record_id = ?',
       variables: <Variable<Object>>[
@@ -458,31 +432,27 @@ class OperationDao {
       for (final row in rows)
         row.read<String>('field_name'): SyncFieldVersion(
           logicalClock: row.read<int>('logical_clock'),
-          deviceId: row.read<String>('device_id'),
           operationId: row.read<String>('operation_id'),
         ),
     };
   }
 
   Future<void> _recordVersion(
-    EncryptedOperation operation, {
+    Operation operation, {
     Set<String>? taskFields,
   }) async {
     await _database.customStatement(
       'INSERT OR IGNORE INTO sync_record_versions '
-      '(account_id, operation_id, record_id, device_id, logical_clock, '
-      'entity_type, payload_nonce, payload_ciphertext, is_tombstone, '
-      'schema_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      '(account_id, operation_id, record_id, logical_clock, entity_type, '
+      'payload, is_tombstone, schema_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       <Object?>[
         operation.accountId,
         operation.operationId,
         operation.recordId,
-        operation.deviceId,
         operation.logicalClock,
         operation.entityType,
-        operation.payloadNonce,
-        operation.payloadCiphertext,
-        operation.isTombstone,
+        _encodePayload(operation.payload),
+        operation.isTombstone ? 1 : 0,
         operation.schemaVersion,
       ],
     );
@@ -497,7 +467,7 @@ class OperationDao {
           );
         }
         final current = await _database.customSelect(
-          'SELECT logical_clock, device_id FROM sync_task_field_versions '
+          'SELECT logical_clock, operation_id FROM sync_task_field_versions '
           'WHERE account_id = ? AND record_id = ? AND field_name = ?',
           variables: <Variable<Object>>[
             Variable<String>(operation.accountId),
@@ -508,26 +478,25 @@ class OperationDao {
         if (current != null &&
             _compareFieldStamp(
                   operation.logicalClock,
-                  operation.deviceId,
+                  operation.operationId,
                   current.read<int>('logical_clock'),
-                  current.read<String>('device_id'),
+                  current.read<String>('operation_id'),
                 ) <=
                 0) {
           continue;
         }
         await _database.customStatement(
           'INSERT INTO sync_task_field_versions '
-          '(account_id, record_id, field_name, logical_clock, device_id, '
-          'operation_id) VALUES (?, ?, ?, ?, ?, ?) '
+          '(account_id, record_id, field_name, logical_clock, operation_id) '
+          'VALUES (?, ?, ?, ?, ?) '
           'ON CONFLICT(account_id, record_id, field_name) DO UPDATE SET '
           'logical_clock = excluded.logical_clock, '
-          'device_id = excluded.device_id, operation_id = excluded.operation_id',
+          'operation_id = excluded.operation_id',
           <Object?>[
             operation.accountId,
             operation.recordId,
             fieldName,
             operation.logicalClock,
-            operation.deviceId,
             operation.operationId,
           ],
         );
@@ -535,21 +504,18 @@ class OperationDao {
     }
   }
 
-  Future<void> _retainTombstone(EncryptedOperation operation) =>
+  Future<void> _retainTombstone(Operation operation) =>
       _database.customStatement(
         'INSERT OR IGNORE INTO sync_tombstones '
-        '(account_id, operation_id, record_id, device_id, logical_clock, '
-        'entity_type, payload_nonce, payload_ciphertext, schema_version) '
-        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        '(account_id, operation_id, record_id, logical_clock, entity_type, '
+        'payload, schema_version) VALUES (?, ?, ?, ?, ?, ?, ?)',
         <Object?>[
           operation.accountId,
           operation.operationId,
           operation.recordId,
-          operation.deviceId,
           operation.logicalClock,
           operation.entityType,
-          operation.payloadNonce,
-          operation.payloadCiphertext,
+          _encodePayload(operation.payload),
           operation.schemaVersion,
         ],
       );
@@ -588,9 +554,8 @@ class OperationDao {
         'CREATE TABLE IF NOT EXISTS sync_record_versions ('
         'local_sequence INTEGER PRIMARY KEY AUTOINCREMENT, '
         'account_id TEXT NOT NULL, operation_id TEXT NOT NULL, '
-        'record_id TEXT NOT NULL, device_id TEXT NOT NULL, '
-        'logical_clock INTEGER NOT NULL, entity_type TEXT NOT NULL, '
-        'payload_nonce BLOB NOT NULL, payload_ciphertext BLOB NOT NULL, '
+        'record_id TEXT NOT NULL, logical_clock INTEGER NOT NULL, '
+        'entity_type TEXT NOT NULL, payload TEXT NOT NULL, '
         'is_tombstone INTEGER NOT NULL, schema_version INTEGER NOT NULL, '
         'UNIQUE(account_id, operation_id))',
       );
@@ -598,9 +563,8 @@ class OperationDao {
   Future<void> _ensureTombstonesTable() => _database.customStatement(
         'CREATE TABLE IF NOT EXISTS sync_tombstones ('
         'account_id TEXT NOT NULL, operation_id TEXT NOT NULL, '
-        'record_id TEXT NOT NULL, device_id TEXT NOT NULL, '
-        'logical_clock INTEGER NOT NULL, entity_type TEXT NOT NULL, '
-        'payload_nonce BLOB NOT NULL, payload_ciphertext BLOB NOT NULL, '
+        'record_id TEXT NOT NULL, logical_clock INTEGER NOT NULL, '
+        'entity_type TEXT NOT NULL, payload TEXT NOT NULL, '
         'schema_version INTEGER NOT NULL, '
         'PRIMARY KEY(account_id, operation_id))',
       );
@@ -609,7 +573,7 @@ class OperationDao {
         'CREATE TABLE IF NOT EXISTS sync_task_field_versions ('
         'account_id TEXT NOT NULL, record_id TEXT NOT NULL, '
         'field_name TEXT NOT NULL, logical_clock INTEGER NOT NULL, '
-        'device_id TEXT NOT NULL, operation_id TEXT NOT NULL, '
+        'operation_id TEXT NOT NULL, '
         'PRIMARY KEY(account_id, record_id, field_name))',
       );
 }
@@ -617,12 +581,10 @@ class OperationDao {
 final class SyncFieldVersion {
   const SyncFieldVersion({
     required this.logicalClock,
-    required this.deviceId,
     required this.operationId,
   });
 
   final int logicalClock;
-  final String deviceId;
   final String operationId;
 }
 
@@ -634,27 +596,26 @@ final class SyncRecordSnapshot {
     required this.taskFieldVersions,
   });
 
-  final EncryptedLocalRecord? record;
-  final EncryptedOperation? currentVersion;
-  final EncryptedOperation? previousVersion;
+  final LocalRecord? record;
+  final Operation? currentVersion;
+  final Operation? previousVersion;
   final Map<String, SyncFieldVersion> taskFieldVersions;
 }
 
 final class SyncRecordMutation {
   SyncRecordMutation({
-    Iterable<EncryptedLocalRecord> recordsToPut =
-        const <EncryptedLocalRecord>[],
+    Iterable<LocalRecord> recordsToPut = const <LocalRecord>[],
     Iterable<String> recordIdsToDelete = const <String>[],
     this.recordIncomingVersion = true,
     this.versionOperation,
     this.taskFieldsToStamp,
-  })  : recordsToPut = List<EncryptedLocalRecord>.unmodifiable(recordsToPut),
+  })  : recordsToPut = List<LocalRecord>.unmodifiable(recordsToPut),
         recordIdsToDelete = List<String>.unmodifiable(recordIdsToDelete);
 
-  final List<EncryptedLocalRecord> recordsToPut;
+  final List<LocalRecord> recordsToPut;
   final List<String> recordIdsToDelete;
   final bool recordIncomingVersion;
-  final EncryptedOperation? versionOperation;
+  final Operation? versionOperation;
   final Set<String>? taskFieldsToStamp;
 }
 
@@ -664,13 +625,12 @@ final class SyncPullApplyResult {
   final int appliedCount;
 }
 
-EncryptedEntityType _entityTypeFor(String wireName) =>
-    EncryptedEntityType.values.singleWhere(
+EntityType _entityTypeFor(String wireName) => EntityType.values.singleWhere(
       (entityType) => entityType.wireName == wireName,
       orElse: () => throw ArgumentError.value(
         wireName,
         'wireName',
-        'must be a supported encrypted entity type',
+        'must be a supported entity type',
       ),
     );
 
@@ -713,13 +673,13 @@ const Set<String> _taskFields = <String>{
 
 int _compareFieldStamp(
   int leftClock,
-  String leftDevice,
+  String leftOperation,
   int rightClock,
-  String rightDevice,
+  String rightOperation,
 ) {
   final clockComparison = leftClock.compareTo(rightClock);
   return clockComparison == 0
-      ? leftDevice.compareTo(rightDevice)
+      ? leftOperation.compareTo(rightOperation)
       : clockComparison;
 }
 
@@ -734,14 +694,7 @@ String _normalizedUuid(String value, String fieldName) {
   return normalized;
 }
 
-bool _bytesEqual(List<int> left, List<int> right) {
-  if (left.length != right.length) {
-    return false;
-  }
-  for (var index = 0; index < left.length; index++) {
-    if (left[index] != right[index]) {
-      return false;
-    }
-  }
-  return true;
-}
+String _encodePayload(Map<String, Object?> payload) => jsonEncode(payload);
+
+Map<String, Object?> _decodePayload(String payload) =>
+    (jsonDecode(payload) as Map<String, dynamic>).cast<String, Object?>();

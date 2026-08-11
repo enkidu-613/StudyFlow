@@ -9,7 +9,7 @@ import 'package:studyflow_sync_contract/sync_contract.dart';
 abstract interface class SyncApi {
   Future<SyncPushResult> push({
     required AuthContext authContext,
-    required List<SyncOperationV1> operations,
+    required List<SyncOperationV2> operations,
   });
 
   Future<SyncPullResult> pull({
@@ -30,7 +30,7 @@ final class HttpSyncApi implements SyncApi {
   @override
   Future<SyncPushResult> push({
     required AuthContext authContext,
-    required List<SyncOperationV1> operations,
+    required List<SyncOperationV2> operations,
   }) async {
     final json = _object(
       await _send(
@@ -88,7 +88,7 @@ final class HttpSyncApi implements SyncApi {
         nextCursor: nextCursor,
         operations: operations
             .map(
-              (operation) => SyncOperationV1.fromJson(
+              (operation) => SyncOperationV2.fromJson(
                 _object(operation, 'pulled operation').cast<String, dynamic>(),
               ),
             )
@@ -157,7 +157,6 @@ final class HttpSyncApi implements SyncApi {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ${authContext.accessToken}',
-        'X-Device-Id': authContext.deviceId,
       };
 
   void close() => _client.close();
@@ -193,8 +192,8 @@ final class SyncPushResult {
 final class SyncPullResult {
   SyncPullResult({
     required this.nextCursor,
-    required Iterable<SyncOperationV1> operations,
-  }) : operations = List<SyncOperationV1>.unmodifiable(operations) {
+    required Iterable<SyncOperationV2> operations,
+  }) : operations = List<SyncOperationV2>.unmodifiable(operations) {
     if (nextCursor < 0) {
       throw ArgumentError.value(
           nextCursor, 'nextCursor', 'must be nonnegative');
@@ -202,7 +201,7 @@ final class SyncPullResult {
   }
 
   final int nextCursor;
-  final List<SyncOperationV1> operations;
+  final List<SyncOperationV2> operations;
 }
 
 sealed class SyncApiFailure implements Exception {
@@ -234,10 +233,6 @@ class SyncProtocolFailure extends SyncApiFailure {
 
 final class SyncConflictFailure extends SyncProtocolFailure {
   const SyncConflictFailure(super.message, {super.cause});
-}
-
-final class SyncDecryptionFailure extends SyncApiFailure {
-  const SyncDecryptionFailure(super.message, {super.cause});
 }
 
 final RegExp _canonicalUuidPattern = RegExp(

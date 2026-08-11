@@ -28,18 +28,12 @@ class $_TasksTable extends _Tasks with TableInfo<$_TasksTable, _Task> {
   late final GeneratedColumn<int> schemaVersion = GeneratedColumn<int>(
       'schema_version', aliasedName, false,
       type: DriftSqlType.int, requiredDuringInsert: true);
-  static const VerificationMeta _payloadNonceMeta =
-      const VerificationMeta('payloadNonce');
+  static const VerificationMeta _payloadMeta =
+      const VerificationMeta('payload');
   @override
-  late final GeneratedColumn<Uint8List> payloadNonce =
-      GeneratedColumn<Uint8List>('payload_nonce', aliasedName, false,
-          type: DriftSqlType.blob, requiredDuringInsert: true);
-  static const VerificationMeta _payloadCiphertextMeta =
-      const VerificationMeta('payloadCiphertext');
-  @override
-  late final GeneratedColumn<Uint8List> payloadCiphertext =
-      GeneratedColumn<Uint8List>('payload_ciphertext', aliasedName, false,
-          type: DriftSqlType.blob, requiredDuringInsert: true);
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+      'payload', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
   static const VerificationMeta _updatedAtMeta =
       const VerificationMeta('updatedAt');
   @override
@@ -47,14 +41,8 @@ class $_TasksTable extends _Tasks with TableInfo<$_TasksTable, _Task> {
       'updated_at', aliasedName, false,
       type: DriftSqlType.dateTime, requiredDuringInsert: true);
   @override
-  List<GeneratedColumn> get $columns => [
-        accountId,
-        recordId,
-        schemaVersion,
-        payloadNonce,
-        payloadCiphertext,
-        updatedAt
-      ];
+  List<GeneratedColumn> get $columns =>
+      [accountId, recordId, schemaVersion, payload, updatedAt];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -85,21 +73,11 @@ class $_TasksTable extends _Tasks with TableInfo<$_TasksTable, _Task> {
     } else if (isInserting) {
       context.missing(_schemaVersionMeta);
     }
-    if (data.containsKey('payload_nonce')) {
-      context.handle(
-          _payloadNonceMeta,
-          payloadNonce.isAcceptableOrUnknown(
-              data['payload_nonce']!, _payloadNonceMeta));
+    if (data.containsKey('payload')) {
+      context.handle(_payloadMeta,
+          payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta));
     } else if (isInserting) {
-      context.missing(_payloadNonceMeta);
-    }
-    if (data.containsKey('payload_ciphertext')) {
-      context.handle(
-          _payloadCiphertextMeta,
-          payloadCiphertext.isAcceptableOrUnknown(
-              data['payload_ciphertext']!, _payloadCiphertextMeta));
-    } else if (isInserting) {
-      context.missing(_payloadCiphertextMeta);
+      context.missing(_payloadMeta);
     }
     if (data.containsKey('updated_at')) {
       context.handle(_updatedAtMeta,
@@ -122,10 +100,8 @@ class $_TasksTable extends _Tasks with TableInfo<$_TasksTable, _Task> {
           .read(DriftSqlType.string, data['${effectivePrefix}record_id'])!,
       schemaVersion: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}schema_version'])!,
-      payloadNonce: attachedDatabase.typeMapping
-          .read(DriftSqlType.blob, data['${effectivePrefix}payload_nonce'])!,
-      payloadCiphertext: attachedDatabase.typeMapping.read(
-          DriftSqlType.blob, data['${effectivePrefix}payload_ciphertext'])!,
+      payload: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}payload'])!,
       updatedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
     );
@@ -141,15 +117,13 @@ class _Task extends DataClass implements Insertable<_Task> {
   final String accountId;
   final String recordId;
   final int schemaVersion;
-  final Uint8List payloadNonce;
-  final Uint8List payloadCiphertext;
+  final String payload;
   final DateTime updatedAt;
   const _Task(
       {required this.accountId,
       required this.recordId,
       required this.schemaVersion,
-      required this.payloadNonce,
-      required this.payloadCiphertext,
+      required this.payload,
       required this.updatedAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -157,8 +131,7 @@ class _Task extends DataClass implements Insertable<_Task> {
     map['account_id'] = Variable<String>(accountId);
     map['record_id'] = Variable<String>(recordId);
     map['schema_version'] = Variable<int>(schemaVersion);
-    map['payload_nonce'] = Variable<Uint8List>(payloadNonce);
-    map['payload_ciphertext'] = Variable<Uint8List>(payloadCiphertext);
+    map['payload'] = Variable<String>(payload);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
@@ -168,8 +141,7 @@ class _Task extends DataClass implements Insertable<_Task> {
       accountId: Value(accountId),
       recordId: Value(recordId),
       schemaVersion: Value(schemaVersion),
-      payloadNonce: Value(payloadNonce),
-      payloadCiphertext: Value(payloadCiphertext),
+      payload: Value(payload),
       updatedAt: Value(updatedAt),
     );
   }
@@ -181,9 +153,7 @@ class _Task extends DataClass implements Insertable<_Task> {
       accountId: serializer.fromJson<String>(json['accountId']),
       recordId: serializer.fromJson<String>(json['recordId']),
       schemaVersion: serializer.fromJson<int>(json['schemaVersion']),
-      payloadNonce: serializer.fromJson<Uint8List>(json['payloadNonce']),
-      payloadCiphertext:
-          serializer.fromJson<Uint8List>(json['payloadCiphertext']),
+      payload: serializer.fromJson<String>(json['payload']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -194,8 +164,7 @@ class _Task extends DataClass implements Insertable<_Task> {
       'accountId': serializer.toJson<String>(accountId),
       'recordId': serializer.toJson<String>(recordId),
       'schemaVersion': serializer.toJson<int>(schemaVersion),
-      'payloadNonce': serializer.toJson<Uint8List>(payloadNonce),
-      'payloadCiphertext': serializer.toJson<Uint8List>(payloadCiphertext),
+      'payload': serializer.toJson<String>(payload),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -204,15 +173,13 @@ class _Task extends DataClass implements Insertable<_Task> {
           {String? accountId,
           String? recordId,
           int? schemaVersion,
-          Uint8List? payloadNonce,
-          Uint8List? payloadCiphertext,
+          String? payload,
           DateTime? updatedAt}) =>
       _Task(
         accountId: accountId ?? this.accountId,
         recordId: recordId ?? this.recordId,
         schemaVersion: schemaVersion ?? this.schemaVersion,
-        payloadNonce: payloadNonce ?? this.payloadNonce,
-        payloadCiphertext: payloadCiphertext ?? this.payloadCiphertext,
+        payload: payload ?? this.payload,
         updatedAt: updatedAt ?? this.updatedAt,
       );
   _Task copyWithCompanion(_TasksCompanion data) {
@@ -222,12 +189,7 @@ class _Task extends DataClass implements Insertable<_Task> {
       schemaVersion: data.schemaVersion.present
           ? data.schemaVersion.value
           : this.schemaVersion,
-      payloadNonce: data.payloadNonce.present
-          ? data.payloadNonce.value
-          : this.payloadNonce,
-      payloadCiphertext: data.payloadCiphertext.present
-          ? data.payloadCiphertext.value
-          : this.payloadCiphertext,
+      payload: data.payload.present ? data.payload.value : this.payload,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -238,21 +200,15 @@ class _Task extends DataClass implements Insertable<_Task> {
           ..write('accountId: $accountId, ')
           ..write('recordId: $recordId, ')
           ..write('schemaVersion: $schemaVersion, ')
-          ..write('payloadNonce: $payloadNonce, ')
-          ..write('payloadCiphertext: $payloadCiphertext, ')
+          ..write('payload: $payload, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
-      accountId,
-      recordId,
-      schemaVersion,
-      $driftBlobEquality.hash(payloadNonce),
-      $driftBlobEquality.hash(payloadCiphertext),
-      updatedAt);
+  int get hashCode =>
+      Object.hash(accountId, recordId, schemaVersion, payload, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -260,9 +216,7 @@ class _Task extends DataClass implements Insertable<_Task> {
           other.accountId == this.accountId &&
           other.recordId == this.recordId &&
           other.schemaVersion == this.schemaVersion &&
-          $driftBlobEquality.equals(other.payloadNonce, this.payloadNonce) &&
-          $driftBlobEquality.equals(
-              other.payloadCiphertext, this.payloadCiphertext) &&
+          other.payload == this.payload &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -270,16 +224,14 @@ class _TasksCompanion extends UpdateCompanion<_Task> {
   final Value<String> accountId;
   final Value<String> recordId;
   final Value<int> schemaVersion;
-  final Value<Uint8List> payloadNonce;
-  final Value<Uint8List> payloadCiphertext;
+  final Value<String> payload;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const _TasksCompanion({
     this.accountId = const Value.absent(),
     this.recordId = const Value.absent(),
     this.schemaVersion = const Value.absent(),
-    this.payloadNonce = const Value.absent(),
-    this.payloadCiphertext = const Value.absent(),
+    this.payload = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -287,22 +239,19 @@ class _TasksCompanion extends UpdateCompanion<_Task> {
     required String accountId,
     required String recordId,
     required int schemaVersion,
-    required Uint8List payloadNonce,
-    required Uint8List payloadCiphertext,
+    required String payload,
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
   })  : accountId = Value(accountId),
         recordId = Value(recordId),
         schemaVersion = Value(schemaVersion),
-        payloadNonce = Value(payloadNonce),
-        payloadCiphertext = Value(payloadCiphertext),
+        payload = Value(payload),
         updatedAt = Value(updatedAt);
   static Insertable<_Task> custom({
     Expression<String>? accountId,
     Expression<String>? recordId,
     Expression<int>? schemaVersion,
-    Expression<Uint8List>? payloadNonce,
-    Expression<Uint8List>? payloadCiphertext,
+    Expression<String>? payload,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -310,8 +259,7 @@ class _TasksCompanion extends UpdateCompanion<_Task> {
       if (accountId != null) 'account_id': accountId,
       if (recordId != null) 'record_id': recordId,
       if (schemaVersion != null) 'schema_version': schemaVersion,
-      if (payloadNonce != null) 'payload_nonce': payloadNonce,
-      if (payloadCiphertext != null) 'payload_ciphertext': payloadCiphertext,
+      if (payload != null) 'payload': payload,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -321,16 +269,14 @@ class _TasksCompanion extends UpdateCompanion<_Task> {
       {Value<String>? accountId,
       Value<String>? recordId,
       Value<int>? schemaVersion,
-      Value<Uint8List>? payloadNonce,
-      Value<Uint8List>? payloadCiphertext,
+      Value<String>? payload,
       Value<DateTime>? updatedAt,
       Value<int>? rowid}) {
     return _TasksCompanion(
       accountId: accountId ?? this.accountId,
       recordId: recordId ?? this.recordId,
       schemaVersion: schemaVersion ?? this.schemaVersion,
-      payloadNonce: payloadNonce ?? this.payloadNonce,
-      payloadCiphertext: payloadCiphertext ?? this.payloadCiphertext,
+      payload: payload ?? this.payload,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -348,11 +294,8 @@ class _TasksCompanion extends UpdateCompanion<_Task> {
     if (schemaVersion.present) {
       map['schema_version'] = Variable<int>(schemaVersion.value);
     }
-    if (payloadNonce.present) {
-      map['payload_nonce'] = Variable<Uint8List>(payloadNonce.value);
-    }
-    if (payloadCiphertext.present) {
-      map['payload_ciphertext'] = Variable<Uint8List>(payloadCiphertext.value);
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
     }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
@@ -369,8 +312,7 @@ class _TasksCompanion extends UpdateCompanion<_Task> {
           ..write('accountId: $accountId, ')
           ..write('recordId: $recordId, ')
           ..write('schemaVersion: $schemaVersion, ')
-          ..write('payloadNonce: $payloadNonce, ')
-          ..write('payloadCiphertext: $payloadCiphertext, ')
+          ..write('payload: $payload, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -402,18 +344,12 @@ class $_ScheduleBlocksTable extends _ScheduleBlocks
   late final GeneratedColumn<int> schemaVersion = GeneratedColumn<int>(
       'schema_version', aliasedName, false,
       type: DriftSqlType.int, requiredDuringInsert: true);
-  static const VerificationMeta _payloadNonceMeta =
-      const VerificationMeta('payloadNonce');
+  static const VerificationMeta _payloadMeta =
+      const VerificationMeta('payload');
   @override
-  late final GeneratedColumn<Uint8List> payloadNonce =
-      GeneratedColumn<Uint8List>('payload_nonce', aliasedName, false,
-          type: DriftSqlType.blob, requiredDuringInsert: true);
-  static const VerificationMeta _payloadCiphertextMeta =
-      const VerificationMeta('payloadCiphertext');
-  @override
-  late final GeneratedColumn<Uint8List> payloadCiphertext =
-      GeneratedColumn<Uint8List>('payload_ciphertext', aliasedName, false,
-          type: DriftSqlType.blob, requiredDuringInsert: true);
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+      'payload', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
   static const VerificationMeta _updatedAtMeta =
       const VerificationMeta('updatedAt');
   @override
@@ -421,14 +357,8 @@ class $_ScheduleBlocksTable extends _ScheduleBlocks
       'updated_at', aliasedName, false,
       type: DriftSqlType.dateTime, requiredDuringInsert: true);
   @override
-  List<GeneratedColumn> get $columns => [
-        accountId,
-        recordId,
-        schemaVersion,
-        payloadNonce,
-        payloadCiphertext,
-        updatedAt
-      ];
+  List<GeneratedColumn> get $columns =>
+      [accountId, recordId, schemaVersion, payload, updatedAt];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -459,21 +389,11 @@ class $_ScheduleBlocksTable extends _ScheduleBlocks
     } else if (isInserting) {
       context.missing(_schemaVersionMeta);
     }
-    if (data.containsKey('payload_nonce')) {
-      context.handle(
-          _payloadNonceMeta,
-          payloadNonce.isAcceptableOrUnknown(
-              data['payload_nonce']!, _payloadNonceMeta));
+    if (data.containsKey('payload')) {
+      context.handle(_payloadMeta,
+          payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta));
     } else if (isInserting) {
-      context.missing(_payloadNonceMeta);
-    }
-    if (data.containsKey('payload_ciphertext')) {
-      context.handle(
-          _payloadCiphertextMeta,
-          payloadCiphertext.isAcceptableOrUnknown(
-              data['payload_ciphertext']!, _payloadCiphertextMeta));
-    } else if (isInserting) {
-      context.missing(_payloadCiphertextMeta);
+      context.missing(_payloadMeta);
     }
     if (data.containsKey('updated_at')) {
       context.handle(_updatedAtMeta,
@@ -496,10 +416,8 @@ class $_ScheduleBlocksTable extends _ScheduleBlocks
           .read(DriftSqlType.string, data['${effectivePrefix}record_id'])!,
       schemaVersion: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}schema_version'])!,
-      payloadNonce: attachedDatabase.typeMapping
-          .read(DriftSqlType.blob, data['${effectivePrefix}payload_nonce'])!,
-      payloadCiphertext: attachedDatabase.typeMapping.read(
-          DriftSqlType.blob, data['${effectivePrefix}payload_ciphertext'])!,
+      payload: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}payload'])!,
       updatedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
     );
@@ -515,15 +433,13 @@ class _ScheduleBlock extends DataClass implements Insertable<_ScheduleBlock> {
   final String accountId;
   final String recordId;
   final int schemaVersion;
-  final Uint8List payloadNonce;
-  final Uint8List payloadCiphertext;
+  final String payload;
   final DateTime updatedAt;
   const _ScheduleBlock(
       {required this.accountId,
       required this.recordId,
       required this.schemaVersion,
-      required this.payloadNonce,
-      required this.payloadCiphertext,
+      required this.payload,
       required this.updatedAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -531,8 +447,7 @@ class _ScheduleBlock extends DataClass implements Insertable<_ScheduleBlock> {
     map['account_id'] = Variable<String>(accountId);
     map['record_id'] = Variable<String>(recordId);
     map['schema_version'] = Variable<int>(schemaVersion);
-    map['payload_nonce'] = Variable<Uint8List>(payloadNonce);
-    map['payload_ciphertext'] = Variable<Uint8List>(payloadCiphertext);
+    map['payload'] = Variable<String>(payload);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
@@ -542,8 +457,7 @@ class _ScheduleBlock extends DataClass implements Insertable<_ScheduleBlock> {
       accountId: Value(accountId),
       recordId: Value(recordId),
       schemaVersion: Value(schemaVersion),
-      payloadNonce: Value(payloadNonce),
-      payloadCiphertext: Value(payloadCiphertext),
+      payload: Value(payload),
       updatedAt: Value(updatedAt),
     );
   }
@@ -555,9 +469,7 @@ class _ScheduleBlock extends DataClass implements Insertable<_ScheduleBlock> {
       accountId: serializer.fromJson<String>(json['accountId']),
       recordId: serializer.fromJson<String>(json['recordId']),
       schemaVersion: serializer.fromJson<int>(json['schemaVersion']),
-      payloadNonce: serializer.fromJson<Uint8List>(json['payloadNonce']),
-      payloadCiphertext:
-          serializer.fromJson<Uint8List>(json['payloadCiphertext']),
+      payload: serializer.fromJson<String>(json['payload']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -568,8 +480,7 @@ class _ScheduleBlock extends DataClass implements Insertable<_ScheduleBlock> {
       'accountId': serializer.toJson<String>(accountId),
       'recordId': serializer.toJson<String>(recordId),
       'schemaVersion': serializer.toJson<int>(schemaVersion),
-      'payloadNonce': serializer.toJson<Uint8List>(payloadNonce),
-      'payloadCiphertext': serializer.toJson<Uint8List>(payloadCiphertext),
+      'payload': serializer.toJson<String>(payload),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -578,15 +489,13 @@ class _ScheduleBlock extends DataClass implements Insertable<_ScheduleBlock> {
           {String? accountId,
           String? recordId,
           int? schemaVersion,
-          Uint8List? payloadNonce,
-          Uint8List? payloadCiphertext,
+          String? payload,
           DateTime? updatedAt}) =>
       _ScheduleBlock(
         accountId: accountId ?? this.accountId,
         recordId: recordId ?? this.recordId,
         schemaVersion: schemaVersion ?? this.schemaVersion,
-        payloadNonce: payloadNonce ?? this.payloadNonce,
-        payloadCiphertext: payloadCiphertext ?? this.payloadCiphertext,
+        payload: payload ?? this.payload,
         updatedAt: updatedAt ?? this.updatedAt,
       );
   _ScheduleBlock copyWithCompanion(_ScheduleBlocksCompanion data) {
@@ -596,12 +505,7 @@ class _ScheduleBlock extends DataClass implements Insertable<_ScheduleBlock> {
       schemaVersion: data.schemaVersion.present
           ? data.schemaVersion.value
           : this.schemaVersion,
-      payloadNonce: data.payloadNonce.present
-          ? data.payloadNonce.value
-          : this.payloadNonce,
-      payloadCiphertext: data.payloadCiphertext.present
-          ? data.payloadCiphertext.value
-          : this.payloadCiphertext,
+      payload: data.payload.present ? data.payload.value : this.payload,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -612,21 +516,15 @@ class _ScheduleBlock extends DataClass implements Insertable<_ScheduleBlock> {
           ..write('accountId: $accountId, ')
           ..write('recordId: $recordId, ')
           ..write('schemaVersion: $schemaVersion, ')
-          ..write('payloadNonce: $payloadNonce, ')
-          ..write('payloadCiphertext: $payloadCiphertext, ')
+          ..write('payload: $payload, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
-      accountId,
-      recordId,
-      schemaVersion,
-      $driftBlobEquality.hash(payloadNonce),
-      $driftBlobEquality.hash(payloadCiphertext),
-      updatedAt);
+  int get hashCode =>
+      Object.hash(accountId, recordId, schemaVersion, payload, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -634,9 +532,7 @@ class _ScheduleBlock extends DataClass implements Insertable<_ScheduleBlock> {
           other.accountId == this.accountId &&
           other.recordId == this.recordId &&
           other.schemaVersion == this.schemaVersion &&
-          $driftBlobEquality.equals(other.payloadNonce, this.payloadNonce) &&
-          $driftBlobEquality.equals(
-              other.payloadCiphertext, this.payloadCiphertext) &&
+          other.payload == this.payload &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -644,16 +540,14 @@ class _ScheduleBlocksCompanion extends UpdateCompanion<_ScheduleBlock> {
   final Value<String> accountId;
   final Value<String> recordId;
   final Value<int> schemaVersion;
-  final Value<Uint8List> payloadNonce;
-  final Value<Uint8List> payloadCiphertext;
+  final Value<String> payload;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const _ScheduleBlocksCompanion({
     this.accountId = const Value.absent(),
     this.recordId = const Value.absent(),
     this.schemaVersion = const Value.absent(),
-    this.payloadNonce = const Value.absent(),
-    this.payloadCiphertext = const Value.absent(),
+    this.payload = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -661,22 +555,19 @@ class _ScheduleBlocksCompanion extends UpdateCompanion<_ScheduleBlock> {
     required String accountId,
     required String recordId,
     required int schemaVersion,
-    required Uint8List payloadNonce,
-    required Uint8List payloadCiphertext,
+    required String payload,
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
   })  : accountId = Value(accountId),
         recordId = Value(recordId),
         schemaVersion = Value(schemaVersion),
-        payloadNonce = Value(payloadNonce),
-        payloadCiphertext = Value(payloadCiphertext),
+        payload = Value(payload),
         updatedAt = Value(updatedAt);
   static Insertable<_ScheduleBlock> custom({
     Expression<String>? accountId,
     Expression<String>? recordId,
     Expression<int>? schemaVersion,
-    Expression<Uint8List>? payloadNonce,
-    Expression<Uint8List>? payloadCiphertext,
+    Expression<String>? payload,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -684,8 +575,7 @@ class _ScheduleBlocksCompanion extends UpdateCompanion<_ScheduleBlock> {
       if (accountId != null) 'account_id': accountId,
       if (recordId != null) 'record_id': recordId,
       if (schemaVersion != null) 'schema_version': schemaVersion,
-      if (payloadNonce != null) 'payload_nonce': payloadNonce,
-      if (payloadCiphertext != null) 'payload_ciphertext': payloadCiphertext,
+      if (payload != null) 'payload': payload,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -695,16 +585,14 @@ class _ScheduleBlocksCompanion extends UpdateCompanion<_ScheduleBlock> {
       {Value<String>? accountId,
       Value<String>? recordId,
       Value<int>? schemaVersion,
-      Value<Uint8List>? payloadNonce,
-      Value<Uint8List>? payloadCiphertext,
+      Value<String>? payload,
       Value<DateTime>? updatedAt,
       Value<int>? rowid}) {
     return _ScheduleBlocksCompanion(
       accountId: accountId ?? this.accountId,
       recordId: recordId ?? this.recordId,
       schemaVersion: schemaVersion ?? this.schemaVersion,
-      payloadNonce: payloadNonce ?? this.payloadNonce,
-      payloadCiphertext: payloadCiphertext ?? this.payloadCiphertext,
+      payload: payload ?? this.payload,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -722,11 +610,8 @@ class _ScheduleBlocksCompanion extends UpdateCompanion<_ScheduleBlock> {
     if (schemaVersion.present) {
       map['schema_version'] = Variable<int>(schemaVersion.value);
     }
-    if (payloadNonce.present) {
-      map['payload_nonce'] = Variable<Uint8List>(payloadNonce.value);
-    }
-    if (payloadCiphertext.present) {
-      map['payload_ciphertext'] = Variable<Uint8List>(payloadCiphertext.value);
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
     }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
@@ -743,8 +628,7 @@ class _ScheduleBlocksCompanion extends UpdateCompanion<_ScheduleBlock> {
           ..write('accountId: $accountId, ')
           ..write('recordId: $recordId, ')
           ..write('schemaVersion: $schemaVersion, ')
-          ..write('payloadNonce: $payloadNonce, ')
-          ..write('payloadCiphertext: $payloadCiphertext, ')
+          ..write('payload: $payload, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -776,18 +660,12 @@ class $_FocusSessionsTable extends _FocusSessions
   late final GeneratedColumn<int> schemaVersion = GeneratedColumn<int>(
       'schema_version', aliasedName, false,
       type: DriftSqlType.int, requiredDuringInsert: true);
-  static const VerificationMeta _payloadNonceMeta =
-      const VerificationMeta('payloadNonce');
+  static const VerificationMeta _payloadMeta =
+      const VerificationMeta('payload');
   @override
-  late final GeneratedColumn<Uint8List> payloadNonce =
-      GeneratedColumn<Uint8List>('payload_nonce', aliasedName, false,
-          type: DriftSqlType.blob, requiredDuringInsert: true);
-  static const VerificationMeta _payloadCiphertextMeta =
-      const VerificationMeta('payloadCiphertext');
-  @override
-  late final GeneratedColumn<Uint8List> payloadCiphertext =
-      GeneratedColumn<Uint8List>('payload_ciphertext', aliasedName, false,
-          type: DriftSqlType.blob, requiredDuringInsert: true);
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+      'payload', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
   static const VerificationMeta _updatedAtMeta =
       const VerificationMeta('updatedAt');
   @override
@@ -795,14 +673,8 @@ class $_FocusSessionsTable extends _FocusSessions
       'updated_at', aliasedName, false,
       type: DriftSqlType.dateTime, requiredDuringInsert: true);
   @override
-  List<GeneratedColumn> get $columns => [
-        accountId,
-        recordId,
-        schemaVersion,
-        payloadNonce,
-        payloadCiphertext,
-        updatedAt
-      ];
+  List<GeneratedColumn> get $columns =>
+      [accountId, recordId, schemaVersion, payload, updatedAt];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -833,21 +705,11 @@ class $_FocusSessionsTable extends _FocusSessions
     } else if (isInserting) {
       context.missing(_schemaVersionMeta);
     }
-    if (data.containsKey('payload_nonce')) {
-      context.handle(
-          _payloadNonceMeta,
-          payloadNonce.isAcceptableOrUnknown(
-              data['payload_nonce']!, _payloadNonceMeta));
+    if (data.containsKey('payload')) {
+      context.handle(_payloadMeta,
+          payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta));
     } else if (isInserting) {
-      context.missing(_payloadNonceMeta);
-    }
-    if (data.containsKey('payload_ciphertext')) {
-      context.handle(
-          _payloadCiphertextMeta,
-          payloadCiphertext.isAcceptableOrUnknown(
-              data['payload_ciphertext']!, _payloadCiphertextMeta));
-    } else if (isInserting) {
-      context.missing(_payloadCiphertextMeta);
+      context.missing(_payloadMeta);
     }
     if (data.containsKey('updated_at')) {
       context.handle(_updatedAtMeta,
@@ -870,10 +732,8 @@ class $_FocusSessionsTable extends _FocusSessions
           .read(DriftSqlType.string, data['${effectivePrefix}record_id'])!,
       schemaVersion: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}schema_version'])!,
-      payloadNonce: attachedDatabase.typeMapping
-          .read(DriftSqlType.blob, data['${effectivePrefix}payload_nonce'])!,
-      payloadCiphertext: attachedDatabase.typeMapping.read(
-          DriftSqlType.blob, data['${effectivePrefix}payload_ciphertext'])!,
+      payload: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}payload'])!,
       updatedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
     );
@@ -889,15 +749,13 @@ class _FocusSession extends DataClass implements Insertable<_FocusSession> {
   final String accountId;
   final String recordId;
   final int schemaVersion;
-  final Uint8List payloadNonce;
-  final Uint8List payloadCiphertext;
+  final String payload;
   final DateTime updatedAt;
   const _FocusSession(
       {required this.accountId,
       required this.recordId,
       required this.schemaVersion,
-      required this.payloadNonce,
-      required this.payloadCiphertext,
+      required this.payload,
       required this.updatedAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -905,8 +763,7 @@ class _FocusSession extends DataClass implements Insertable<_FocusSession> {
     map['account_id'] = Variable<String>(accountId);
     map['record_id'] = Variable<String>(recordId);
     map['schema_version'] = Variable<int>(schemaVersion);
-    map['payload_nonce'] = Variable<Uint8List>(payloadNonce);
-    map['payload_ciphertext'] = Variable<Uint8List>(payloadCiphertext);
+    map['payload'] = Variable<String>(payload);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
@@ -916,8 +773,7 @@ class _FocusSession extends DataClass implements Insertable<_FocusSession> {
       accountId: Value(accountId),
       recordId: Value(recordId),
       schemaVersion: Value(schemaVersion),
-      payloadNonce: Value(payloadNonce),
-      payloadCiphertext: Value(payloadCiphertext),
+      payload: Value(payload),
       updatedAt: Value(updatedAt),
     );
   }
@@ -929,9 +785,7 @@ class _FocusSession extends DataClass implements Insertable<_FocusSession> {
       accountId: serializer.fromJson<String>(json['accountId']),
       recordId: serializer.fromJson<String>(json['recordId']),
       schemaVersion: serializer.fromJson<int>(json['schemaVersion']),
-      payloadNonce: serializer.fromJson<Uint8List>(json['payloadNonce']),
-      payloadCiphertext:
-          serializer.fromJson<Uint8List>(json['payloadCiphertext']),
+      payload: serializer.fromJson<String>(json['payload']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -942,8 +796,7 @@ class _FocusSession extends DataClass implements Insertable<_FocusSession> {
       'accountId': serializer.toJson<String>(accountId),
       'recordId': serializer.toJson<String>(recordId),
       'schemaVersion': serializer.toJson<int>(schemaVersion),
-      'payloadNonce': serializer.toJson<Uint8List>(payloadNonce),
-      'payloadCiphertext': serializer.toJson<Uint8List>(payloadCiphertext),
+      'payload': serializer.toJson<String>(payload),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -952,15 +805,13 @@ class _FocusSession extends DataClass implements Insertable<_FocusSession> {
           {String? accountId,
           String? recordId,
           int? schemaVersion,
-          Uint8List? payloadNonce,
-          Uint8List? payloadCiphertext,
+          String? payload,
           DateTime? updatedAt}) =>
       _FocusSession(
         accountId: accountId ?? this.accountId,
         recordId: recordId ?? this.recordId,
         schemaVersion: schemaVersion ?? this.schemaVersion,
-        payloadNonce: payloadNonce ?? this.payloadNonce,
-        payloadCiphertext: payloadCiphertext ?? this.payloadCiphertext,
+        payload: payload ?? this.payload,
         updatedAt: updatedAt ?? this.updatedAt,
       );
   _FocusSession copyWithCompanion(_FocusSessionsCompanion data) {
@@ -970,12 +821,7 @@ class _FocusSession extends DataClass implements Insertable<_FocusSession> {
       schemaVersion: data.schemaVersion.present
           ? data.schemaVersion.value
           : this.schemaVersion,
-      payloadNonce: data.payloadNonce.present
-          ? data.payloadNonce.value
-          : this.payloadNonce,
-      payloadCiphertext: data.payloadCiphertext.present
-          ? data.payloadCiphertext.value
-          : this.payloadCiphertext,
+      payload: data.payload.present ? data.payload.value : this.payload,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -986,21 +832,15 @@ class _FocusSession extends DataClass implements Insertable<_FocusSession> {
           ..write('accountId: $accountId, ')
           ..write('recordId: $recordId, ')
           ..write('schemaVersion: $schemaVersion, ')
-          ..write('payloadNonce: $payloadNonce, ')
-          ..write('payloadCiphertext: $payloadCiphertext, ')
+          ..write('payload: $payload, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
-      accountId,
-      recordId,
-      schemaVersion,
-      $driftBlobEquality.hash(payloadNonce),
-      $driftBlobEquality.hash(payloadCiphertext),
-      updatedAt);
+  int get hashCode =>
+      Object.hash(accountId, recordId, schemaVersion, payload, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1008,9 +848,7 @@ class _FocusSession extends DataClass implements Insertable<_FocusSession> {
           other.accountId == this.accountId &&
           other.recordId == this.recordId &&
           other.schemaVersion == this.schemaVersion &&
-          $driftBlobEquality.equals(other.payloadNonce, this.payloadNonce) &&
-          $driftBlobEquality.equals(
-              other.payloadCiphertext, this.payloadCiphertext) &&
+          other.payload == this.payload &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -1018,16 +856,14 @@ class _FocusSessionsCompanion extends UpdateCompanion<_FocusSession> {
   final Value<String> accountId;
   final Value<String> recordId;
   final Value<int> schemaVersion;
-  final Value<Uint8List> payloadNonce;
-  final Value<Uint8List> payloadCiphertext;
+  final Value<String> payload;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const _FocusSessionsCompanion({
     this.accountId = const Value.absent(),
     this.recordId = const Value.absent(),
     this.schemaVersion = const Value.absent(),
-    this.payloadNonce = const Value.absent(),
-    this.payloadCiphertext = const Value.absent(),
+    this.payload = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -1035,22 +871,19 @@ class _FocusSessionsCompanion extends UpdateCompanion<_FocusSession> {
     required String accountId,
     required String recordId,
     required int schemaVersion,
-    required Uint8List payloadNonce,
-    required Uint8List payloadCiphertext,
+    required String payload,
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
   })  : accountId = Value(accountId),
         recordId = Value(recordId),
         schemaVersion = Value(schemaVersion),
-        payloadNonce = Value(payloadNonce),
-        payloadCiphertext = Value(payloadCiphertext),
+        payload = Value(payload),
         updatedAt = Value(updatedAt);
   static Insertable<_FocusSession> custom({
     Expression<String>? accountId,
     Expression<String>? recordId,
     Expression<int>? schemaVersion,
-    Expression<Uint8List>? payloadNonce,
-    Expression<Uint8List>? payloadCiphertext,
+    Expression<String>? payload,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -1058,8 +891,7 @@ class _FocusSessionsCompanion extends UpdateCompanion<_FocusSession> {
       if (accountId != null) 'account_id': accountId,
       if (recordId != null) 'record_id': recordId,
       if (schemaVersion != null) 'schema_version': schemaVersion,
-      if (payloadNonce != null) 'payload_nonce': payloadNonce,
-      if (payloadCiphertext != null) 'payload_ciphertext': payloadCiphertext,
+      if (payload != null) 'payload': payload,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -1069,16 +901,14 @@ class _FocusSessionsCompanion extends UpdateCompanion<_FocusSession> {
       {Value<String>? accountId,
       Value<String>? recordId,
       Value<int>? schemaVersion,
-      Value<Uint8List>? payloadNonce,
-      Value<Uint8List>? payloadCiphertext,
+      Value<String>? payload,
       Value<DateTime>? updatedAt,
       Value<int>? rowid}) {
     return _FocusSessionsCompanion(
       accountId: accountId ?? this.accountId,
       recordId: recordId ?? this.recordId,
       schemaVersion: schemaVersion ?? this.schemaVersion,
-      payloadNonce: payloadNonce ?? this.payloadNonce,
-      payloadCiphertext: payloadCiphertext ?? this.payloadCiphertext,
+      payload: payload ?? this.payload,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -1096,11 +926,8 @@ class _FocusSessionsCompanion extends UpdateCompanion<_FocusSession> {
     if (schemaVersion.present) {
       map['schema_version'] = Variable<int>(schemaVersion.value);
     }
-    if (payloadNonce.present) {
-      map['payload_nonce'] = Variable<Uint8List>(payloadNonce.value);
-    }
-    if (payloadCiphertext.present) {
-      map['payload_ciphertext'] = Variable<Uint8List>(payloadCiphertext.value);
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
     }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
@@ -1117,8 +944,7 @@ class _FocusSessionsCompanion extends UpdateCompanion<_FocusSession> {
           ..write('accountId: $accountId, ')
           ..write('recordId: $recordId, ')
           ..write('schemaVersion: $schemaVersion, ')
-          ..write('payloadNonce: $payloadNonce, ')
-          ..write('payloadCiphertext: $payloadCiphertext, ')
+          ..write('payload: $payload, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -1150,18 +976,12 @@ class $_CheckInsTable extends _CheckIns
   late final GeneratedColumn<int> schemaVersion = GeneratedColumn<int>(
       'schema_version', aliasedName, false,
       type: DriftSqlType.int, requiredDuringInsert: true);
-  static const VerificationMeta _payloadNonceMeta =
-      const VerificationMeta('payloadNonce');
+  static const VerificationMeta _payloadMeta =
+      const VerificationMeta('payload');
   @override
-  late final GeneratedColumn<Uint8List> payloadNonce =
-      GeneratedColumn<Uint8List>('payload_nonce', aliasedName, false,
-          type: DriftSqlType.blob, requiredDuringInsert: true);
-  static const VerificationMeta _payloadCiphertextMeta =
-      const VerificationMeta('payloadCiphertext');
-  @override
-  late final GeneratedColumn<Uint8List> payloadCiphertext =
-      GeneratedColumn<Uint8List>('payload_ciphertext', aliasedName, false,
-          type: DriftSqlType.blob, requiredDuringInsert: true);
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+      'payload', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
   static const VerificationMeta _updatedAtMeta =
       const VerificationMeta('updatedAt');
   @override
@@ -1169,14 +989,8 @@ class $_CheckInsTable extends _CheckIns
       'updated_at', aliasedName, false,
       type: DriftSqlType.dateTime, requiredDuringInsert: true);
   @override
-  List<GeneratedColumn> get $columns => [
-        accountId,
-        recordId,
-        schemaVersion,
-        payloadNonce,
-        payloadCiphertext,
-        updatedAt
-      ];
+  List<GeneratedColumn> get $columns =>
+      [accountId, recordId, schemaVersion, payload, updatedAt];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1207,21 +1021,11 @@ class $_CheckInsTable extends _CheckIns
     } else if (isInserting) {
       context.missing(_schemaVersionMeta);
     }
-    if (data.containsKey('payload_nonce')) {
-      context.handle(
-          _payloadNonceMeta,
-          payloadNonce.isAcceptableOrUnknown(
-              data['payload_nonce']!, _payloadNonceMeta));
+    if (data.containsKey('payload')) {
+      context.handle(_payloadMeta,
+          payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta));
     } else if (isInserting) {
-      context.missing(_payloadNonceMeta);
-    }
-    if (data.containsKey('payload_ciphertext')) {
-      context.handle(
-          _payloadCiphertextMeta,
-          payloadCiphertext.isAcceptableOrUnknown(
-              data['payload_ciphertext']!, _payloadCiphertextMeta));
-    } else if (isInserting) {
-      context.missing(_payloadCiphertextMeta);
+      context.missing(_payloadMeta);
     }
     if (data.containsKey('updated_at')) {
       context.handle(_updatedAtMeta,
@@ -1244,10 +1048,8 @@ class $_CheckInsTable extends _CheckIns
           .read(DriftSqlType.string, data['${effectivePrefix}record_id'])!,
       schemaVersion: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}schema_version'])!,
-      payloadNonce: attachedDatabase.typeMapping
-          .read(DriftSqlType.blob, data['${effectivePrefix}payload_nonce'])!,
-      payloadCiphertext: attachedDatabase.typeMapping.read(
-          DriftSqlType.blob, data['${effectivePrefix}payload_ciphertext'])!,
+      payload: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}payload'])!,
       updatedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
     );
@@ -1263,15 +1065,13 @@ class _CheckIn extends DataClass implements Insertable<_CheckIn> {
   final String accountId;
   final String recordId;
   final int schemaVersion;
-  final Uint8List payloadNonce;
-  final Uint8List payloadCiphertext;
+  final String payload;
   final DateTime updatedAt;
   const _CheckIn(
       {required this.accountId,
       required this.recordId,
       required this.schemaVersion,
-      required this.payloadNonce,
-      required this.payloadCiphertext,
+      required this.payload,
       required this.updatedAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1279,8 +1079,7 @@ class _CheckIn extends DataClass implements Insertable<_CheckIn> {
     map['account_id'] = Variable<String>(accountId);
     map['record_id'] = Variable<String>(recordId);
     map['schema_version'] = Variable<int>(schemaVersion);
-    map['payload_nonce'] = Variable<Uint8List>(payloadNonce);
-    map['payload_ciphertext'] = Variable<Uint8List>(payloadCiphertext);
+    map['payload'] = Variable<String>(payload);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
@@ -1290,8 +1089,7 @@ class _CheckIn extends DataClass implements Insertable<_CheckIn> {
       accountId: Value(accountId),
       recordId: Value(recordId),
       schemaVersion: Value(schemaVersion),
-      payloadNonce: Value(payloadNonce),
-      payloadCiphertext: Value(payloadCiphertext),
+      payload: Value(payload),
       updatedAt: Value(updatedAt),
     );
   }
@@ -1303,9 +1101,7 @@ class _CheckIn extends DataClass implements Insertable<_CheckIn> {
       accountId: serializer.fromJson<String>(json['accountId']),
       recordId: serializer.fromJson<String>(json['recordId']),
       schemaVersion: serializer.fromJson<int>(json['schemaVersion']),
-      payloadNonce: serializer.fromJson<Uint8List>(json['payloadNonce']),
-      payloadCiphertext:
-          serializer.fromJson<Uint8List>(json['payloadCiphertext']),
+      payload: serializer.fromJson<String>(json['payload']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -1316,8 +1112,7 @@ class _CheckIn extends DataClass implements Insertable<_CheckIn> {
       'accountId': serializer.toJson<String>(accountId),
       'recordId': serializer.toJson<String>(recordId),
       'schemaVersion': serializer.toJson<int>(schemaVersion),
-      'payloadNonce': serializer.toJson<Uint8List>(payloadNonce),
-      'payloadCiphertext': serializer.toJson<Uint8List>(payloadCiphertext),
+      'payload': serializer.toJson<String>(payload),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -1326,15 +1121,13 @@ class _CheckIn extends DataClass implements Insertable<_CheckIn> {
           {String? accountId,
           String? recordId,
           int? schemaVersion,
-          Uint8List? payloadNonce,
-          Uint8List? payloadCiphertext,
+          String? payload,
           DateTime? updatedAt}) =>
       _CheckIn(
         accountId: accountId ?? this.accountId,
         recordId: recordId ?? this.recordId,
         schemaVersion: schemaVersion ?? this.schemaVersion,
-        payloadNonce: payloadNonce ?? this.payloadNonce,
-        payloadCiphertext: payloadCiphertext ?? this.payloadCiphertext,
+        payload: payload ?? this.payload,
         updatedAt: updatedAt ?? this.updatedAt,
       );
   _CheckIn copyWithCompanion(_CheckInsCompanion data) {
@@ -1344,12 +1137,7 @@ class _CheckIn extends DataClass implements Insertable<_CheckIn> {
       schemaVersion: data.schemaVersion.present
           ? data.schemaVersion.value
           : this.schemaVersion,
-      payloadNonce: data.payloadNonce.present
-          ? data.payloadNonce.value
-          : this.payloadNonce,
-      payloadCiphertext: data.payloadCiphertext.present
-          ? data.payloadCiphertext.value
-          : this.payloadCiphertext,
+      payload: data.payload.present ? data.payload.value : this.payload,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -1360,21 +1148,15 @@ class _CheckIn extends DataClass implements Insertable<_CheckIn> {
           ..write('accountId: $accountId, ')
           ..write('recordId: $recordId, ')
           ..write('schemaVersion: $schemaVersion, ')
-          ..write('payloadNonce: $payloadNonce, ')
-          ..write('payloadCiphertext: $payloadCiphertext, ')
+          ..write('payload: $payload, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
-      accountId,
-      recordId,
-      schemaVersion,
-      $driftBlobEquality.hash(payloadNonce),
-      $driftBlobEquality.hash(payloadCiphertext),
-      updatedAt);
+  int get hashCode =>
+      Object.hash(accountId, recordId, schemaVersion, payload, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1382,9 +1164,7 @@ class _CheckIn extends DataClass implements Insertable<_CheckIn> {
           other.accountId == this.accountId &&
           other.recordId == this.recordId &&
           other.schemaVersion == this.schemaVersion &&
-          $driftBlobEquality.equals(other.payloadNonce, this.payloadNonce) &&
-          $driftBlobEquality.equals(
-              other.payloadCiphertext, this.payloadCiphertext) &&
+          other.payload == this.payload &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -1392,16 +1172,14 @@ class _CheckInsCompanion extends UpdateCompanion<_CheckIn> {
   final Value<String> accountId;
   final Value<String> recordId;
   final Value<int> schemaVersion;
-  final Value<Uint8List> payloadNonce;
-  final Value<Uint8List> payloadCiphertext;
+  final Value<String> payload;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const _CheckInsCompanion({
     this.accountId = const Value.absent(),
     this.recordId = const Value.absent(),
     this.schemaVersion = const Value.absent(),
-    this.payloadNonce = const Value.absent(),
-    this.payloadCiphertext = const Value.absent(),
+    this.payload = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -1409,22 +1187,19 @@ class _CheckInsCompanion extends UpdateCompanion<_CheckIn> {
     required String accountId,
     required String recordId,
     required int schemaVersion,
-    required Uint8List payloadNonce,
-    required Uint8List payloadCiphertext,
+    required String payload,
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
   })  : accountId = Value(accountId),
         recordId = Value(recordId),
         schemaVersion = Value(schemaVersion),
-        payloadNonce = Value(payloadNonce),
-        payloadCiphertext = Value(payloadCiphertext),
+        payload = Value(payload),
         updatedAt = Value(updatedAt);
   static Insertable<_CheckIn> custom({
     Expression<String>? accountId,
     Expression<String>? recordId,
     Expression<int>? schemaVersion,
-    Expression<Uint8List>? payloadNonce,
-    Expression<Uint8List>? payloadCiphertext,
+    Expression<String>? payload,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -1432,8 +1207,7 @@ class _CheckInsCompanion extends UpdateCompanion<_CheckIn> {
       if (accountId != null) 'account_id': accountId,
       if (recordId != null) 'record_id': recordId,
       if (schemaVersion != null) 'schema_version': schemaVersion,
-      if (payloadNonce != null) 'payload_nonce': payloadNonce,
-      if (payloadCiphertext != null) 'payload_ciphertext': payloadCiphertext,
+      if (payload != null) 'payload': payload,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -1443,16 +1217,14 @@ class _CheckInsCompanion extends UpdateCompanion<_CheckIn> {
       {Value<String>? accountId,
       Value<String>? recordId,
       Value<int>? schemaVersion,
-      Value<Uint8List>? payloadNonce,
-      Value<Uint8List>? payloadCiphertext,
+      Value<String>? payload,
       Value<DateTime>? updatedAt,
       Value<int>? rowid}) {
     return _CheckInsCompanion(
       accountId: accountId ?? this.accountId,
       recordId: recordId ?? this.recordId,
       schemaVersion: schemaVersion ?? this.schemaVersion,
-      payloadNonce: payloadNonce ?? this.payloadNonce,
-      payloadCiphertext: payloadCiphertext ?? this.payloadCiphertext,
+      payload: payload ?? this.payload,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -1470,11 +1242,8 @@ class _CheckInsCompanion extends UpdateCompanion<_CheckIn> {
     if (schemaVersion.present) {
       map['schema_version'] = Variable<int>(schemaVersion.value);
     }
-    if (payloadNonce.present) {
-      map['payload_nonce'] = Variable<Uint8List>(payloadNonce.value);
-    }
-    if (payloadCiphertext.present) {
-      map['payload_ciphertext'] = Variable<Uint8List>(payloadCiphertext.value);
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
     }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
@@ -1491,8 +1260,7 @@ class _CheckInsCompanion extends UpdateCompanion<_CheckIn> {
           ..write('accountId: $accountId, ')
           ..write('recordId: $recordId, ')
           ..write('schemaVersion: $schemaVersion, ')
-          ..write('payloadNonce: $payloadNonce, ')
-          ..write('payloadCiphertext: $payloadCiphertext, ')
+          ..write('payload: $payload, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -1524,12 +1292,6 @@ class $_PendingOperationsTable extends _PendingOperations
   late final GeneratedColumn<String> recordId = GeneratedColumn<String>(
       'record_id', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _deviceIdMeta =
-      const VerificationMeta('deviceId');
-  @override
-  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
-      'device_id', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
   static const VerificationMeta _logicalClockMeta =
       const VerificationMeta('logicalClock');
   @override
@@ -1542,54 +1304,41 @@ class $_PendingOperationsTable extends _PendingOperations
   late final GeneratedColumn<String> entityType = GeneratedColumn<String>(
       'entity_type', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _payloadNonceMeta =
-      const VerificationMeta('payloadNonce');
+  static const VerificationMeta _payloadMeta =
+      const VerificationMeta('payload');
   @override
-  late final GeneratedColumn<Uint8List> payloadNonce =
-      GeneratedColumn<Uint8List>('payload_nonce', aliasedName, false,
-          type: DriftSqlType.blob, requiredDuringInsert: true);
-  static const VerificationMeta _payloadCiphertextMeta =
-      const VerificationMeta('payloadCiphertext');
-  @override
-  late final GeneratedColumn<Uint8List> payloadCiphertext =
-      GeneratedColumn<Uint8List>('payload_ciphertext', aliasedName, false,
-          type: DriftSqlType.blob, requiredDuringInsert: true);
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+      'payload', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
   static const VerificationMeta _isTombstoneMeta =
       const VerificationMeta('isTombstone');
   @override
-  late final GeneratedColumn<bool> isTombstone = GeneratedColumn<bool>(
+  late final GeneratedColumn<int> isTombstone = GeneratedColumn<int>(
       'is_tombstone', aliasedName, false,
-      type: DriftSqlType.bool,
-      requiredDuringInsert: true,
-      defaultConstraints: GeneratedColumn.constraintIsAlways(
-          'CHECK ("is_tombstone" IN (0, 1))'));
+      type: DriftSqlType.int, requiredDuringInsert: true);
   static const VerificationMeta _schemaVersionMeta =
       const VerificationMeta('schemaVersion');
   @override
   late final GeneratedColumn<int> schemaVersion = GeneratedColumn<int>(
       'schema_version', aliasedName, false,
       type: DriftSqlType.int, requiredDuringInsert: true);
-  static const VerificationMeta _enqueuedAtMeta =
-      const VerificationMeta('enqueuedAt');
+  static const VerificationMeta _queuedAtMeta =
+      const VerificationMeta('queuedAt');
   @override
-  late final GeneratedColumn<DateTime> enqueuedAt = GeneratedColumn<DateTime>(
-      'enqueued_at', aliasedName, false,
-      type: DriftSqlType.dateTime,
-      requiredDuringInsert: false,
-      defaultValue: currentDateAndTime);
+  late final GeneratedColumn<DateTime> queuedAt = GeneratedColumn<DateTime>(
+      'queued_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
   @override
   List<GeneratedColumn> get $columns => [
         accountId,
         operationId,
         recordId,
-        deviceId,
         logicalClock,
         entityType,
-        payloadNonce,
-        payloadCiphertext,
+        payload,
         isTombstone,
         schemaVersion,
-        enqueuedAt
+        queuedAt
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1621,12 +1370,6 @@ class $_PendingOperationsTable extends _PendingOperations
     } else if (isInserting) {
       context.missing(_recordIdMeta);
     }
-    if (data.containsKey('device_id')) {
-      context.handle(_deviceIdMeta,
-          deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta));
-    } else if (isInserting) {
-      context.missing(_deviceIdMeta);
-    }
     if (data.containsKey('logical_clock')) {
       context.handle(
           _logicalClockMeta,
@@ -1643,21 +1386,11 @@ class $_PendingOperationsTable extends _PendingOperations
     } else if (isInserting) {
       context.missing(_entityTypeMeta);
     }
-    if (data.containsKey('payload_nonce')) {
-      context.handle(
-          _payloadNonceMeta,
-          payloadNonce.isAcceptableOrUnknown(
-              data['payload_nonce']!, _payloadNonceMeta));
+    if (data.containsKey('payload')) {
+      context.handle(_payloadMeta,
+          payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta));
     } else if (isInserting) {
-      context.missing(_payloadNonceMeta);
-    }
-    if (data.containsKey('payload_ciphertext')) {
-      context.handle(
-          _payloadCiphertextMeta,
-          payloadCiphertext.isAcceptableOrUnknown(
-              data['payload_ciphertext']!, _payloadCiphertextMeta));
-    } else if (isInserting) {
-      context.missing(_payloadCiphertextMeta);
+      context.missing(_payloadMeta);
     }
     if (data.containsKey('is_tombstone')) {
       context.handle(
@@ -1675,11 +1408,11 @@ class $_PendingOperationsTable extends _PendingOperations
     } else if (isInserting) {
       context.missing(_schemaVersionMeta);
     }
-    if (data.containsKey('enqueued_at')) {
-      context.handle(
-          _enqueuedAtMeta,
-          enqueuedAt.isAcceptableOrUnknown(
-              data['enqueued_at']!, _enqueuedAtMeta));
+    if (data.containsKey('queued_at')) {
+      context.handle(_queuedAtMeta,
+          queuedAt.isAcceptableOrUnknown(data['queued_at']!, _queuedAtMeta));
+    } else if (isInserting) {
+      context.missing(_queuedAtMeta);
     }
     return context;
   }
@@ -1696,22 +1429,18 @@ class $_PendingOperationsTable extends _PendingOperations
           .read(DriftSqlType.string, data['${effectivePrefix}operation_id'])!,
       recordId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}record_id'])!,
-      deviceId: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}device_id'])!,
       logicalClock: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}logical_clock'])!,
       entityType: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}entity_type'])!,
-      payloadNonce: attachedDatabase.typeMapping
-          .read(DriftSqlType.blob, data['${effectivePrefix}payload_nonce'])!,
-      payloadCiphertext: attachedDatabase.typeMapping.read(
-          DriftSqlType.blob, data['${effectivePrefix}payload_ciphertext'])!,
+      payload: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}payload'])!,
       isTombstone: attachedDatabase.typeMapping
-          .read(DriftSqlType.bool, data['${effectivePrefix}is_tombstone'])!,
+          .read(DriftSqlType.int, data['${effectivePrefix}is_tombstone'])!,
       schemaVersion: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}schema_version'])!,
-      enqueuedAt: attachedDatabase.typeMapping
-          .read(DriftSqlType.dateTime, data['${effectivePrefix}enqueued_at'])!,
+      queuedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}queued_at'])!,
     );
   }
 
@@ -1726,40 +1455,34 @@ class _PendingOperation extends DataClass
   final String accountId;
   final String operationId;
   final String recordId;
-  final String deviceId;
   final int logicalClock;
   final String entityType;
-  final Uint8List payloadNonce;
-  final Uint8List payloadCiphertext;
-  final bool isTombstone;
+  final String payload;
+  final int isTombstone;
   final int schemaVersion;
-  final DateTime enqueuedAt;
+  final DateTime queuedAt;
   const _PendingOperation(
       {required this.accountId,
       required this.operationId,
       required this.recordId,
-      required this.deviceId,
       required this.logicalClock,
       required this.entityType,
-      required this.payloadNonce,
-      required this.payloadCiphertext,
+      required this.payload,
       required this.isTombstone,
       required this.schemaVersion,
-      required this.enqueuedAt});
+      required this.queuedAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['account_id'] = Variable<String>(accountId);
     map['operation_id'] = Variable<String>(operationId);
     map['record_id'] = Variable<String>(recordId);
-    map['device_id'] = Variable<String>(deviceId);
     map['logical_clock'] = Variable<int>(logicalClock);
     map['entity_type'] = Variable<String>(entityType);
-    map['payload_nonce'] = Variable<Uint8List>(payloadNonce);
-    map['payload_ciphertext'] = Variable<Uint8List>(payloadCiphertext);
-    map['is_tombstone'] = Variable<bool>(isTombstone);
+    map['payload'] = Variable<String>(payload);
+    map['is_tombstone'] = Variable<int>(isTombstone);
     map['schema_version'] = Variable<int>(schemaVersion);
-    map['enqueued_at'] = Variable<DateTime>(enqueuedAt);
+    map['queued_at'] = Variable<DateTime>(queuedAt);
     return map;
   }
 
@@ -1768,14 +1491,12 @@ class _PendingOperation extends DataClass
       accountId: Value(accountId),
       operationId: Value(operationId),
       recordId: Value(recordId),
-      deviceId: Value(deviceId),
       logicalClock: Value(logicalClock),
       entityType: Value(entityType),
-      payloadNonce: Value(payloadNonce),
-      payloadCiphertext: Value(payloadCiphertext),
+      payload: Value(payload),
       isTombstone: Value(isTombstone),
       schemaVersion: Value(schemaVersion),
-      enqueuedAt: Value(enqueuedAt),
+      queuedAt: Value(queuedAt),
     );
   }
 
@@ -1786,15 +1507,12 @@ class _PendingOperation extends DataClass
       accountId: serializer.fromJson<String>(json['accountId']),
       operationId: serializer.fromJson<String>(json['operationId']),
       recordId: serializer.fromJson<String>(json['recordId']),
-      deviceId: serializer.fromJson<String>(json['deviceId']),
       logicalClock: serializer.fromJson<int>(json['logicalClock']),
       entityType: serializer.fromJson<String>(json['entityType']),
-      payloadNonce: serializer.fromJson<Uint8List>(json['payloadNonce']),
-      payloadCiphertext:
-          serializer.fromJson<Uint8List>(json['payloadCiphertext']),
-      isTombstone: serializer.fromJson<bool>(json['isTombstone']),
+      payload: serializer.fromJson<String>(json['payload']),
+      isTombstone: serializer.fromJson<int>(json['isTombstone']),
       schemaVersion: serializer.fromJson<int>(json['schemaVersion']),
-      enqueuedAt: serializer.fromJson<DateTime>(json['enqueuedAt']),
+      queuedAt: serializer.fromJson<DateTime>(json['queuedAt']),
     );
   }
   @override
@@ -1804,14 +1522,12 @@ class _PendingOperation extends DataClass
       'accountId': serializer.toJson<String>(accountId),
       'operationId': serializer.toJson<String>(operationId),
       'recordId': serializer.toJson<String>(recordId),
-      'deviceId': serializer.toJson<String>(deviceId),
       'logicalClock': serializer.toJson<int>(logicalClock),
       'entityType': serializer.toJson<String>(entityType),
-      'payloadNonce': serializer.toJson<Uint8List>(payloadNonce),
-      'payloadCiphertext': serializer.toJson<Uint8List>(payloadCiphertext),
-      'isTombstone': serializer.toJson<bool>(isTombstone),
+      'payload': serializer.toJson<String>(payload),
+      'isTombstone': serializer.toJson<int>(isTombstone),
       'schemaVersion': serializer.toJson<int>(schemaVersion),
-      'enqueuedAt': serializer.toJson<DateTime>(enqueuedAt),
+      'queuedAt': serializer.toJson<DateTime>(queuedAt),
     };
   }
 
@@ -1819,26 +1535,22 @@ class _PendingOperation extends DataClass
           {String? accountId,
           String? operationId,
           String? recordId,
-          String? deviceId,
           int? logicalClock,
           String? entityType,
-          Uint8List? payloadNonce,
-          Uint8List? payloadCiphertext,
-          bool? isTombstone,
+          String? payload,
+          int? isTombstone,
           int? schemaVersion,
-          DateTime? enqueuedAt}) =>
+          DateTime? queuedAt}) =>
       _PendingOperation(
         accountId: accountId ?? this.accountId,
         operationId: operationId ?? this.operationId,
         recordId: recordId ?? this.recordId,
-        deviceId: deviceId ?? this.deviceId,
         logicalClock: logicalClock ?? this.logicalClock,
         entityType: entityType ?? this.entityType,
-        payloadNonce: payloadNonce ?? this.payloadNonce,
-        payloadCiphertext: payloadCiphertext ?? this.payloadCiphertext,
+        payload: payload ?? this.payload,
         isTombstone: isTombstone ?? this.isTombstone,
         schemaVersion: schemaVersion ?? this.schemaVersion,
-        enqueuedAt: enqueuedAt ?? this.enqueuedAt,
+        queuedAt: queuedAt ?? this.queuedAt,
       );
   _PendingOperation copyWithCompanion(_PendingOperationsCompanion data) {
     return _PendingOperation(
@@ -1846,25 +1558,18 @@ class _PendingOperation extends DataClass
       operationId:
           data.operationId.present ? data.operationId.value : this.operationId,
       recordId: data.recordId.present ? data.recordId.value : this.recordId,
-      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
       logicalClock: data.logicalClock.present
           ? data.logicalClock.value
           : this.logicalClock,
       entityType:
           data.entityType.present ? data.entityType.value : this.entityType,
-      payloadNonce: data.payloadNonce.present
-          ? data.payloadNonce.value
-          : this.payloadNonce,
-      payloadCiphertext: data.payloadCiphertext.present
-          ? data.payloadCiphertext.value
-          : this.payloadCiphertext,
+      payload: data.payload.present ? data.payload.value : this.payload,
       isTombstone:
           data.isTombstone.present ? data.isTombstone.value : this.isTombstone,
       schemaVersion: data.schemaVersion.present
           ? data.schemaVersion.value
           : this.schemaVersion,
-      enqueuedAt:
-          data.enqueuedAt.present ? data.enqueuedAt.value : this.enqueuedAt,
+      queuedAt: data.queuedAt.present ? data.queuedAt.value : this.queuedAt,
     );
   }
 
@@ -1874,31 +1579,19 @@ class _PendingOperation extends DataClass
           ..write('accountId: $accountId, ')
           ..write('operationId: $operationId, ')
           ..write('recordId: $recordId, ')
-          ..write('deviceId: $deviceId, ')
           ..write('logicalClock: $logicalClock, ')
           ..write('entityType: $entityType, ')
-          ..write('payloadNonce: $payloadNonce, ')
-          ..write('payloadCiphertext: $payloadCiphertext, ')
+          ..write('payload: $payload, ')
           ..write('isTombstone: $isTombstone, ')
           ..write('schemaVersion: $schemaVersion, ')
-          ..write('enqueuedAt: $enqueuedAt')
+          ..write('queuedAt: $queuedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
-      accountId,
-      operationId,
-      recordId,
-      deviceId,
-      logicalClock,
-      entityType,
-      $driftBlobEquality.hash(payloadNonce),
-      $driftBlobEquality.hash(payloadCiphertext),
-      isTombstone,
-      schemaVersion,
-      enqueuedAt);
+  int get hashCode => Object.hash(accountId, operationId, recordId,
+      logicalClock, entityType, payload, isTombstone, schemaVersion, queuedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1906,93 +1599,79 @@ class _PendingOperation extends DataClass
           other.accountId == this.accountId &&
           other.operationId == this.operationId &&
           other.recordId == this.recordId &&
-          other.deviceId == this.deviceId &&
           other.logicalClock == this.logicalClock &&
           other.entityType == this.entityType &&
-          $driftBlobEquality.equals(other.payloadNonce, this.payloadNonce) &&
-          $driftBlobEquality.equals(
-              other.payloadCiphertext, this.payloadCiphertext) &&
+          other.payload == this.payload &&
           other.isTombstone == this.isTombstone &&
           other.schemaVersion == this.schemaVersion &&
-          other.enqueuedAt == this.enqueuedAt);
+          other.queuedAt == this.queuedAt);
 }
 
 class _PendingOperationsCompanion extends UpdateCompanion<_PendingOperation> {
   final Value<String> accountId;
   final Value<String> operationId;
   final Value<String> recordId;
-  final Value<String> deviceId;
   final Value<int> logicalClock;
   final Value<String> entityType;
-  final Value<Uint8List> payloadNonce;
-  final Value<Uint8List> payloadCiphertext;
-  final Value<bool> isTombstone;
+  final Value<String> payload;
+  final Value<int> isTombstone;
   final Value<int> schemaVersion;
-  final Value<DateTime> enqueuedAt;
+  final Value<DateTime> queuedAt;
   final Value<int> rowid;
   const _PendingOperationsCompanion({
     this.accountId = const Value.absent(),
     this.operationId = const Value.absent(),
     this.recordId = const Value.absent(),
-    this.deviceId = const Value.absent(),
     this.logicalClock = const Value.absent(),
     this.entityType = const Value.absent(),
-    this.payloadNonce = const Value.absent(),
-    this.payloadCiphertext = const Value.absent(),
+    this.payload = const Value.absent(),
     this.isTombstone = const Value.absent(),
     this.schemaVersion = const Value.absent(),
-    this.enqueuedAt = const Value.absent(),
+    this.queuedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   _PendingOperationsCompanion.insert({
     required String accountId,
     required String operationId,
     required String recordId,
-    required String deviceId,
     required int logicalClock,
     required String entityType,
-    required Uint8List payloadNonce,
-    required Uint8List payloadCiphertext,
-    required bool isTombstone,
+    required String payload,
+    required int isTombstone,
     required int schemaVersion,
-    this.enqueuedAt = const Value.absent(),
+    required DateTime queuedAt,
     this.rowid = const Value.absent(),
   })  : accountId = Value(accountId),
         operationId = Value(operationId),
         recordId = Value(recordId),
-        deviceId = Value(deviceId),
         logicalClock = Value(logicalClock),
         entityType = Value(entityType),
-        payloadNonce = Value(payloadNonce),
-        payloadCiphertext = Value(payloadCiphertext),
+        payload = Value(payload),
         isTombstone = Value(isTombstone),
-        schemaVersion = Value(schemaVersion);
+        schemaVersion = Value(schemaVersion),
+        queuedAt = Value(queuedAt);
   static Insertable<_PendingOperation> custom({
     Expression<String>? accountId,
     Expression<String>? operationId,
     Expression<String>? recordId,
-    Expression<String>? deviceId,
     Expression<int>? logicalClock,
     Expression<String>? entityType,
-    Expression<Uint8List>? payloadNonce,
-    Expression<Uint8List>? payloadCiphertext,
-    Expression<bool>? isTombstone,
+    Expression<String>? payload,
+    Expression<int>? isTombstone,
     Expression<int>? schemaVersion,
-    Expression<DateTime>? enqueuedAt,
+    Expression<DateTime>? queuedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (accountId != null) 'account_id': accountId,
       if (operationId != null) 'operation_id': operationId,
       if (recordId != null) 'record_id': recordId,
-      if (deviceId != null) 'device_id': deviceId,
       if (logicalClock != null) 'logical_clock': logicalClock,
       if (entityType != null) 'entity_type': entityType,
-      if (payloadNonce != null) 'payload_nonce': payloadNonce,
-      if (payloadCiphertext != null) 'payload_ciphertext': payloadCiphertext,
+      if (payload != null) 'payload': payload,
       if (isTombstone != null) 'is_tombstone': isTombstone,
       if (schemaVersion != null) 'schema_version': schemaVersion,
-      if (enqueuedAt != null) 'enqueued_at': enqueuedAt,
+      if (queuedAt != null) 'queued_at': queuedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2001,27 +1680,23 @@ class _PendingOperationsCompanion extends UpdateCompanion<_PendingOperation> {
       {Value<String>? accountId,
       Value<String>? operationId,
       Value<String>? recordId,
-      Value<String>? deviceId,
       Value<int>? logicalClock,
       Value<String>? entityType,
-      Value<Uint8List>? payloadNonce,
-      Value<Uint8List>? payloadCiphertext,
-      Value<bool>? isTombstone,
+      Value<String>? payload,
+      Value<int>? isTombstone,
       Value<int>? schemaVersion,
-      Value<DateTime>? enqueuedAt,
+      Value<DateTime>? queuedAt,
       Value<int>? rowid}) {
     return _PendingOperationsCompanion(
       accountId: accountId ?? this.accountId,
       operationId: operationId ?? this.operationId,
       recordId: recordId ?? this.recordId,
-      deviceId: deviceId ?? this.deviceId,
       logicalClock: logicalClock ?? this.logicalClock,
       entityType: entityType ?? this.entityType,
-      payloadNonce: payloadNonce ?? this.payloadNonce,
-      payloadCiphertext: payloadCiphertext ?? this.payloadCiphertext,
+      payload: payload ?? this.payload,
       isTombstone: isTombstone ?? this.isTombstone,
       schemaVersion: schemaVersion ?? this.schemaVersion,
-      enqueuedAt: enqueuedAt ?? this.enqueuedAt,
+      queuedAt: queuedAt ?? this.queuedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2038,29 +1713,23 @@ class _PendingOperationsCompanion extends UpdateCompanion<_PendingOperation> {
     if (recordId.present) {
       map['record_id'] = Variable<String>(recordId.value);
     }
-    if (deviceId.present) {
-      map['device_id'] = Variable<String>(deviceId.value);
-    }
     if (logicalClock.present) {
       map['logical_clock'] = Variable<int>(logicalClock.value);
     }
     if (entityType.present) {
       map['entity_type'] = Variable<String>(entityType.value);
     }
-    if (payloadNonce.present) {
-      map['payload_nonce'] = Variable<Uint8List>(payloadNonce.value);
-    }
-    if (payloadCiphertext.present) {
-      map['payload_ciphertext'] = Variable<Uint8List>(payloadCiphertext.value);
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
     }
     if (isTombstone.present) {
-      map['is_tombstone'] = Variable<bool>(isTombstone.value);
+      map['is_tombstone'] = Variable<int>(isTombstone.value);
     }
     if (schemaVersion.present) {
       map['schema_version'] = Variable<int>(schemaVersion.value);
     }
-    if (enqueuedAt.present) {
-      map['enqueued_at'] = Variable<DateTime>(enqueuedAt.value);
+    if (queuedAt.present) {
+      map['queued_at'] = Variable<DateTime>(queuedAt.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -2074,14 +1743,12 @@ class _PendingOperationsCompanion extends UpdateCompanion<_PendingOperation> {
           ..write('accountId: $accountId, ')
           ..write('operationId: $operationId, ')
           ..write('recordId: $recordId, ')
-          ..write('deviceId: $deviceId, ')
           ..write('logicalClock: $logicalClock, ')
           ..write('entityType: $entityType, ')
-          ..write('payloadNonce: $payloadNonce, ')
-          ..write('payloadCiphertext: $payloadCiphertext, ')
+          ..write('payload: $payload, ')
           ..write('isTombstone: $isTombstone, ')
           ..write('schemaVersion: $schemaVersion, ')
-          ..write('enqueuedAt: $enqueuedAt, ')
+          ..write('queuedAt: $queuedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2109,8 +1776,7 @@ typedef $$_TasksTableCreateCompanionBuilder = _TasksCompanion Function({
   required String accountId,
   required String recordId,
   required int schemaVersion,
-  required Uint8List payloadNonce,
-  required Uint8List payloadCiphertext,
+  required String payload,
   required DateTime updatedAt,
   Value<int> rowid,
 });
@@ -2118,8 +1784,7 @@ typedef $$_TasksTableUpdateCompanionBuilder = _TasksCompanion Function({
   Value<String> accountId,
   Value<String> recordId,
   Value<int> schemaVersion,
-  Value<Uint8List> payloadNonce,
-  Value<Uint8List> payloadCiphertext,
+  Value<String> payload,
   Value<DateTime> updatedAt,
   Value<int> rowid,
 });
@@ -2142,12 +1807,8 @@ class $$_TasksTableFilterComposer
   ColumnFilters<int> get schemaVersion => $composableBuilder(
       column: $table.schemaVersion, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<Uint8List> get payloadNonce => $composableBuilder(
-      column: $table.payloadNonce, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<Uint8List> get payloadCiphertext => $composableBuilder(
-      column: $table.payloadCiphertext,
-      builder: (column) => ColumnFilters(column));
+  ColumnFilters<String> get payload => $composableBuilder(
+      column: $table.payload, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnFilters(column));
@@ -2172,13 +1833,8 @@ class $$_TasksTableOrderingComposer
       column: $table.schemaVersion,
       builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<Uint8List> get payloadNonce => $composableBuilder(
-      column: $table.payloadNonce,
-      builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<Uint8List> get payloadCiphertext => $composableBuilder(
-      column: $table.payloadCiphertext,
-      builder: (column) => ColumnOrderings(column));
+  ColumnOrderings<String> get payload => $composableBuilder(
+      column: $table.payload, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
@@ -2202,11 +1858,8 @@ class $$_TasksTableAnnotationComposer
   GeneratedColumn<int> get schemaVersion => $composableBuilder(
       column: $table.schemaVersion, builder: (column) => column);
 
-  GeneratedColumn<Uint8List> get payloadNonce => $composableBuilder(
-      column: $table.payloadNonce, builder: (column) => column);
-
-  GeneratedColumn<Uint8List> get payloadCiphertext => $composableBuilder(
-      column: $table.payloadCiphertext, builder: (column) => column);
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
@@ -2238,8 +1891,7 @@ class $$_TasksTableTableManager extends RootTableManager<
             Value<String> accountId = const Value.absent(),
             Value<String> recordId = const Value.absent(),
             Value<int> schemaVersion = const Value.absent(),
-            Value<Uint8List> payloadNonce = const Value.absent(),
-            Value<Uint8List> payloadCiphertext = const Value.absent(),
+            Value<String> payload = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -2247,8 +1899,7 @@ class $$_TasksTableTableManager extends RootTableManager<
             accountId: accountId,
             recordId: recordId,
             schemaVersion: schemaVersion,
-            payloadNonce: payloadNonce,
-            payloadCiphertext: payloadCiphertext,
+            payload: payload,
             updatedAt: updatedAt,
             rowid: rowid,
           ),
@@ -2256,8 +1907,7 @@ class $$_TasksTableTableManager extends RootTableManager<
             required String accountId,
             required String recordId,
             required int schemaVersion,
-            required Uint8List payloadNonce,
-            required Uint8List payloadCiphertext,
+            required String payload,
             required DateTime updatedAt,
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -2265,8 +1915,7 @@ class $$_TasksTableTableManager extends RootTableManager<
             accountId: accountId,
             recordId: recordId,
             schemaVersion: schemaVersion,
-            payloadNonce: payloadNonce,
-            payloadCiphertext: payloadCiphertext,
+            payload: payload,
             updatedAt: updatedAt,
             rowid: rowid,
           ),
@@ -2294,8 +1943,7 @@ typedef $$_ScheduleBlocksTableCreateCompanionBuilder = _ScheduleBlocksCompanion
   required String accountId,
   required String recordId,
   required int schemaVersion,
-  required Uint8List payloadNonce,
-  required Uint8List payloadCiphertext,
+  required String payload,
   required DateTime updatedAt,
   Value<int> rowid,
 });
@@ -2304,8 +1952,7 @@ typedef $$_ScheduleBlocksTableUpdateCompanionBuilder = _ScheduleBlocksCompanion
   Value<String> accountId,
   Value<String> recordId,
   Value<int> schemaVersion,
-  Value<Uint8List> payloadNonce,
-  Value<Uint8List> payloadCiphertext,
+  Value<String> payload,
   Value<DateTime> updatedAt,
   Value<int> rowid,
 });
@@ -2328,12 +1975,8 @@ class $$_ScheduleBlocksTableFilterComposer
   ColumnFilters<int> get schemaVersion => $composableBuilder(
       column: $table.schemaVersion, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<Uint8List> get payloadNonce => $composableBuilder(
-      column: $table.payloadNonce, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<Uint8List> get payloadCiphertext => $composableBuilder(
-      column: $table.payloadCiphertext,
-      builder: (column) => ColumnFilters(column));
+  ColumnFilters<String> get payload => $composableBuilder(
+      column: $table.payload, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnFilters(column));
@@ -2358,13 +2001,8 @@ class $$_ScheduleBlocksTableOrderingComposer
       column: $table.schemaVersion,
       builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<Uint8List> get payloadNonce => $composableBuilder(
-      column: $table.payloadNonce,
-      builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<Uint8List> get payloadCiphertext => $composableBuilder(
-      column: $table.payloadCiphertext,
-      builder: (column) => ColumnOrderings(column));
+  ColumnOrderings<String> get payload => $composableBuilder(
+      column: $table.payload, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
@@ -2388,11 +2026,8 @@ class $$_ScheduleBlocksTableAnnotationComposer
   GeneratedColumn<int> get schemaVersion => $composableBuilder(
       column: $table.schemaVersion, builder: (column) => column);
 
-  GeneratedColumn<Uint8List> get payloadNonce => $composableBuilder(
-      column: $table.payloadNonce, builder: (column) => column);
-
-  GeneratedColumn<Uint8List> get payloadCiphertext => $composableBuilder(
-      column: $table.payloadCiphertext, builder: (column) => column);
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
@@ -2428,8 +2063,7 @@ class $$_ScheduleBlocksTableTableManager extends RootTableManager<
             Value<String> accountId = const Value.absent(),
             Value<String> recordId = const Value.absent(),
             Value<int> schemaVersion = const Value.absent(),
-            Value<Uint8List> payloadNonce = const Value.absent(),
-            Value<Uint8List> payloadCiphertext = const Value.absent(),
+            Value<String> payload = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -2437,8 +2071,7 @@ class $$_ScheduleBlocksTableTableManager extends RootTableManager<
             accountId: accountId,
             recordId: recordId,
             schemaVersion: schemaVersion,
-            payloadNonce: payloadNonce,
-            payloadCiphertext: payloadCiphertext,
+            payload: payload,
             updatedAt: updatedAt,
             rowid: rowid,
           ),
@@ -2446,8 +2079,7 @@ class $$_ScheduleBlocksTableTableManager extends RootTableManager<
             required String accountId,
             required String recordId,
             required int schemaVersion,
-            required Uint8List payloadNonce,
-            required Uint8List payloadCiphertext,
+            required String payload,
             required DateTime updatedAt,
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -2455,8 +2087,7 @@ class $$_ScheduleBlocksTableTableManager extends RootTableManager<
             accountId: accountId,
             recordId: recordId,
             schemaVersion: schemaVersion,
-            payloadNonce: payloadNonce,
-            payloadCiphertext: payloadCiphertext,
+            payload: payload,
             updatedAt: updatedAt,
             rowid: rowid,
           ),
@@ -2487,8 +2118,7 @@ typedef $$_FocusSessionsTableCreateCompanionBuilder = _FocusSessionsCompanion
   required String accountId,
   required String recordId,
   required int schemaVersion,
-  required Uint8List payloadNonce,
-  required Uint8List payloadCiphertext,
+  required String payload,
   required DateTime updatedAt,
   Value<int> rowid,
 });
@@ -2497,8 +2127,7 @@ typedef $$_FocusSessionsTableUpdateCompanionBuilder = _FocusSessionsCompanion
   Value<String> accountId,
   Value<String> recordId,
   Value<int> schemaVersion,
-  Value<Uint8List> payloadNonce,
-  Value<Uint8List> payloadCiphertext,
+  Value<String> payload,
   Value<DateTime> updatedAt,
   Value<int> rowid,
 });
@@ -2521,12 +2150,8 @@ class $$_FocusSessionsTableFilterComposer
   ColumnFilters<int> get schemaVersion => $composableBuilder(
       column: $table.schemaVersion, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<Uint8List> get payloadNonce => $composableBuilder(
-      column: $table.payloadNonce, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<Uint8List> get payloadCiphertext => $composableBuilder(
-      column: $table.payloadCiphertext,
-      builder: (column) => ColumnFilters(column));
+  ColumnFilters<String> get payload => $composableBuilder(
+      column: $table.payload, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnFilters(column));
@@ -2551,13 +2176,8 @@ class $$_FocusSessionsTableOrderingComposer
       column: $table.schemaVersion,
       builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<Uint8List> get payloadNonce => $composableBuilder(
-      column: $table.payloadNonce,
-      builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<Uint8List> get payloadCiphertext => $composableBuilder(
-      column: $table.payloadCiphertext,
-      builder: (column) => ColumnOrderings(column));
+  ColumnOrderings<String> get payload => $composableBuilder(
+      column: $table.payload, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
@@ -2581,11 +2201,8 @@ class $$_FocusSessionsTableAnnotationComposer
   GeneratedColumn<int> get schemaVersion => $composableBuilder(
       column: $table.schemaVersion, builder: (column) => column);
 
-  GeneratedColumn<Uint8List> get payloadNonce => $composableBuilder(
-      column: $table.payloadNonce, builder: (column) => column);
-
-  GeneratedColumn<Uint8List> get payloadCiphertext => $composableBuilder(
-      column: $table.payloadCiphertext, builder: (column) => column);
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
@@ -2621,8 +2238,7 @@ class $$_FocusSessionsTableTableManager extends RootTableManager<
             Value<String> accountId = const Value.absent(),
             Value<String> recordId = const Value.absent(),
             Value<int> schemaVersion = const Value.absent(),
-            Value<Uint8List> payloadNonce = const Value.absent(),
-            Value<Uint8List> payloadCiphertext = const Value.absent(),
+            Value<String> payload = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -2630,8 +2246,7 @@ class $$_FocusSessionsTableTableManager extends RootTableManager<
             accountId: accountId,
             recordId: recordId,
             schemaVersion: schemaVersion,
-            payloadNonce: payloadNonce,
-            payloadCiphertext: payloadCiphertext,
+            payload: payload,
             updatedAt: updatedAt,
             rowid: rowid,
           ),
@@ -2639,8 +2254,7 @@ class $$_FocusSessionsTableTableManager extends RootTableManager<
             required String accountId,
             required String recordId,
             required int schemaVersion,
-            required Uint8List payloadNonce,
-            required Uint8List payloadCiphertext,
+            required String payload,
             required DateTime updatedAt,
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -2648,8 +2262,7 @@ class $$_FocusSessionsTableTableManager extends RootTableManager<
             accountId: accountId,
             recordId: recordId,
             schemaVersion: schemaVersion,
-            payloadNonce: payloadNonce,
-            payloadCiphertext: payloadCiphertext,
+            payload: payload,
             updatedAt: updatedAt,
             rowid: rowid,
           ),
@@ -2679,8 +2292,7 @@ typedef $$_CheckInsTableCreateCompanionBuilder = _CheckInsCompanion Function({
   required String accountId,
   required String recordId,
   required int schemaVersion,
-  required Uint8List payloadNonce,
-  required Uint8List payloadCiphertext,
+  required String payload,
   required DateTime updatedAt,
   Value<int> rowid,
 });
@@ -2688,8 +2300,7 @@ typedef $$_CheckInsTableUpdateCompanionBuilder = _CheckInsCompanion Function({
   Value<String> accountId,
   Value<String> recordId,
   Value<int> schemaVersion,
-  Value<Uint8List> payloadNonce,
-  Value<Uint8List> payloadCiphertext,
+  Value<String> payload,
   Value<DateTime> updatedAt,
   Value<int> rowid,
 });
@@ -2712,12 +2323,8 @@ class $$_CheckInsTableFilterComposer
   ColumnFilters<int> get schemaVersion => $composableBuilder(
       column: $table.schemaVersion, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<Uint8List> get payloadNonce => $composableBuilder(
-      column: $table.payloadNonce, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<Uint8List> get payloadCiphertext => $composableBuilder(
-      column: $table.payloadCiphertext,
-      builder: (column) => ColumnFilters(column));
+  ColumnFilters<String> get payload => $composableBuilder(
+      column: $table.payload, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnFilters(column));
@@ -2742,13 +2349,8 @@ class $$_CheckInsTableOrderingComposer
       column: $table.schemaVersion,
       builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<Uint8List> get payloadNonce => $composableBuilder(
-      column: $table.payloadNonce,
-      builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<Uint8List> get payloadCiphertext => $composableBuilder(
-      column: $table.payloadCiphertext,
-      builder: (column) => ColumnOrderings(column));
+  ColumnOrderings<String> get payload => $composableBuilder(
+      column: $table.payload, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
@@ -2772,11 +2374,8 @@ class $$_CheckInsTableAnnotationComposer
   GeneratedColumn<int> get schemaVersion => $composableBuilder(
       column: $table.schemaVersion, builder: (column) => column);
 
-  GeneratedColumn<Uint8List> get payloadNonce => $composableBuilder(
-      column: $table.payloadNonce, builder: (column) => column);
-
-  GeneratedColumn<Uint8List> get payloadCiphertext => $composableBuilder(
-      column: $table.payloadCiphertext, builder: (column) => column);
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
@@ -2808,8 +2407,7 @@ class $$_CheckInsTableTableManager extends RootTableManager<
             Value<String> accountId = const Value.absent(),
             Value<String> recordId = const Value.absent(),
             Value<int> schemaVersion = const Value.absent(),
-            Value<Uint8List> payloadNonce = const Value.absent(),
-            Value<Uint8List> payloadCiphertext = const Value.absent(),
+            Value<String> payload = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -2817,8 +2415,7 @@ class $$_CheckInsTableTableManager extends RootTableManager<
             accountId: accountId,
             recordId: recordId,
             schemaVersion: schemaVersion,
-            payloadNonce: payloadNonce,
-            payloadCiphertext: payloadCiphertext,
+            payload: payload,
             updatedAt: updatedAt,
             rowid: rowid,
           ),
@@ -2826,8 +2423,7 @@ class $$_CheckInsTableTableManager extends RootTableManager<
             required String accountId,
             required String recordId,
             required int schemaVersion,
-            required Uint8List payloadNonce,
-            required Uint8List payloadCiphertext,
+            required String payload,
             required DateTime updatedAt,
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -2835,8 +2431,7 @@ class $$_CheckInsTableTableManager extends RootTableManager<
             accountId: accountId,
             recordId: recordId,
             schemaVersion: schemaVersion,
-            payloadNonce: payloadNonce,
-            payloadCiphertext: payloadCiphertext,
+            payload: payload,
             updatedAt: updatedAt,
             rowid: rowid,
           ),
@@ -2864,14 +2459,12 @@ typedef $$_PendingOperationsTableCreateCompanionBuilder
   required String accountId,
   required String operationId,
   required String recordId,
-  required String deviceId,
   required int logicalClock,
   required String entityType,
-  required Uint8List payloadNonce,
-  required Uint8List payloadCiphertext,
-  required bool isTombstone,
+  required String payload,
+  required int isTombstone,
   required int schemaVersion,
-  Value<DateTime> enqueuedAt,
+  required DateTime queuedAt,
   Value<int> rowid,
 });
 typedef $$_PendingOperationsTableUpdateCompanionBuilder
@@ -2879,14 +2472,12 @@ typedef $$_PendingOperationsTableUpdateCompanionBuilder
   Value<String> accountId,
   Value<String> operationId,
   Value<String> recordId,
-  Value<String> deviceId,
   Value<int> logicalClock,
   Value<String> entityType,
-  Value<Uint8List> payloadNonce,
-  Value<Uint8List> payloadCiphertext,
-  Value<bool> isTombstone,
+  Value<String> payload,
+  Value<int> isTombstone,
   Value<int> schemaVersion,
-  Value<DateTime> enqueuedAt,
+  Value<DateTime> queuedAt,
   Value<int> rowid,
 });
 
@@ -2908,30 +2499,23 @@ class $$_PendingOperationsTableFilterComposer
   ColumnFilters<String> get recordId => $composableBuilder(
       column: $table.recordId, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<String> get deviceId => $composableBuilder(
-      column: $table.deviceId, builder: (column) => ColumnFilters(column));
-
   ColumnFilters<int> get logicalClock => $composableBuilder(
       column: $table.logicalClock, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get entityType => $composableBuilder(
       column: $table.entityType, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<Uint8List> get payloadNonce => $composableBuilder(
-      column: $table.payloadNonce, builder: (column) => ColumnFilters(column));
+  ColumnFilters<String> get payload => $composableBuilder(
+      column: $table.payload, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<Uint8List> get payloadCiphertext => $composableBuilder(
-      column: $table.payloadCiphertext,
-      builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<bool> get isTombstone => $composableBuilder(
+  ColumnFilters<int> get isTombstone => $composableBuilder(
       column: $table.isTombstone, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<int> get schemaVersion => $composableBuilder(
       column: $table.schemaVersion, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<DateTime> get enqueuedAt => $composableBuilder(
-      column: $table.enqueuedAt, builder: (column) => ColumnFilters(column));
+  ColumnFilters<DateTime> get queuedAt => $composableBuilder(
+      column: $table.queuedAt, builder: (column) => ColumnFilters(column));
 }
 
 class $$_PendingOperationsTableOrderingComposer
@@ -2952,9 +2536,6 @@ class $$_PendingOperationsTableOrderingComposer
   ColumnOrderings<String> get recordId => $composableBuilder(
       column: $table.recordId, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<String> get deviceId => $composableBuilder(
-      column: $table.deviceId, builder: (column) => ColumnOrderings(column));
-
   ColumnOrderings<int> get logicalClock => $composableBuilder(
       column: $table.logicalClock,
       builder: (column) => ColumnOrderings(column));
@@ -2962,23 +2543,18 @@ class $$_PendingOperationsTableOrderingComposer
   ColumnOrderings<String> get entityType => $composableBuilder(
       column: $table.entityType, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<Uint8List> get payloadNonce => $composableBuilder(
-      column: $table.payloadNonce,
-      builder: (column) => ColumnOrderings(column));
+  ColumnOrderings<String> get payload => $composableBuilder(
+      column: $table.payload, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<Uint8List> get payloadCiphertext => $composableBuilder(
-      column: $table.payloadCiphertext,
-      builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<bool> get isTombstone => $composableBuilder(
+  ColumnOrderings<int> get isTombstone => $composableBuilder(
       column: $table.isTombstone, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<int> get schemaVersion => $composableBuilder(
       column: $table.schemaVersion,
       builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<DateTime> get enqueuedAt => $composableBuilder(
-      column: $table.enqueuedAt, builder: (column) => ColumnOrderings(column));
+  ColumnOrderings<DateTime> get queuedAt => $composableBuilder(
+      column: $table.queuedAt, builder: (column) => ColumnOrderings(column));
 }
 
 class $$_PendingOperationsTableAnnotationComposer
@@ -2999,29 +2575,23 @@ class $$_PendingOperationsTableAnnotationComposer
   GeneratedColumn<String> get recordId =>
       $composableBuilder(column: $table.recordId, builder: (column) => column);
 
-  GeneratedColumn<String> get deviceId =>
-      $composableBuilder(column: $table.deviceId, builder: (column) => column);
-
   GeneratedColumn<int> get logicalClock => $composableBuilder(
       column: $table.logicalClock, builder: (column) => column);
 
   GeneratedColumn<String> get entityType => $composableBuilder(
       column: $table.entityType, builder: (column) => column);
 
-  GeneratedColumn<Uint8List> get payloadNonce => $composableBuilder(
-      column: $table.payloadNonce, builder: (column) => column);
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
 
-  GeneratedColumn<Uint8List> get payloadCiphertext => $composableBuilder(
-      column: $table.payloadCiphertext, builder: (column) => column);
-
-  GeneratedColumn<bool> get isTombstone => $composableBuilder(
+  GeneratedColumn<int> get isTombstone => $composableBuilder(
       column: $table.isTombstone, builder: (column) => column);
 
   GeneratedColumn<int> get schemaVersion => $composableBuilder(
       column: $table.schemaVersion, builder: (column) => column);
 
-  GeneratedColumn<DateTime> get enqueuedAt => $composableBuilder(
-      column: $table.enqueuedAt, builder: (column) => column);
+  GeneratedColumn<DateTime> get queuedAt =>
+      $composableBuilder(column: $table.queuedAt, builder: (column) => column);
 }
 
 class $$_PendingOperationsTableTableManager extends RootTableManager<
@@ -3056,56 +2626,48 @@ class $$_PendingOperationsTableTableManager extends RootTableManager<
             Value<String> accountId = const Value.absent(),
             Value<String> operationId = const Value.absent(),
             Value<String> recordId = const Value.absent(),
-            Value<String> deviceId = const Value.absent(),
             Value<int> logicalClock = const Value.absent(),
             Value<String> entityType = const Value.absent(),
-            Value<Uint8List> payloadNonce = const Value.absent(),
-            Value<Uint8List> payloadCiphertext = const Value.absent(),
-            Value<bool> isTombstone = const Value.absent(),
+            Value<String> payload = const Value.absent(),
+            Value<int> isTombstone = const Value.absent(),
             Value<int> schemaVersion = const Value.absent(),
-            Value<DateTime> enqueuedAt = const Value.absent(),
+            Value<DateTime> queuedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               _PendingOperationsCompanion(
             accountId: accountId,
             operationId: operationId,
             recordId: recordId,
-            deviceId: deviceId,
             logicalClock: logicalClock,
             entityType: entityType,
-            payloadNonce: payloadNonce,
-            payloadCiphertext: payloadCiphertext,
+            payload: payload,
             isTombstone: isTombstone,
             schemaVersion: schemaVersion,
-            enqueuedAt: enqueuedAt,
+            queuedAt: queuedAt,
             rowid: rowid,
           ),
           createCompanionCallback: ({
             required String accountId,
             required String operationId,
             required String recordId,
-            required String deviceId,
             required int logicalClock,
             required String entityType,
-            required Uint8List payloadNonce,
-            required Uint8List payloadCiphertext,
-            required bool isTombstone,
+            required String payload,
+            required int isTombstone,
             required int schemaVersion,
-            Value<DateTime> enqueuedAt = const Value.absent(),
+            required DateTime queuedAt,
             Value<int> rowid = const Value.absent(),
           }) =>
               _PendingOperationsCompanion.insert(
             accountId: accountId,
             operationId: operationId,
             recordId: recordId,
-            deviceId: deviceId,
             logicalClock: logicalClock,
             entityType: entityType,
-            payloadNonce: payloadNonce,
-            payloadCiphertext: payloadCiphertext,
+            payload: payload,
             isTombstone: isTombstone,
             schemaVersion: schemaVersion,
-            enqueuedAt: enqueuedAt,
+            queuedAt: queuedAt,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0

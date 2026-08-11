@@ -7,8 +7,6 @@ import 'package:studyflow/auth/auth_repository.dart';
 import 'package:studyflow/auth/auth_screen.dart';
 import 'package:studyflow/auth/client_auth_controller.dart';
 import 'package:studyflow/auth/client_session.dart';
-import 'package:studyflow/auth/device_identity.dart';
-import 'package:studyflow/auth/recovery_key_screen.dart';
 import 'package:studyflow/config/client_config.dart';
 import 'package:studyflow/features/focus/focus_screen.dart';
 import 'package:studyflow/features/home/home_screen.dart';
@@ -16,14 +14,12 @@ import 'package:studyflow/features/schedule/schedule_screen.dart';
 import 'package:studyflow/features/settings/settings_screen.dart';
 import 'package:studyflow/features/shell/studyflow_shell.dart';
 import 'package:studyflow/features/tasks/task_list_screen.dart';
-import 'package:studyflow/security/key_manager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final apiBaseUri = ClientConfig.fromDartDefines().apiBaseUri;
   if (apiBaseUri == null) {
-    final session = await ClientSession.openLocal();
-    runApp(StudyFlowApp(session: session));
+    runApp(const StudyFlowConfigErrorApp());
     return;
   }
 
@@ -32,23 +28,48 @@ Future<void> main() async {
     api: authApi,
     store: FlutterSecureAuthContextStore(),
   );
-  final keyStore = FlutterSecureKeyStore();
-  final controller = ClientAuthController(
-    repository: authRepository,
-    deviceIdentity: DeviceIdentity(
-      store: FlutterSecureDeviceIdentityStore(),
-    ),
-    keyStore: keyStore,
-  );
+  final controller = ClientAuthController(repository: authRepository);
   runApp(
     StudyFlowRoot(
       apiBaseUri: apiBaseUri,
       authApi: authApi,
       authRepository: authRepository,
       controller: controller,
-      keyStore: keyStore,
     ),
   );
+}
+
+final class StudyFlowConfigErrorApp extends StatelessWidget {
+  const StudyFlowConfigErrorApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Icon(Icons.settings_ethernet, size: 48),
+                SizedBox(height: 16),
+                Text(
+                  'API 地址未配置',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  '请使用 --dart-define=STUDYFLOW_API_BASE_URL=https://api.example.com 启动客户端。',
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 final class StudyFlowRoot extends StatefulWidget {
@@ -57,7 +78,6 @@ final class StudyFlowRoot extends StatefulWidget {
     required this.authApi,
     required this.authRepository,
     required this.controller,
-    required this.keyStore,
     super.key,
   });
 
@@ -65,7 +85,6 @@ final class StudyFlowRoot extends StatefulWidget {
   final HttpAuthApi authApi;
   final AuthRepository authRepository;
   final ClientAuthController controller;
-  final SecureKeyStore keyStore;
 
   @override
   State<StudyFlowRoot> createState() => _StudyFlowRootState();
@@ -73,7 +92,6 @@ final class StudyFlowRoot extends StatefulWidget {
 
 final class _StudyFlowRootState extends State<StudyFlowRoot> {
   ClientSession? _session;
-  String? _recoveryAccountId;
   String? _message;
   bool _loading = true;
 
@@ -98,14 +116,14 @@ final class _StudyFlowRootState extends State<StudyFlowRoot> {
     try {
       context = await widget.authRepository.restoreActiveContext();
       if (context != null) {
-        await _openSession(context);
+        final refreshed = await _refreshOrClear(context);
+        if (refreshed != null) {
+          await _openSession(refreshed);
+        }
       }
     } on Object catch (error) {
       if (mounted) {
-        setState(() {
-          _recoveryAccountId = context?.accountId;
-          _message = 'Saved session could not be opened: $error';
-        });
+        setState(() => _message = '无法恢复上次会话：$error');
       }
     } finally {
       if (mounted) {
@@ -114,13 +132,29 @@ final class _StudyFlowRootState extends State<StudyFlowRoot> {
     }
   }
 
+  Future<AuthContext?> _refreshOrClear(AuthContext context) async {
+    try {
+      return await widget.authRepository.refresh();
+    } on AuthApiException catch (error) {
+      await widget.authRepository.logout();
+      if (mounted) {
+        setState(() => _message = '登录已过期，请重新登录（${error.message}）');
+      }
+      return null;
+    } on Object catch (error) {
+      await widget.authRepository.logout();
+      if (mounted) {
+        setState(() => _message = '无法恢复上次会话，请重新登录：$error');
+      }
+      return null;
+    }
+  }
+
   Future<void> _openSession(AuthContext context) async {
     final next = await ClientSession.openAuthenticated(
       authContext: context,
       apiBaseUri: widget.apiBaseUri,
       authRepository: widget.authRepository,
-      secureKeyStore: widget.keyStore,
-      deviceEnrollmentKeyNamespace: context.deviceId,
     );
     final previous = _session;
     _session = next;
@@ -135,20 +169,14 @@ final class _StudyFlowRootState extends State<StudyFlowRoot> {
     await _openSession(context);
   }
 
-  Future<void> _recover(String recoveryKey) async {
-    final accountId = _recoveryAccountId;
-    if (accountId == null) {
-      throw StateError('No saved account is available for recovery.');
+  Future<void> _logout() async {
+    final previous = _session;
+    _session = null;
+    await previous?.close();
+    await widget.authRepository.logout();
+    if (mounted) {
+      setState(() => _message = null);
     }
-    await widget.controller.restoreRecoveryKey(
-      accountId: accountId,
-      recoveryKey: recoveryKey,
-    );
-    final context = await widget.authRepository.restoreActiveContext();
-    if (context == null || context.accountId != accountId) {
-      throw StateError('Saved account context is unavailable.');
-    }
-    await _openSession(context);
   }
 
   @override
@@ -160,35 +188,31 @@ final class _StudyFlowRootState extends State<StudyFlowRoot> {
     }
     final session = _session;
     if (session != null) {
-      return StudyFlowApp(session: session);
+      return StudyFlowApp(
+        session: session,
+        onLogout: _logout,
+      );
     }
     return MaterialApp(
       home: AuthScreen(
         initialMessage: _message,
-        onLogin: (password) => _authenticate(
-          () => widget.controller.login(password: password),
+        onLogin: (email, password) => _authenticate(
+          () => widget.controller.login(email: email, password: password),
         ),
-        onBootstrap: (token, password) => _authenticate(
-          () => widget.controller.bootstrap(
-            bootstrapToken: token,
-            password: password,
-          ),
+        onRegister: (email, password) => _authenticate(
+          () => widget.controller.register(email: email, password: password),
         ),
-        onPair: (code) => _authenticate(
-          () => widget.controller.pair(code: code),
-        ),
-        recoveryAccountId: _recoveryAccountId,
-        onRecovery: _recoveryAccountId == null ? null : _recover,
       ),
     );
   }
 }
 
 class StudyFlowApp extends StatelessWidget {
-  const StudyFlowApp({this.workspace, this.session, super.key});
+  const StudyFlowApp({this.workspace, this.session, this.onLogout, super.key});
 
   final StudyFlowWorkspace? workspace;
   final ClientSession? session;
+  final Future<void> Function()? onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -234,10 +258,9 @@ class StudyFlowApp extends StatelessWidget {
                 path: '/settings',
                 builder: (context, state) => SettingsScreen(
                   workspace: workspace,
-                  recoveryController:
-                      KeyManagerRecoveryKeyController(workspace.keyManager),
                   syncStatus: session?.syncEngine?.status,
                   onSync: session?.syncNow,
+                  onLogout: onLogout,
                 ),
               ),
             ],

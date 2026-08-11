@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studyflow/app/studyflow_workspace.dart';
 import 'package:studyflow/features/checkins/check_in_screen.dart';
-import 'package:studyflow/security/key_manager.dart';
 
 void main() {
   late Directory directory;
@@ -12,12 +11,8 @@ void main() {
 
   setUp(() async {
     directory = await Directory.systemTemp.createTemp('studyflow-checkin-');
-    final keyManager = KeyManager(
-      accountId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-      store: MemorySecureKeyStore(),
-    );
     workspace = await StudyFlowWorkspace.openForTesting(
-      keyManager: keyManager,
+      accountId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       baseDirectory: directory,
     );
   });
@@ -106,24 +101,4 @@ void main() {
     expect(find.text('No check-ins yet'), findsOneWidget);
     expect(await tester.runAsync(workspace.pendingCount), 0);
   });
-}
-
-final class MemorySecureKeyStore implements SecureKeyStore {
-  final Map<String, String> _values = <String, String>{};
-
-  @override
-  Future<String?> read({
-    required String accountId,
-    required StoredKeyName keyName,
-  }) async =>
-      _values['$accountId:${keyName.name}'];
-
-  @override
-  Future<void> write({
-    required String accountId,
-    required StoredKeyName keyName,
-    required String value,
-  }) async {
-    _values['$accountId:${keyName.name}'] = value;
-  }
 }

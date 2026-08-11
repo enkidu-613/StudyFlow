@@ -9,8 +9,6 @@ import 'package:studyflow/auth/auth_repository.dart';
 import 'package:studyflow/features/schedule/schedule_repository.dart';
 import 'package:studyflow/features/tasks/task_repository.dart';
 import 'package:studyflow/providers/app_providers.dart';
-import 'package:studyflow/security/key_manager.dart';
-import 'package:studyflow/security/payload_cipher.dart';
 import 'package:studyflow/storage/app_database.dart';
 import 'package:studyflow/sync/sync_api.dart';
 import 'package:studyflow/sync/sync_engine.dart';
@@ -19,7 +17,6 @@ import 'package:studyflow_domain/domain.dart';
 import 'package:studyflow_sync_contract/sync_contract.dart';
 
 const _accountId = '11111111-1111-4111-8111-111111111111';
-const _deviceId = '22222222-2222-4222-8222-222222222222';
 const _taskId = '33333333-3333-4333-8333-333333333333';
 const _operationId = '44444444-4444-4444-8444-444444444444';
 
@@ -58,11 +55,10 @@ void main() {
     final remoteTask = testTask(title: 'Remote algebra');
     api
       ..nextCursor = 1
-      ..pulledOperations = <SyncOperationV1>[
-        await fixture.encryptOperation(
+      ..pulledOperations = <SyncOperationV2>[
+        await fixture.contractOperation(
           operationId: '55555555-5555-4555-8555-555555555555',
           recordId: remoteTask.id,
-          deviceId: '66666666-6666-4666-8666-666666666666',
           logicalClock: 1,
           entityType: 'task',
           payload: remoteTask.toJson(),
@@ -86,20 +82,18 @@ void main() {
 
     await fixture.taskRepository.save(
       testTask(title: 'Local algebra'),
-      write: EncryptedWrite(
+      write: Write(
         operationId: '77777777-7777-4777-8777-777777777777',
-        deviceId: _deviceId,
         logicalClock: 2,
       ),
     );
     final remoteTask = testTask(status: TaskStatus.completed);
     api
       ..nextCursor = 1
-      ..pulledOperations = <SyncOperationV1>[
-        await fixture.encryptOperation(
+      ..pulledOperations = <SyncOperationV2>[
+        await fixture.contractOperation(
           operationId: '88888888-8888-4888-8888-888888888888',
           recordId: remoteTask.id,
-          deviceId: '66666666-6666-4666-8666-666666666666',
           logicalClock: 2,
           entityType: 'task',
           payload: remoteTask.toJson(),
@@ -118,30 +112,27 @@ void main() {
     final fixture = await testEngine(api: api, seedPendingTask: false);
     await fixture.taskRepository.save(
       testTask(title: 'Local clock 10'),
-      write: EncryptedWrite(
+      write: Write(
         operationId: '16161616-1616-4616-8616-161616161616',
-        deviceId: _deviceId,
         logicalClock: 10,
       ),
     );
     await fixture.engine.runOnce();
 
-    api.pages = <List<SyncOperationV1>>[
-      <SyncOperationV1>[
-        await fixture.encryptOperation(
+    api.pages = <List<SyncOperationV2>>[
+      <SyncOperationV2>[
+        await fixture.contractOperation(
           operationId: '17171717-1717-4717-8717-171717171717',
           recordId: _taskId,
-          deviceId: '66666666-6666-4666-8666-666666666666',
           logicalClock: 5,
           entityType: 'task',
           payload: testTask(title: 'Remote clock 5').toJson(),
         ),
       ],
-      <SyncOperationV1>[
-        await fixture.encryptOperation(
+      <SyncOperationV2>[
+        await fixture.contractOperation(
           operationId: '18181818-1818-4818-8818-181818181818',
           recordId: _taskId,
-          deviceId: '66666666-6666-4666-8666-666666666666',
           logicalClock: 7,
           entityType: 'task',
           payload: testTask(title: 'Remote clock 7').toJson(),
@@ -159,7 +150,7 @@ void main() {
       'title',
     );
     expect(stamp!.logicalClock, 10);
-    expect(stamp.deviceId, _deviceId);
+    expect(stamp.operationId, '16161616-1616-4616-8616-161616161616');
   });
 
   test(
@@ -169,9 +160,8 @@ void main() {
     final fixture = await testEngine(api: api, seedPendingTask: false);
     await fixture.taskRepository.save(
       testTask(),
-      write: EncryptedWrite(
+      write: Write(
         operationId: '23232323-2323-4323-8323-232323232323',
-        deviceId: _deviceId,
         logicalClock: 1,
       ),
     );
@@ -179,32 +169,29 @@ void main() {
 
     await fixture.taskRepository.save(
       testTask(title: 'Local title at 10'),
-      write: EncryptedWrite(
+      write: Write(
         operationId: '24242424-2424-4424-8424-242424242424',
-        deviceId: _deviceId,
         logicalClock: 10,
       ),
     );
-    final statusAt5 = await fixture.encryptOperation(
+    final statusAt5 = await fixture.contractOperation(
       operationId: '25252525-2525-4525-8525-252525252525',
       recordId: _taskId,
-      deviceId: '66666666-6666-4666-8666-666666666666',
       logicalClock: 5,
       entityType: 'task',
       payload: testTask(status: TaskStatus.completed).toJson(),
     );
-    final tombstoneAt7 = await fixture.encryptOperation(
+    final tombstoneAt7 = await fixture.contractOperation(
       operationId: '26262626-2626-4626-8626-262626262626',
       recordId: _taskId,
-      deviceId: '66666666-6666-4666-8666-666666666666',
       logicalClock: 7,
       entityType: 'task',
       payload: testTask(status: TaskStatus.completed).toJson(),
       isTombstone: true,
     );
-    api.pages = <List<SyncOperationV1>>[
-      <SyncOperationV1>[statusAt5],
-      <SyncOperationV1>[tombstoneAt7],
+    api.pages = <List<SyncOperationV2>>[
+      <SyncOperationV2>[statusAt5],
+      <SyncOperationV2>[tombstoneAt7],
     ];
 
     await fixture.engine.runOnce();
@@ -227,13 +214,16 @@ void main() {
       'status',
     );
     expect(titleStamp!.logicalClock, 10);
-    expect(titleStamp.deviceId, _deviceId);
+    expect(titleStamp.operationId, '24242424-2424-4424-8424-242424242424');
     expect(statusStamp!.logicalClock, 5);
     final current = await fixture.store.operations.snapshotFor(
-      fixture.asEncrypted(tombstoneAt7),
+      fixture.asOperation(tombstoneAt7),
     );
     expect(current.currentVersion!.logicalClock, 10);
-    expect(current.currentVersion!.deviceId, _deviceId);
+    expect(
+      current.currentVersion!.operationId,
+      '24242424-2424-4424-8424-242424242424',
+    );
     expect(current.currentVersion!.isTombstone, isFalse);
   });
 
@@ -279,14 +269,12 @@ void main() {
     final fixture = await testEngine(api: api, seedPendingTask: false);
     final repository = ScheduleRepository(
       store: fixture.store,
-      cipher: fixture.cipher,
     );
     final base = testScheduleBlock(id: blockId);
     await repository.save(
       base,
-      write: EncryptedWrite(
+      write: Write(
         operationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-        deviceId: _deviceId,
         logicalClock: 1,
       ),
     );
@@ -299,9 +287,8 @@ void main() {
     );
     await repository.save(
       local,
-      write: EncryptedWrite(
+      write: Write(
         operationId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
-        deviceId: _deviceId,
         logicalClock: 2,
       ),
     );
@@ -311,11 +298,10 @@ void main() {
     );
     api
       ..nextCursor = 1
-      ..pulledOperations = <SyncOperationV1>[
-        await fixture.encryptOperation(
+      ..pulledOperations = <SyncOperationV2>[
+        await fixture.contractOperation(
           operationId: conflictOperationId,
           recordId: blockId,
-          deviceId: '66666666-6666-4666-8666-666666666666',
           logicalClock: 2,
           entityType: 'schedule_block',
           payload: remote.toJson(),
@@ -338,11 +324,10 @@ void main() {
     await fixture.engine.runOnce();
     api
       ..nextCursor = 1
-      ..pulledOperations = <SyncOperationV1>[
-        await fixture.encryptOperation(
+      ..pulledOperations = <SyncOperationV2>[
+        await fixture.contractOperation(
           operationId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
           recordId: _taskId,
-          deviceId: '66666666-6666-4666-8666-666666666666',
           logicalClock: 2,
           entityType: 'task',
           payload: testTask().toJson(),
@@ -372,7 +357,7 @@ void main() {
       endedAt: DateTime.utc(2026, 8, 11, 9),
       completionMethod: FocusCompletionMethod.manual,
     );
-    await fixture.seedEncryptedRecord(
+    await fixture.seedRecord(
       operationId: '12121212-1212-4212-8212-121212121212',
       recordId: sessionId,
       logicalClock: 1,
@@ -390,11 +375,10 @@ void main() {
     );
     api
       ..nextCursor = 1
-      ..pulledOperations = <SyncOperationV1>[
-        await fixture.encryptOperation(
+      ..pulledOperations = <SyncOperationV2>[
+        await fixture.contractOperation(
           operationId: remoteOperationId,
           recordId: sessionId,
-          deviceId: '66666666-6666-4666-8666-666666666666',
           logicalClock: 2,
           entityType: 'focus_session',
           payload: remoteSession.toJson(),
@@ -411,15 +395,14 @@ void main() {
     expect(conflict.endedAt, remoteSession.endedAt);
   });
 
-  test('HTTP sync API uses bearer and device scope with Task 3 JSON', () async {
-    final operation = SyncOperationV1(
+  test('HTTP sync API uses bearer auth and sends plaintext JSON payloads',
+      () async {
+    final operation = SyncOperationV2(
       operationId: _operationId,
       recordId: _taskId,
-      deviceId: _deviceId,
       logicalClock: 1,
       entityType: 'task',
-      payloadNonce: base64Encode(List<int>.filled(24, 1)),
-      payloadCiphertext: base64Encode(List<int>.filled(16, 2)),
+      payload: testTask().toJson(),
       isTombstone: false,
       schemaVersion: 1,
     );
@@ -429,7 +412,7 @@ void main() {
       client: MockClient((request) async {
         requestCount += 1;
         expect(request.headers['authorization'], 'Bearer access-token');
-        expect(request.headers['x-device-id'], _deviceId);
+        expect(request.headers.containsKey('x-device-id'), isFalse);
         if (request.method == 'POST') {
           expect(request.url.path, '/v1/sync/push');
           expect(jsonDecode(request.body), <String, Object?>{
@@ -461,7 +444,7 @@ void main() {
 
     final pushed = await api.push(
       authContext: testAuthContext(),
-      operations: <SyncOperationV1>[operation],
+      operations: <SyncOperationV2>[operation],
     );
     final pulled = await api.pull(
       authContext: testAuthContext(),
@@ -504,7 +487,6 @@ void main() {
             api: api,
             authContext: testAuthContext(),
             store: fixture.store,
-            cipher: fixture.cipher,
           ),
         ),
       ],
@@ -531,51 +513,16 @@ void main() {
     );
   });
 
-  test('decryption failure rolls back record apply and cursor', () async {
-    final api = ScriptedSyncApi();
-    final fixture = await testEngine(api: api, seedPendingTask: false);
-    final valid = await fixture.encryptOperation(
-      operationId: '13131313-1313-4313-8313-131313131313',
-      recordId: _taskId,
-      deviceId: '66666666-6666-4666-8666-666666666666',
-      logicalClock: 1,
-      entityType: 'task',
-      payload: testTask().toJson(),
-    );
-    final corruptedBytes = base64Decode(valid.payloadCiphertext)..[0] ^= 1;
-    api
-      ..nextCursor = 1
-      ..pulledOperations = <SyncOperationV1>[
-        SyncOperationV1(
-          operationId: valid.operationId,
-          recordId: valid.recordId,
-          deviceId: valid.deviceId,
-          logicalClock: valid.logicalClock,
-          entityType: valid.entityType,
-          payloadNonce: valid.payloadNonce,
-          payloadCiphertext: base64Encode(corruptedBytes),
-          isTombstone: valid.isTombstone,
-          schemaVersion: valid.schemaVersion,
-        ),
-      ];
-
-    final result = await fixture.engine.runOnce();
-
-    expect(result.failureCategory, SyncFailureCategory.decryption);
-    expect(await fixture.taskRepository.get(_taskId), isNull);
-    expect(await fixture.store.operations.lastCommittedCursor(), 0);
-  });
-
-  test('decrypted entity schema failure rolls back cursor', () async {
+  test('malformed pulled payload rolls back record apply and cursor',
+      () async {
     final api = ScriptedSyncApi();
     final fixture = await testEngine(api: api, seedPendingTask: false);
     api
       ..nextCursor = 1
-      ..pulledOperations = <SyncOperationV1>[
-        await fixture.encryptOperation(
-          operationId: '14141414-1414-4414-8414-141414141414',
+      ..pulledOperations = <SyncOperationV2>[
+        await fixture.contractOperation(
+          operationId: '13131313-1313-4313-8313-131313131313',
           recordId: '15151515-1515-4515-8515-151515151515',
-          deviceId: '66666666-6666-4666-8666-666666666666',
           logicalClock: 1,
           entityType: 'check_in',
           payload: const <String, Object?>{
@@ -587,6 +534,7 @@ void main() {
     final result = await fixture.engine.runOnce();
 
     expect(result.failureCategory, SyncFailureCategory.schema);
+    expect(await fixture.taskRepository.get(_taskId), isNull);
     expect(await fixture.store.operations.lastCommittedCursor(), 0);
   });
 
@@ -596,19 +544,17 @@ void main() {
     final fixture = await testEngine(api: api, seedPendingTask: false);
     api
       ..nextCursor = 9
-      ..pulledOperations = <SyncOperationV1>[
-        await fixture.encryptOperation(
+      ..pulledOperations = <SyncOperationV2>[
+        await fixture.contractOperation(
           operationId: '19191919-1919-4919-8919-191919191919',
           recordId: _taskId,
-          deviceId: '66666666-6666-4666-8666-666666666666',
           logicalClock: 1,
           entityType: 'task',
           payload: testTask(title: 'Should roll back').toJson(),
         ),
-        await fixture.encryptOperation(
+        await fixture.contractOperation(
           operationId: '20202020-2020-4020-8020-202020202020',
           recordId: '21212121-2121-4121-8121-212121212121',
-          deviceId: '66666666-6666-4666-8666-666666666666',
           logicalClock: 2,
           entityType: 'check_in',
           payload: const <String, Object?>{
@@ -652,20 +598,21 @@ void main() {
     expect(await accountAStore.operations.lastCommittedCursor(), 11);
   });
 
-  test('captured pushed payload contains ciphertext and no plaintext fields',
-      () async {
+  test('captured pushed payload is plaintext JSON', () async {
     final api = ScriptedSyncApi();
     final fixture = await testEngine(api: api);
 
     await fixture.engine.runOnce();
 
-    final captured = jsonEncode(api.capturedPushes.single.toJson());
-    expect(captured, contains('payloadCiphertext'));
-    expect(captured, isNot(contains('Algebra')));
-    expect(captured, isNot(contains('Chapter 1')));
+    final captured = jsonDecode(
+      jsonEncode(api.capturedPushes.single.toJson()),
+    ) as Map<String, dynamic>;
+    expect(captured, contains('payload'));
+    expect(jsonEncode(captured['payload']), contains('Algebra'));
+    expect(jsonEncode(captured['payload']), contains('Chapter 1'));
   });
 
-  test('sync logging exposes metadata only, never decrypted plaintext',
+  test('sync logging exposes metadata only, never record payloads',
       () async {
     final logger = CapturingSyncLogger();
     final fixture = await testEngine(
@@ -706,7 +653,7 @@ final class FailingSyncApi implements SyncApi {
   @override
   Future<SyncPushResult> push({
     required AuthContext authContext,
-    required List<SyncOperationV1> operations,
+    required List<SyncOperationV2> operations,
   }) async {
     events.add('push');
     if (failuresRemaining > 0) {
@@ -729,20 +676,20 @@ final class FailingSyncApi implements SyncApi {
     events.add('pull:$after');
     return SyncPullResult(
       nextCursor: after,
-      operations: const <SyncOperationV1>[],
+      operations: const <SyncOperationV2>[],
     );
   }
 }
 
 final class ScriptedSyncApi implements SyncApi {
-  List<SyncOperationV1> pulledOperations = <SyncOperationV1>[];
+  List<SyncOperationV2> pulledOperations = <SyncOperationV2>[];
   int nextCursor = 0;
-  final List<SyncOperationV1> capturedPushes = <SyncOperationV1>[];
+  final List<SyncOperationV2> capturedPushes = <SyncOperationV2>[];
 
   @override
   Future<SyncPushResult> push({
     required AuthContext authContext,
-    required List<SyncOperationV1> operations,
+    required List<SyncOperationV2> operations,
   }) async {
     capturedPushes.addAll(operations);
     return SyncPushResult(
@@ -765,12 +712,12 @@ final class ScriptedSyncApi implements SyncApi {
 }
 
 final class PagedSyncApi implements SyncApi {
-  List<List<SyncOperationV1>> pages = <List<SyncOperationV1>>[];
+  List<List<SyncOperationV2>> pages = <List<SyncOperationV2>>[];
 
   @override
   Future<SyncPushResult> push({
     required AuthContext authContext,
-    required List<SyncOperationV1> operations,
+    required List<SyncOperationV2> operations,
   }) async =>
       SyncPushResult(
         accepted: operations.map((operation) => operation.operationId).toList(),
@@ -784,7 +731,7 @@ final class PagedSyncApi implements SyncApi {
     required int after,
     int limit = 50,
   }) async {
-    final operations = pages.isEmpty ? <SyncOperationV1>[] : pages.removeAt(0);
+    final operations = pages.isEmpty ? <SyncOperationV2>[] : pages.removeAt(0);
     return SyncPullResult(
         nextCursor: operations.isEmpty ? after : after + 1,
         operations: operations);
@@ -795,7 +742,7 @@ final class MalformedAckApi implements SyncApi {
   @override
   Future<SyncPushResult> push({
     required AuthContext authContext,
-    required List<SyncOperationV1> operations,
+    required List<SyncOperationV2> operations,
   }) async =>
       SyncPushResult(
         accepted: const <String>['not-a-uuid'],
@@ -816,7 +763,7 @@ final class OmittedAckApi implements SyncApi {
   @override
   Future<SyncPushResult> push({
     required AuthContext authContext,
-    required List<SyncOperationV1> operations,
+    required List<SyncOperationV2> operations,
   }) async =>
       SyncPushResult(
         accepted: const <String>[],
@@ -837,7 +784,7 @@ final class DuplicateAckApi implements SyncApi {
   @override
   Future<SyncPushResult> push({
     required AuthContext authContext,
-    required List<SyncOperationV1> operations,
+    required List<SyncOperationV2> operations,
   }) async =>
       SyncPushResult(
         accepted: <String>[
@@ -868,7 +815,7 @@ final class PushThenPullFailureApi implements SyncApi {
   @override
   Future<SyncPushResult> push({
     required AuthContext authContext,
-    required List<SyncOperationV1> operations,
+    required List<SyncOperationV2> operations,
   }) async =>
       SyncPushResult(
         accepted: operations.map((operation) => operation.operationId).toList(),
@@ -901,7 +848,7 @@ final class AlwaysFailingSyncApi implements SyncApi {
   @override
   Future<SyncPushResult> push({
     required AuthContext authContext,
-    required List<SyncOperationV1> operations,
+    required List<SyncOperationV2> operations,
   }) async =>
       throw failure;
 }
@@ -913,31 +860,22 @@ Future<TestEngineFixture> testEngine({
 }) async {
   final temporaryDirectory =
       await Directory.systemTemp.createTemp('studyflow-sync-engine-');
-  final keyManager = KeyManager(
-    accountId: _accountId,
-    store: MemorySecureKeyStore(),
-  );
-  await keyManager.createAccountDataKey();
   final store = await AccountScopedStore.openForTesting(
     activeAccountId: _accountId,
-    keyManager: keyManager,
     baseDirectory: temporaryDirectory,
   );
   addTearDown(() async {
     await store.close();
     await temporaryDirectory.delete(recursive: true);
   });
-  final cipher = PayloadCipher(keyManager);
   final taskRepository = TaskRepository(
     store: store,
-    cipher: cipher,
   );
   if (seedPendingTask) {
     await taskRepository.save(
       testTask(),
-      write: EncryptedWrite(
+      write: Write(
         operationId: _operationId,
-        deviceId: _deviceId,
         logicalClock: 1,
       ),
     );
@@ -946,14 +884,12 @@ Future<TestEngineFixture> testEngine({
     api: api,
     authContext: testAuthContext(),
     store: store,
-    cipher: cipher,
     logger: logger,
   );
   addTearDown(engine.dispose);
   return TestEngineFixture(
     engine: engine,
     store: store,
-    cipher: cipher,
     taskRepository: taskRepository,
   );
 }
@@ -961,14 +897,8 @@ Future<TestEngineFixture> testEngine({
 Future<AccountScopedStore> openAccountStore(String accountId) async {
   final directory =
       await Directory.systemTemp.createTemp('studyflow-account-scope-');
-  final keyManager = KeyManager(
-    accountId: accountId,
-    store: MemorySecureKeyStore(),
-  );
-  await keyManager.createAccountDataKey();
   final store = await AccountScopedStore.openForTesting(
     activeAccountId: accountId,
-    keyManager: keyManager,
     baseDirectory: directory,
   );
   addTearDown(() async {
@@ -979,11 +909,11 @@ Future<AccountScopedStore> openAccountStore(String accountId) async {
 }
 
 AuthContext testAuthContext() => AuthContext(
-      accountId: _accountId,
-      deviceId: _deviceId,
+      userId: _accountId,
+      email: 'user@example.com',
       accessToken: 'access-token',
       refreshToken: 'refresh-token',
-      encryptedAccountDataKeyEnvelope: base64Encode(<int>[1, 2, 3]),
+      expiresIn: 900,
     );
 
 Task testTask({
@@ -1021,98 +951,69 @@ final class TestEngineFixture {
   const TestEngineFixture({
     required this.engine,
     required this.store,
-    required this.cipher,
     required this.taskRepository,
   });
 
   final SyncEngine engine;
   final AccountScopedStore store;
-  final PayloadCipher cipher;
   final TaskRepository taskRepository;
 
-  Future<SyncOperationV1> encryptOperation({
+  Future<SyncOperationV2> contractOperation({
     required String operationId,
     required String recordId,
-    required String deviceId,
     required int logicalClock,
     required String entityType,
-    required Object? payload,
+    required Map<String, Object?> payload,
     bool isTombstone = false,
-  }) async {
-    final encrypted = await cipher.encrypt(
-      utf8.encode(jsonEncode(payload)),
-      PayloadAssociatedData(
-        accountId: _accountId,
+  }) async =>
+      SyncOperationV2(
+        operationId: operationId,
         recordId: recordId,
-        schemaVersion: 1,
+        logicalClock: logicalClock,
         entityType: entityType,
-      ),
-    );
-    return SyncOperationV1(
-      operationId: operationId,
-      recordId: recordId,
-      deviceId: deviceId,
-      logicalClock: logicalClock,
-      entityType: entityType,
-      payloadNonce: base64Encode(encrypted.nonce),
-      payloadCiphertext: base64Encode(encrypted.ciphertext),
-      isTombstone: isTombstone,
-      schemaVersion: 1,
-    );
-  }
+        payload: payload,
+        isTombstone: isTombstone,
+        schemaVersion: 1,
+      );
 
-  EncryptedOperation asEncrypted(SyncOperationV1 operation) =>
-      EncryptedOperation(
+  Operation asOperation(SyncOperationV2 operation) => Operation(
         accountId: _accountId,
         operationId: operation.operationId,
         recordId: operation.recordId,
-        deviceId: operation.deviceId,
         logicalClock: operation.logicalClock,
         entityType: operation.entityType,
-        payloadNonce: base64Decode(operation.payloadNonce),
-        payloadCiphertext: base64Decode(operation.payloadCiphertext),
+        payload: operation.payload,
         isTombstone: operation.isTombstone,
         schemaVersion: operation.schemaVersion,
       );
 
-  Future<void> seedEncryptedRecord({
+  Future<void> seedRecord({
     required String operationId,
     required String recordId,
     required int logicalClock,
     required String entityType,
-    required Object? payload,
+    required Map<String, Object?> payload,
   }) async {
-    final contract = await encryptOperation(
+    final operation = Operation(
+      accountId: _accountId,
       operationId: operationId,
       recordId: recordId,
-      deviceId: _deviceId,
       logicalClock: logicalClock,
       entityType: entityType,
       payload: payload,
-    );
-    final operation = EncryptedOperation(
-      accountId: _accountId,
-      operationId: contract.operationId,
-      recordId: contract.recordId,
-      deviceId: contract.deviceId,
-      logicalClock: contract.logicalClock,
-      entityType: contract.entityType,
-      payloadNonce: base64Decode(contract.payloadNonce),
-      payloadCiphertext: base64Decode(contract.payloadCiphertext),
       isTombstone: false,
-      schemaVersion: contract.schemaVersion,
+      schemaVersion: 1,
     );
     await store.transaction((transaction) async {
       await transaction.putRecord(
-        EncryptedLocalRecord(
+        LocalRecord(
           accountId: _accountId,
           recordId: recordId,
-          entityType: EncryptedEntityType.values.singleWhere(
+          entityType: EntityType.values.singleWhere(
             (value) => value.wireName == entityType,
           ),
           schemaVersion: 1,
-          payloadNonce: operation.payloadNonce,
-          payloadCiphertext: operation.payloadCiphertext,
+          payload: jsonEncode(payload),
           updatedAt: DateTime.now().toUtc(),
         ),
       );
@@ -1121,48 +1022,16 @@ final class TestEngineFixture {
   }
 
   Future<FocusSession?> readFocusSession(String recordId) async {
-    final record = await store.records(EncryptedEntityType.focusSession).get(
+    final record = await store.records(EntityType.focusSession).get(
           accountId: _accountId,
           recordId: recordId,
         );
     if (record == null) {
       return null;
     }
-    final plaintext = await cipher.decrypt(
-      EncryptedPayload(
-        nonce: record.payloadNonce,
-        ciphertext: record.payloadCiphertext,
-      ),
-      PayloadAssociatedData(
-        accountId: _accountId,
-        recordId: recordId,
-        schemaVersion: 1,
-        entityType: 'focus_session',
-      ),
-    );
     return FocusSession.fromJson(
-      (jsonDecode(utf8.decode(plaintext)) as Map<String, dynamic>)
+      (jsonDecode(record.payload) as Map<String, dynamic>)
           .cast<String, Object?>(),
     );
-  }
-}
-
-final class MemorySecureKeyStore implements SecureKeyStore {
-  final Map<String, String> _values = <String, String>{};
-
-  @override
-  Future<String?> read({
-    required String accountId,
-    required StoredKeyName keyName,
-  }) async =>
-      _values['$accountId:${keyName.name}'];
-
-  @override
-  Future<void> write({
-    required String accountId,
-    required StoredKeyName keyName,
-    required String value,
-  }) async {
-    _values['$accountId:${keyName.name}'] = value;
   }
 }

@@ -1,93 +1,15 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:cryptography/cryptography.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
-import '../security/key_manager.dart';
-
 part 'app_database.g.dart';
 part 'operation_dao.dart';
 part 'tables.dart';
-
-final class _AccountDatabaseKey {
-  _AccountDatabaseKey({required this.accountId, required SecretKey key})
-      : _key = key;
-
-  final String accountId;
-  final SecretKey _key;
-
-  Future<List<int>> extractBytes() => _key.extractBytes();
-}
-
-abstract interface class _DatabaseOpener {
-  Future<QueryExecutor> open({
-    required _AccountDatabaseKey databaseKey,
-  });
-}
-
-class _EncryptedDatabaseOpener implements _DatabaseOpener {
-  _EncryptedDatabaseOpener({required this.baseDirectory});
-
-  static Future<_EncryptedDatabaseOpener> forApplicationSupport() async {
-    final supportDirectory = await getApplicationSupportDirectory();
-    return _EncryptedDatabaseOpener(
-      baseDirectory: Directory(path.join(supportDirectory.path, 'encrypted')),
-    );
-  }
-
-  final Directory baseDirectory;
-
-  File databaseFileFor(String accountId) {
-    final normalizedAccountId = _normalizedAccountId(accountId);
-    return File(
-      path.join(baseDirectory.path, 'studyflow-$normalizedAccountId.sqlite3'),
-    );
-  }
-
-  @override
-  Future<QueryExecutor> open({
-    required _AccountDatabaseKey databaseKey,
-  }) async {
-    final extractedKeyBytes = await databaseKey.extractBytes();
-    if (extractedKeyBytes.length != 32) {
-      throw const DatabaseRecoveryException(
-        'The encrypted database key has an invalid length.',
-      );
-    }
-
-    await baseDirectory.create(recursive: true);
-    final keyBytes = Uint8List.fromList(extractedKeyBytes);
-    var keyHex = _toHex(keyBytes);
-    keyBytes.fillRange(0, keyBytes.length, 0);
-    return NativeDatabase(
-      databaseFileFor(databaseKey.accountId),
-      logStatements: false,
-      setup: (database) {
-        final setupKeyHex = keyHex;
-        try {
-          final availableCiphers = database.select('PRAGMA cipher;');
-          if (availableCiphers.isEmpty ||
-              availableCiphers.first.values.isEmpty) {
-            throw const DatabaseRecoveryException(
-              'Encrypted SQLite support is unavailable in this build.',
-            );
-          }
-          database.execute("PRAGMA cipher = 'chacha20';");
-          database.execute("PRAGMA hexkey = '$setupKeyHex';");
-          database.execute('PRAGMA memory_security = ON;');
-          database.select('SELECT count(*) FROM sqlite_master;');
-        } finally {
-          keyHex = '';
-        }
-      },
-    );
-  }
-}
 
 @DriftDatabase(
   tables: <Type>[
@@ -103,33 +25,29 @@ class _AccountDatabase extends _$_AccountDatabase {
 
   static Future<_AccountDatabase> open({
     required String activeAccountId,
-    required _AccountDatabaseKey databaseKey,
-    required _DatabaseOpener opener,
+    required Directory baseDirectory,
   }) async {
     final normalizedAccountId = _normalizedAccountId(activeAccountId);
-    if (databaseKey.accountId != normalizedAccountId) {
-      throw const StorageAccountScopeException(
-        'Database key account does not match the active account.',
-      );
-    }
-
-    _AccountDatabase? database;
+    await baseDirectory.create(recursive: true);
+    final database = _AccountDatabase._(
+      NativeDatabase(
+        File(
+          path.join(
+            baseDirectory.path,
+            'studyflow-$normalizedAccountId.sqlite3',
+          ),
+        ),
+        logStatements: false,
+      ),
+      activeAccountId: normalizedAccountId,
+    );
     try {
-      final executor = await opener.open(databaseKey: databaseKey);
-      database = _AccountDatabase._(
-        executor,
-        activeAccountId: normalizedAccountId,
-      );
       await database.customSelect('SELECT 1;').getSingle();
       return database;
-    } on DatabaseRecoveryException {
-      await database?.close();
-      rethrow;
-    } catch (error) {
-      await database?.close();
+    } on Object catch (error) {
+      await database.close();
       throw DatabaseRecoveryException(
-        'Encrypted local data could not be opened. Restore the correct '
-        'account key or recover the local database.',
+        'Local data could not be opened. The database file may be corrupt.',
         cause: error,
       );
     }
@@ -157,53 +75,38 @@ class AccountScopedStore {
 
   static Future<AccountScopedStore> open({
     required String activeAccountId,
-    required KeyManager keyManager,
   }) async {
+    final supportDirectory = await getApplicationSupportDirectory();
     return _open(
       activeAccountId: activeAccountId,
-      keyManager: keyManager,
-      opener: await _EncryptedDatabaseOpener.forApplicationSupport(),
+      baseDirectory: Directory(
+        path.join(supportDirectory.path, 'plaintext'),
+      ),
     );
   }
 
   @visibleForTesting
   static Future<AccountScopedStore> openForTesting({
     required String activeAccountId,
-    required KeyManager keyManager,
     required Directory baseDirectory,
     Future<void> Function()? transactionFailureInjector,
   }) =>
       _open(
         activeAccountId: activeAccountId,
-        keyManager: keyManager,
-        opener: _EncryptedDatabaseOpener(baseDirectory: baseDirectory),
+        baseDirectory: baseDirectory,
         transactionFailureInjector: transactionFailureInjector,
       );
 
   static Future<AccountScopedStore> _open({
     required String activeAccountId,
-    required KeyManager keyManager,
-    required _DatabaseOpener opener,
+    required Directory baseDirectory,
     Future<void> Function()? transactionFailureInjector,
   }) async {
     final normalizedAccountId = _normalizedAccountId(activeAccountId);
-    if (keyManager.accountId != normalizedAccountId) {
-      throw const StorageAccountScopeException(
-        'Key manager account does not match the active account.',
-      );
-    }
-
-    final databaseKey = await _deriveDatabaseKey(keyManager);
-    if (databaseKey.accountId != normalizedAccountId) {
-      throw const StorageAccountScopeException(
-        'Derived database key does not match the active account.',
-      );
-    }
     return AccountScopedStore._(
       await _AccountDatabase.open(
         activeAccountId: normalizedAccountId,
-        databaseKey: databaseKey,
-        opener: opener,
+        baseDirectory: baseDirectory,
       ),
       transactionFailureInjector: transactionFailureInjector,
     );
@@ -214,8 +117,8 @@ class AccountScopedStore {
   final String activeAccountId;
   final OperationDao operations;
 
-  EncryptedRecordRepository records(EncryptedEntityType entityType) =>
-      EncryptedRecordRepository._(_database, entityType);
+  RecordRepository records(EntityType entityType) =>
+      RecordRepository._(_database, entityType);
 
   Future<T> transaction<T>(
     Future<T> Function(AccountScopedTransaction transaction) action,
@@ -230,31 +133,28 @@ class AccountScopedStore {
   Future<void> close() => _database.close();
 }
 
-enum EncryptedEntityType {
+enum EntityType {
   task('task', 'tasks'),
   scheduleBlock('schedule_block', 'schedule_blocks'),
   focusSession('focus_session', 'focus_sessions'),
   checkIn('check_in', 'check_ins');
 
-  const EncryptedEntityType(this.wireName, this.tableName);
+  const EntityType(this.wireName, this.tableName);
 
   final String wireName;
   final String tableName;
 }
 
-class EncryptedLocalRecord {
-  EncryptedLocalRecord({
+class LocalRecord {
+  LocalRecord({
     required String accountId,
     required String recordId,
     required this.entityType,
     required this.schemaVersion,
-    required List<int> payloadNonce,
-    required List<int> payloadCiphertext,
+    required this.payload,
     required this.updatedAt,
   })  : accountId = _normalizedUuid(accountId, 'accountId'),
-        recordId = _normalizedUuid(recordId, 'recordId'),
-        _payloadNonce = Uint8List.fromList(payloadNonce),
-        _payloadCiphertext = Uint8List.fromList(payloadCiphertext) {
+        recordId = _normalizedUuid(recordId, 'recordId') {
     if (schemaVersion != 1) {
       throw ArgumentError.value(
         schemaVersion,
@@ -262,42 +162,30 @@ class EncryptedLocalRecord {
         'must be the supported schema version 1',
       );
     }
-    if (_payloadNonce.length != 24) {
+    if (payload.isEmpty) {
       throw ArgumentError.value(
-        payloadNonce.length,
-        'payloadNonce',
-        'must contain a 24-byte XChaCha20 nonce',
-      );
-    }
-    if (_payloadCiphertext.length < 16) {
-      throw ArgumentError.value(
-        payloadCiphertext.length,
-        'payloadCiphertext',
-        'must contain ciphertext and a Poly1305 tag',
+        payload,
+        'payload',
+        'must not be empty JSON text',
       );
     }
   }
 
   final String accountId;
   final String recordId;
-  final EncryptedEntityType entityType;
+  final EntityType entityType;
   final int schemaVersion;
-  final Uint8List _payloadNonce;
-  final Uint8List _payloadCiphertext;
+  final String payload;
   final DateTime updatedAt;
-
-  Uint8List get payloadNonce => Uint8List.fromList(_payloadNonce);
-  Uint8List get payloadCiphertext => Uint8List.fromList(_payloadCiphertext);
 
   @override
   bool operator ==(Object other) =>
-      other is EncryptedLocalRecord &&
+      other is LocalRecord &&
       accountId == other.accountId &&
       recordId == other.recordId &&
       entityType == other.entityType &&
       schemaVersion == other.schemaVersion &&
-      _bytesEqual(_payloadNonce, other._payloadNonce) &&
-      _bytesEqual(_payloadCiphertext, other._payloadCiphertext) &&
+      payload == other.payload &&
       updatedAt == other.updatedAt;
 
   @override
@@ -306,8 +194,7 @@ class EncryptedLocalRecord {
         recordId,
         entityType,
         schemaVersion,
-        Object.hashAll(_payloadNonce),
-        Object.hashAll(_payloadCiphertext),
+        payload,
         updatedAt,
       );
 }
@@ -317,30 +204,28 @@ final class AccountScopedTransaction {
 
   final _AccountDatabase _database;
 
-  Future<void> putRecord(EncryptedLocalRecord record) async {
+  Future<void> putRecord(LocalRecord record) async {
     _checkAccount(record.accountId);
 
     await _database.customStatement(
       'INSERT INTO ${record.entityType.tableName} '
-      '(account_id, record_id, schema_version, payload_nonce, '
-      'payload_ciphertext, updated_at) VALUES (?, ?, ?, ?, ?, ?) '
+      '(account_id, record_id, schema_version, payload, updated_at) '
+      'VALUES (?, ?, ?, ?, ?) '
       'ON CONFLICT(account_id, record_id) DO UPDATE SET '
       'schema_version = excluded.schema_version, '
-      'payload_nonce = excluded.payload_nonce, '
-      'payload_ciphertext = excluded.payload_ciphertext, '
+      'payload = excluded.payload, '
       'updated_at = excluded.updated_at',
       <Object?>[
         record.accountId,
         record.recordId,
         record.schemaVersion,
-        record.payloadNonce,
-        record.payloadCiphertext,
+        record.payload,
         record.updatedAt.millisecondsSinceEpoch,
       ],
     );
   }
 
-  Future<void> enqueue(EncryptedOperation operation) async {
+  Future<void> enqueue(Operation operation) async {
     if (operation.accountId != _database.activeAccountId) {
       throw const OperationAccountScopeException(
         'Operation account does not match the active account.',
@@ -348,9 +233,9 @@ final class AccountScopedTransaction {
     }
 
     final existingRow = await _database.customSelect(
-      'SELECT account_id, operation_id, record_id, device_id, logical_clock, '
-      'entity_type, payload_nonce, payload_ciphertext, is_tombstone, '
-      'schema_version FROM pending_operations '
+      'SELECT account_id, operation_id, record_id, logical_clock, '
+      'entity_type, payload, is_tombstone, schema_version '
+      'FROM pending_operations '
       'WHERE account_id = ? AND operation_id = ?',
       variables: <Variable<Object>>[
         Variable<String>(operation.accountId),
@@ -358,16 +243,14 @@ final class AccountScopedTransaction {
       ],
     ).getSingleOrNull();
     if (existingRow != null) {
-      final existing = EncryptedOperation(
+      final existing = Operation(
         accountId: existingRow.read<String>('account_id'),
         operationId: existingRow.read<String>('operation_id'),
         recordId: existingRow.read<String>('record_id'),
-        deviceId: existingRow.read<String>('device_id'),
         logicalClock: existingRow.read<int>('logical_clock'),
         entityType: existingRow.read<String>('entity_type'),
-        payloadNonce: existingRow.read<Uint8List>('payload_nonce'),
-        payloadCiphertext: existingRow.read<Uint8List>('payload_ciphertext'),
-        isTombstone: existingRow.read<bool>('is_tombstone'),
+        payload: _decodePayload(existingRow.read<String>('payload')),
+        isTombstone: existingRow.read<int>('is_tombstone') != 0,
         schemaVersion: existingRow.read<int>('schema_version'),
       );
       if (existing == operation) {
@@ -381,13 +264,12 @@ final class AccountScopedTransaction {
             accountId: operation.accountId,
             operationId: operation.operationId,
             recordId: operation.recordId,
-            deviceId: operation.deviceId,
             logicalClock: operation.logicalClock,
             entityType: operation.entityType,
-            payloadNonce: operation.payloadNonce,
-            payloadCiphertext: operation.payloadCiphertext,
-            isTombstone: operation.isTombstone,
+            payload: _encodePayload(operation.payload),
+            isTombstone: operation.isTombstone ? 1 : 0,
             schemaVersion: operation.schemaVersion,
+            queuedAt: DateTime.now().toUtc(),
           ),
         );
   }
@@ -401,13 +283,13 @@ final class AccountScopedTransaction {
   }
 }
 
-class EncryptedRecordRepository {
-  EncryptedRecordRepository._(this._database, this.entityType);
+class RecordRepository {
+  RecordRepository._(this._database, this.entityType);
 
   final _AccountDatabase _database;
-  final EncryptedEntityType entityType;
+  final EntityType entityType;
 
-  Future<void> put(EncryptedLocalRecord record) async {
+  Future<void> put(LocalRecord record) async {
     if (record.entityType != entityType) {
       throw ArgumentError.value(
         record.entityType,
@@ -421,7 +303,7 @@ class EncryptedRecordRepository {
     });
   }
 
-  Future<EncryptedLocalRecord?> get({
+  Future<LocalRecord?> get({
     required String accountId,
     required String recordId,
   }) async {
@@ -431,9 +313,8 @@ class EncryptedRecordRepository {
 
     return _database.transaction(() async {
       final row = await _database.customSelect(
-        'SELECT account_id, record_id, schema_version, payload_nonce, '
-        'payload_ciphertext, updated_at FROM ${entityType.tableName} '
-        'WHERE account_id = ? AND record_id = ?',
+        'SELECT account_id, record_id, schema_version, payload, updated_at '
+        'FROM ${entityType.tableName} WHERE account_id = ? AND record_id = ?',
         variables: <Variable<Object>>[
           Variable<String>(normalizedAccountId),
           Variable<String>(normalizedRecordId),
@@ -442,13 +323,12 @@ class EncryptedRecordRepository {
       if (row == null) {
         return null;
       }
-      return EncryptedLocalRecord(
+      return LocalRecord(
         accountId: row.read<String>('account_id'),
         recordId: row.read<String>('record_id'),
         entityType: entityType,
         schemaVersion: row.read<int>('schema_version'),
-        payloadNonce: row.read<Uint8List>('payload_nonce'),
-        payloadCiphertext: row.read<Uint8List>('payload_ciphertext'),
+        payload: row.read<String>('payload'),
         updatedAt: DateTime.fromMillisecondsSinceEpoch(
           row.read<int>('updated_at'),
           isUtc: true,
@@ -457,14 +337,14 @@ class EncryptedRecordRepository {
     });
   }
 
-  Future<List<EncryptedLocalRecord>> list({required String accountId}) async {
+  Future<List<LocalRecord>> list({required String accountId}) async {
     final normalizedAccountId = _normalizedUuid(accountId, 'accountId');
     _checkAccount(normalizedAccountId);
 
     return _database.transaction(() async {
       final rows = await _database.customSelect(
-        'SELECT account_id, record_id, schema_version, payload_nonce, '
-        'payload_ciphertext, updated_at FROM ${entityType.tableName} '
+        'SELECT account_id, record_id, schema_version, payload, updated_at '
+        'FROM ${entityType.tableName} '
         'WHERE account_id = ? ORDER BY updated_at ASC',
         variables: <Variable<Object>>[
           Variable<String>(normalizedAccountId),
@@ -472,13 +352,12 @@ class EncryptedRecordRepository {
       ).get();
       return rows
           .map(
-            (row) => EncryptedLocalRecord(
+            (row) => LocalRecord(
               accountId: row.read<String>('account_id'),
               recordId: row.read<String>('record_id'),
               entityType: entityType,
               schemaVersion: row.read<int>('schema_version'),
-              payloadNonce: row.read<Uint8List>('payload_nonce'),
-              payloadCiphertext: row.read<Uint8List>('payload_ciphertext'),
+              payload: row.read<String>('payload'),
               updatedAt: DateTime.fromMillisecondsSinceEpoch(
                 row.read<int>('updated_at'),
                 isUtc: true,
@@ -519,20 +398,3 @@ class StorageAccountScopeException implements Exception {
 
 String _normalizedAccountId(String accountId) =>
     _normalizedUuid(accountId, 'accountId');
-
-Future<_AccountDatabaseKey> _deriveDatabaseKey(KeyManager keyManager) async {
-  final accountDataKey = await keyManager.loadAccountDataKey();
-  final derivedKey =
-      await Hkdf(hmac: Hmac.sha256(), outputLength: 32).deriveKey(
-    secretKey: accountDataKey,
-    nonce: utf8.encode('StudyFlow database key salt v1'),
-    info: utf8.encode(keyManager.accountId),
-  );
-  return _AccountDatabaseKey(
-    accountId: keyManager.accountId,
-    key: derivedKey,
-  );
-}
-
-String _toHex(List<int> bytes) =>
-    bytes.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();

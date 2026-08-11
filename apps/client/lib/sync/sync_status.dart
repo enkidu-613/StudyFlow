@@ -5,7 +5,7 @@ enum SyncStatusKind { idle, syncing, offline, failed }
 enum SyncFailureCategory {
   network,
   authentication,
-  decryption,
+  payload,
   schema,
   protocol,
 }

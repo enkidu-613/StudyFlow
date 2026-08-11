@@ -1,4 +1,4 @@
-import 'dart:convert';
+
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -6,7 +6,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:studyflow/app/studyflow_workspace.dart';
 import 'package:studyflow/features/tasks/task_editor_screen.dart';
 import 'package:studyflow/main.dart';
-import 'package:studyflow/security/key_manager.dart';
 import 'package:studyflow_domain/domain.dart';
 
 void main() {
@@ -15,12 +14,8 @@ void main() {
 
   setUp(() async {
     directory = await Directory.systemTemp.createTemp('studyflow-app-test-');
-    final keyManager = KeyManager(
-      accountId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-      store: MemorySecureKeyStore(),
-    );
     workspace = await StudyFlowWorkspace.openForTesting(
-      keyManager: keyManager,
+      accountId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       baseDirectory: directory,
     );
   });
@@ -46,7 +41,7 @@ void main() {
     }
   });
 
-  testWidgets('task creation is saved to the encrypted local store',
+  testWidgets('task creation is saved to the local store',
       (tester) async {
     await tester.pumpWidget(StudyFlowApp(workspace: workspace));
     await tester.pumpAndSettle();
@@ -117,7 +112,7 @@ void main() {
     expect(await tester.runAsync(workspace.pendingCount), 1);
   });
 
-  testWidgets('focus session starts and finishes into encrypted storage',
+  testWidgets('focus session starts and finishes into local storage',
       (tester) async {
     await tester.runAsync(() async {
       await workspace.tasks.save(
@@ -174,25 +169,3 @@ final _task = Task(
   tags: <String>[],
   repeatRule: RepeatRule.none,
 );
-
-final class MemorySecureKeyStore implements SecureKeyStore {
-  final Map<String, String> _values = <String, String>{};
-
-  @override
-  Future<String?> read({
-    required String accountId,
-    required StoredKeyName keyName,
-  }) async {
-    final value = _values['$accountId:$keyName.name'];
-    return value == null ? null : utf8.decode(base64Decode(value));
-  }
-
-  @override
-  Future<void> write({
-    required String accountId,
-    required StoredKeyName keyName,
-    required String value,
-  }) async {
-    _values['$accountId:$keyName.name'] = base64Encode(utf8.encode(value));
-  }
-}

@@ -10,32 +10,27 @@ const Set<String> supportedEntityTypes = <String>{
   'check_in',
 };
 
-class SyncOperationV1 {
-  SyncOperationV1({
+class SyncOperationV2 {
+  SyncOperationV2({
     required String operationId,
     required String recordId,
-    required String deviceId,
     required this.logicalClock,
     required this.entityType,
-    required this.payloadNonce,
-    required this.payloadCiphertext,
+    required this.payload,
     required this.isTombstone,
     required this.schemaVersion,
   })  : operationId = operationId.toLowerCase(),
-        recordId = recordId.toLowerCase(),
-        deviceId = deviceId.toLowerCase() {
+        recordId = recordId.toLowerCase() {
     _validate();
   }
 
-  factory SyncOperationV1.fromJson(Map<String, dynamic> json) {
+  factory SyncOperationV2.fromJson(Map<String, dynamic> json) {
     const fields = <String>{
       'operationId',
       'recordId',
-      'deviceId',
       'logicalClock',
       'entityType',
-      'payloadNonce',
-      'payloadCiphertext',
+      'payload',
       'isTombstone',
       'schemaVersion',
     };
@@ -44,14 +39,16 @@ class SyncOperationV1 {
       throw SyncContractException('unknown fields: ${unknownFields.join(', ')}');
     }
     try {
-      return SyncOperationV1(
+      final payload = json['payload'];
+      if (payload is! Map<String, dynamic>) {
+        throw const SyncContractException('payload must be a JSON object');
+      }
+      return SyncOperationV2(
         operationId: json['operationId'] as String,
         recordId: json['recordId'] as String,
-        deviceId: json['deviceId'] as String,
         logicalClock: json['logicalClock'] as int,
         entityType: json['entityType'] as String,
-        payloadNonce: json['payloadNonce'] as String,
-        payloadCiphertext: json['payloadCiphertext'] as String,
+        payload: payload,
         isTombstone: json['isTombstone'] as bool,
         schemaVersion: json['schemaVersion'] as int,
       );
@@ -62,22 +59,18 @@ class SyncOperationV1 {
 
   final String operationId;
   final String recordId;
-  final String deviceId;
   final int logicalClock;
   final String entityType;
-  final String payloadNonce;
-  final String payloadCiphertext;
+  final Map<String, dynamic> payload;
   final bool isTombstone;
   final int schemaVersion;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'operationId': operationId,
         'recordId': recordId,
-        'deviceId': deviceId,
         'logicalClock': logicalClock,
         'entityType': entityType,
-        'payloadNonce': payloadNonce,
-        'payloadCiphertext': payloadCiphertext,
+        'payload': payload,
         'isTombstone': isTombstone,
         'schemaVersion': schemaVersion,
       };
@@ -85,25 +78,21 @@ class SyncOperationV1 {
   void _validate() {
     _validateUuid(operationId, 'operationId');
     _validateUuid(recordId, 'recordId');
-    _validateUuid(deviceId, 'deviceId');
     if (logicalClock < 0) {
       throw const SyncContractException('logicalClock must be non-negative');
     }
     if (!supportedEntityTypes.contains(entityType)) {
       throw SyncContractException('unsupported entityType: $entityType');
     }
-    _validateBase64(
-      payloadNonce,
-      'payloadNonce',
-      requireNonEmpty: true,
-      maxBytes: maxPayloadBytes,
-    );
-    _validateBase64(
-      payloadCiphertext,
-      'payloadCiphertext',
-      requireNonEmpty: true,
-      maxBytes: maxPayloadBytes,
-    );
+    if (payload.isEmpty && !isTombstone) {
+      throw const SyncContractException(
+        'payload must not be empty for non-tombstone operations',
+      );
+    }
+    final payloadBytes = utf8.encode(jsonEncode(payload)).length;
+    if (payloadBytes > maxPayloadBytes) {
+      throw SyncContractException('payload must be at most 256 KiB');
+    }
     if (schemaVersion != 1) {
       throw SyncContractException('unsupported schemaVersion: $schemaVersion');
     }
@@ -115,30 +104,6 @@ class SyncOperationV1 {
     );
     if (!uuid.hasMatch(value)) {
       throw SyncContractException('$fieldName must be a valid UUID');
-    }
-  }
-
-  static void _validateBase64(
-    String value,
-    String fieldName, {
-    required bool requireNonEmpty,
-    int? maxBytes,
-  }) {
-    if (requireNonEmpty && value.isEmpty) {
-      throw SyncContractException('$fieldName must not be empty');
-    }
-    try {
-      final decoded = base64.decode(value);
-      if (base64.encode(decoded) != value) {
-        throw const FormatException();
-      }
-      if (maxBytes != null && decoded.length > maxBytes) {
-        throw SyncContractException('$fieldName must be at most 256 KiB');
-      }
-    } on SyncContractException {
-      rethrow;
-    } on FormatException {
-      throw SyncContractException('$fieldName must be valid base64');
     }
   }
 }

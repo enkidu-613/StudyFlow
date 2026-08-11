@@ -4,37 +4,37 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
+import 'email_auth_models.dart';
+
 final class AuthContext {
   AuthContext({
-    required String accountId,
-    required String deviceId,
+    required String userId,
+    required this.email,
     required this.accessToken,
     required this.refreshToken,
-    required this.encryptedAccountDataKeyEnvelope,
-  })  : accountId = _normalizedUuid(accountId, 'accountId'),
-        deviceId = _normalizedUuid(deviceId, 'deviceId') {
+    required this.expiresIn,
+  }) : userId = _normalizedUuid(userId, 'userId') {
     _requireSecret(accessToken, 'accessToken');
     _requireSecret(refreshToken, 'refreshToken');
-    _requireCanonicalBase64(
-      encryptedAccountDataKeyEnvelope,
-      'encryptedAccountDataKeyEnvelope',
-    );
+    if (expiresIn <= 0) {
+      throw ArgumentError.value(expiresIn, 'expiresIn', 'must be positive');
+    }
   }
 
-  final String accountId;
-  final String deviceId;
+  final String userId;
+  final String email;
   final String accessToken;
   final String refreshToken;
-  final String encryptedAccountDataKeyEnvelope;
+  final int expiresIn;
 
   factory AuthContext.fromJson(Object? value) {
     final json = _jsonObject(value, 'active auth context');
     const expectedKeys = <String>{
-      'account_id',
-      'device_id',
+      'user_id',
+      'email',
       'access_token',
       'refresh_token',
-      'encrypted_account_data_key_envelope',
+      'expires_in',
     };
     if (json.keys.toSet().difference(expectedKeys).isNotEmpty ||
         expectedKeys.difference(json.keys.toSet()).isNotEmpty) {
@@ -47,50 +47,38 @@ final class AuthContext {
       AuthContext._fromMap(_jsonObject(value, 'authentication response'));
 
   factory AuthContext._fromMap(Map<String, Object?> json) => AuthContext(
-        accountId: _requiredString(json, 'account_id'),
-        deviceId: _requiredString(json, 'device_id'),
+        userId: _requiredString(json, 'user_id'),
+        email: _requiredString(json, 'email'),
         accessToken: _requiredString(json, 'access_token'),
         refreshToken: _requiredString(json, 'refresh_token'),
-        encryptedAccountDataKeyEnvelope:
-            _requiredString(json, 'encrypted_account_data_key_envelope'),
+        expiresIn: _requiredInt(json, 'expires_in'),
       );
 
   Map<String, Object?> toJson() => <String, Object?>{
-        'account_id': accountId,
-        'device_id': deviceId,
+        'user_id': userId,
+        'email': email,
         'access_token': accessToken,
         'refresh_token': refreshToken,
-        'encrypted_account_data_key_envelope': encryptedAccountDataKeyEnvelope,
+        'expires_in': expiresIn,
       };
 
   @override
   bool operator ==(Object other) =>
       other is AuthContext &&
-      other.accountId == accountId &&
-      other.deviceId == deviceId &&
+      other.userId == userId &&
+      other.email == email &&
       other.accessToken == accessToken &&
       other.refreshToken == refreshToken &&
-      other.encryptedAccountDataKeyEnvelope == encryptedAccountDataKeyEnvelope;
+      other.expiresIn == expiresIn;
 
   @override
   int get hashCode => Object.hash(
-        accountId,
-        deviceId,
+        userId,
+        email,
         accessToken,
         refreshToken,
-        encryptedAccountDataKeyEnvelope,
+        expiresIn,
       );
-}
-
-final class PairingCodeResult {
-  PairingCodeResult({required this.code, required this.expiresAt}) {
-    if (!_pairingCodePattern.hasMatch(code)) {
-      throw ArgumentError.value(code, 'code', 'must contain six digits');
-    }
-  }
-
-  final String code;
-  final DateTime expiresAt;
 }
 
 abstract interface class AuthContextStore {
@@ -112,8 +100,6 @@ final class FlutterSecureAuthContextStore implements AuthContextStore {
               mOptions: MacOsOptions(
                 accessibility: KeychainAccessibility.unlocked_this_device,
                 synchronizable: false,
-                // Local macOS Debug builds are unsigned; Data Protection
-                // Keychain requires a provisioning profile.
                 usesDataProtectionKeychain: !kDebugMode,
               ),
             );
@@ -148,39 +134,19 @@ final class FlutterSecureAuthContextStore implements AuthContextStore {
 }
 
 abstract interface class AuthApi {
-  Future<AuthContext> bootstrap({
-    required String bootstrapToken,
+  Future<AuthContext> register({
+    required String email,
     required String password,
-    required String accountId,
-    required String deviceId,
-    required String devicePublicKey,
-    required String encryptedAccountDataKeyEnvelope,
   });
 
   Future<AuthContext> login({
+    required String email,
     required String password,
-    required String deviceId,
   });
 
   Future<AuthContext> refresh({required String refreshToken});
 
-  Future<PairingCodeResult> createPairingCode({
-    required String accessToken,
-    required String targetDeviceId,
-    required String targetDevicePublicKey,
-    required String encryptedAccountDataKeyEnvelope,
-  });
-
-  Future<AuthContext> pair({
-    required String code,
-    required String deviceId,
-    required String devicePublicKey,
-  });
-
-  Future<void> revokeDevice({
-    required String accessToken,
-    required String deviceId,
-  });
+  Future<void> logout({required String refreshToken});
 }
 
 final class HttpAuthApi implements AuthApi {
@@ -192,42 +158,27 @@ final class HttpAuthApi implements AuthApi {
   final http.Client _client;
 
   @override
-  Future<AuthContext> bootstrap({
-    required String bootstrapToken,
+  Future<AuthContext> register({
+    required String email,
     required String password,
-    required String accountId,
-    required String deviceId,
-    required String devicePublicKey,
-    required String encryptedAccountDataKeyEnvelope,
   }) async =>
       AuthContext.fromApiJson(
         await _post(
-          '/v1/auth/bootstrap',
-          <String, Object?>{
-            'password': password,
-            'account_id': _normalizedUuid(accountId, 'accountId'),
-            'device_id': _normalizedUuid(deviceId, 'deviceId'),
-            'device_public_key': devicePublicKey,
-            'encrypted_account_data_key_envelope':
-                encryptedAccountDataKeyEnvelope,
-          },
-          bootstrapToken: bootstrapToken,
+          '/v1/auth/register',
+          <String, Object?>{'email': email, 'password': password},
           acceptedStatusCodes: const <int>{201},
         ),
       );
 
   @override
   Future<AuthContext> login({
+    required String email,
     required String password,
-    required String deviceId,
   }) async =>
       AuthContext.fromApiJson(
         await _post(
           '/v1/auth/login',
-          <String, Object?>{
-            'password': password,
-            'device_id': _normalizedUuid(deviceId, 'deviceId'),
-          },
+          <String, Object?>{'email': email, 'password': password},
         ),
       );
 
@@ -241,58 +192,10 @@ final class HttpAuthApi implements AuthApi {
       );
 
   @override
-  Future<PairingCodeResult> createPairingCode({
-    required String accessToken,
-    required String targetDeviceId,
-    required String targetDevicePublicKey,
-    required String encryptedAccountDataKeyEnvelope,
-  }) async {
-    final body = _jsonObject(
-      await _post(
-        '/v1/devices/pairing-codes',
-        <String, Object?>{
-          'target_device_id': _normalizedUuid(targetDeviceId, 'targetDeviceId'),
-          'target_device_public_key': targetDevicePublicKey,
-          'encrypted_account_data_key_envelope':
-              encryptedAccountDataKeyEnvelope,
-        },
-        accessToken: accessToken,
-        acceptedStatusCodes: const <int>{201},
-      ),
-      'pairing code response',
-    );
-    return PairingCodeResult(
-      code: _requiredString(body, 'code'),
-      expiresAt: DateTime.parse(_requiredString(body, 'expires_at')).toUtc(),
-    );
-  }
-
-  @override
-  Future<AuthContext> pair({
-    required String code,
-    required String deviceId,
-    required String devicePublicKey,
-  }) async =>
-      AuthContext.fromApiJson(
-        await _post(
-          '/v1/devices/pair',
-          <String, Object?>{
-            'code': code,
-            'device_id': _normalizedUuid(deviceId, 'deviceId'),
-            'device_public_key': devicePublicKey,
-          },
-        ),
-      );
-
-  @override
-  Future<void> revokeDevice({
-    required String accessToken,
-    required String deviceId,
-  }) async {
+  Future<void> logout({required String refreshToken}) async {
     await _post(
-      '/v1/devices/revoke',
-      <String, Object?>{'device_id': _normalizedUuid(deviceId, 'deviceId')},
-      accessToken: accessToken,
+      '/v1/auth/logout',
+      <String, Object?>{'refresh_token': refreshToken},
       acceptedStatusCodes: const <int>{204},
     );
   }
@@ -302,23 +205,19 @@ final class HttpAuthApi implements AuthApi {
   Future<Object?> _post(
     String path,
     Map<String, Object?> body, {
-    String? accessToken,
-    String? bootstrapToken,
     Set<int> acceptedStatusCodes = const <int>{200},
   }) async {
     final response = await _client.post(
       _baseUri.resolve(path),
       headers: <String, String>{
         'Content-Type': 'application/json',
-        if (accessToken != null) 'Authorization': 'Bearer $accessToken',
-        if (bootstrapToken != null)
-          'X-StudyFlow-Bootstrap-Token': bootstrapToken,
       },
       body: jsonEncode(body),
     );
     if (!acceptedStatusCodes.contains(response.statusCode)) {
       throw AuthApiException(
         response.statusCode,
+        _serverDetail(response.body),
         'Authentication request failed.',
       );
     }
@@ -330,10 +229,23 @@ final class HttpAuthApi implements AuthApi {
     } on FormatException catch (error) {
       throw AuthApiException(
         response.statusCode,
+        null,
         'Authentication response was invalid.',
         cause: error,
       );
     }
+  }
+
+  String? _serverDetail(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, Object?> && decoded['detail'] is String) {
+        return decoded['detail'] as String;
+      }
+    } on FormatException {
+      // Fall through to the generic message.
+    }
+    return null;
   }
 }
 
@@ -348,27 +260,14 @@ final class AuthRepository {
 
   AuthContext? get activeContext => _activeContext;
 
-  Future<AuthContext> bootstrap({
-    required String bootstrapToken,
+  Future<AuthContext> register({
+    required String email,
     required String password,
-    required String accountId,
-    required String deviceId,
-    required String devicePublicKey,
-    required String encryptedAccountDataKeyEnvelope,
   }) async {
-    final normalizedDeviceId = _normalizedUuid(deviceId, 'deviceId');
-    final authenticated = await _api.bootstrap(
-      bootstrapToken: bootstrapToken,
-      password: password,
-      accountId: _normalizedUuid(accountId, 'accountId'),
-      deviceId: normalizedDeviceId,
-      devicePublicKey: devicePublicKey,
-      encryptedAccountDataKeyEnvelope: encryptedAccountDataKeyEnvelope,
-    );
-    if (authenticated.accountId != _normalizedUuid(accountId, 'accountId') ||
-        authenticated.deviceId != normalizedDeviceId) {
+    final authenticated = await _api.register(email: email, password: password);
+    if (authenticated.email != email.trim().toLowerCase()) {
       throw const AuthScopeException(
-        'Bootstrap response was bound to a different account or device.',
+        'Registration response was bound to a different email.',
       );
     }
     return _persist(authenticated);
@@ -380,39 +279,13 @@ final class AuthRepository {
   }
 
   Future<AuthContext> login({
+    required String email,
     required String password,
-    required String deviceId,
   }) async {
-    final normalizedDeviceId = _normalizedUuid(deviceId, 'deviceId');
-    final authenticated = await _api.login(
-      password: password,
-      deviceId: normalizedDeviceId,
-    );
-    if (authenticated.deviceId != normalizedDeviceId) {
+    final authenticated = await _api.login(email: email, password: password);
+    if (authenticated.email != email.trim().toLowerCase()) {
       throw const AuthScopeException(
-        'Login response was bound to a different device.',
-      );
-    }
-    return _persist(authenticated);
-  }
-
-  Future<AuthContext> pair({
-    required String code,
-    required String deviceId,
-    required String devicePublicKey,
-  }) async {
-    if (!_pairingCodePattern.hasMatch(code)) {
-      throw ArgumentError.value(code, 'code', 'must contain six digits');
-    }
-    final normalizedDeviceId = _normalizedUuid(deviceId, 'deviceId');
-    final authenticated = await _api.pair(
-      code: code,
-      deviceId: normalizedDeviceId,
-      devicePublicKey: devicePublicKey,
-    );
-    if (authenticated.deviceId != normalizedDeviceId) {
-      throw const AuthScopeException(
-        'Pairing response was bound to a different device.',
+        'Login response was bound to a different email.',
       );
     }
     return _persist(authenticated);
@@ -429,50 +302,26 @@ final class AuthRepository {
       }
       rethrow;
     }
-    if (refreshed.accountId != current.accountId ||
-        refreshed.deviceId != current.deviceId) {
+    if (refreshed.userId != current.userId) {
       await logout();
       throw const AuthScopeException(
-        'Refreshed credentials changed the active account or device.',
+        'Refreshed credentials changed the active user.',
       );
     }
     return _persist(refreshed);
   }
 
-  Future<PairingCodeResult> createPairingCode({
-    required String targetDeviceId,
-    required String targetDevicePublicKey,
-    required String encryptedAccountDataKeyEnvelope,
-  }) {
-    final current = _requireActiveContext();
-    return _api.createPairingCode(
-      accessToken: current.accessToken,
-      targetDeviceId: targetDeviceId,
-      targetDevicePublicKey: targetDevicePublicKey,
-      encryptedAccountDataKeyEnvelope: encryptedAccountDataKeyEnvelope,
-    );
-  }
-
-  Future<void> revokeDevice(String deviceId) async {
-    final current = _requireActiveContext();
-    final normalizedDeviceId = _normalizedUuid(deviceId, 'deviceId');
-    try {
-      await _api.revokeDevice(
-        accessToken: current.accessToken,
-        deviceId: normalizedDeviceId,
-      );
-    } on AuthApiException catch (error) {
-      if (error.statusCode == 401) {
-        await _clearActiveContext();
+  Future<void> logout() async {
+    final current = _activeContext;
+    if (current != null) {
+      try {
+        await _api.logout(refreshToken: current.refreshToken);
+      } on AuthApiException {
+        // Best-effort server-side revocation; local state is cleared anyway.
       }
-      rethrow;
     }
-    if (normalizedDeviceId == current.deviceId) {
-      await logout();
-    }
+    await _clearActiveContext();
   }
-
-  Future<void> logout() => _clearActiveContext();
 
   Future<void> _clearActiveContext() async {
     _activeContext = null;
@@ -508,11 +357,20 @@ class AuthStorageException implements Exception {
 }
 
 class AuthApiException implements Exception {
-  const AuthApiException(this.statusCode, this.message, {this.cause});
+  const AuthApiException(this.statusCode, this.serverDetail, this.message,
+      {this.cause});
 
   final int statusCode;
+  final String? serverDetail;
   final String message;
   final Object? cause;
+
+  String get friendlyMessage {
+    if (serverDetail != null && serverDetail!.isNotEmpty) {
+      return serverDetail!;
+    }
+    return friendlyAuthError(statusCode);
+  }
 }
 
 Uri _validatedBaseUri(Uri uri) {
@@ -552,6 +410,14 @@ String _requiredString(Map<String, Object?> json, String key) {
   return value;
 }
 
+int _requiredInt(Map<String, Object?> json, String key) {
+  final value = json[key];
+  if (value is! int) {
+    throw FormatException('$key must be an integer.');
+  }
+  return value;
+}
+
 String _normalizedUuid(String value, String name) {
   final normalized = value.toLowerCase();
   if (!_uuidPattern.hasMatch(normalized)) {
@@ -567,18 +433,6 @@ void _requireSecret(String value, String name) {
   }
 }
 
-void _requireCanonicalBase64(String value, String name) {
-  try {
-    final decoded = base64Decode(value);
-    if (decoded.isEmpty || base64Encode(decoded) != value) {
-      throw const FormatException('non-canonical base64');
-    }
-  } on FormatException {
-    throw ArgumentError.value('<redacted>', name, 'must be canonical base64');
-  }
-}
-
 final RegExp _uuidPattern = RegExp(
   r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
 );
-final RegExp _pairingCodePattern = RegExp(r'^[0-9]{6}$');

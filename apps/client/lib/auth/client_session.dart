@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:http/http.dart' as http;
 
 import '../app/studyflow_workspace.dart';
-import '../security/key_manager.dart';
 import '../sync/sync_api.dart';
 import '../sync/sync_engine.dart';
 import '../sync/sync_status.dart';
@@ -22,22 +21,14 @@ final class ClientSession {
   final HttpSyncApi? syncApi;
   final SyncEngine? syncEngine;
 
-  static Future<ClientSession> openLocal() async => ClientSession._(
-        workspace: await StudyFlowWorkspace.openLocalShell(),
-      );
-
   static Future<ClientSession> openAuthenticated({
     required AuthContext authContext,
     required Uri apiBaseUri,
     AuthRepository? authRepository,
-    SecureKeyStore? secureKeyStore,
-    String? deviceEnrollmentKeyNamespace,
     http.Client? httpClient,
   }) async {
     final workspace = await StudyFlowWorkspace.openAuthenticated(
       authContext: authContext,
-      secureKeyStore: secureKeyStore,
-      deviceEnrollmentKeyNamespace: deviceEnrollmentKeyNamespace,
     );
     final syncApi = HttpSyncApi(
       baseUri: apiBaseUri,
@@ -47,7 +38,6 @@ final class ClientSession {
       api: syncApi,
       authContext: authContext,
       store: workspace.store,
-      cipher: workspace.cipher,
     );
     final session = ClientSession._(
       workspace: workspace,

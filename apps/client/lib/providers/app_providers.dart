@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:studyflow/auth/auth_repository.dart';
-import 'package:studyflow/security/payload_cipher.dart';
 import 'package:studyflow/storage/app_database.dart';
 import 'package:studyflow/sync/sync_api.dart';
 import 'package:studyflow/sync/sync_engine.dart';
@@ -11,13 +10,11 @@ final class AppSyncDependencies {
     required this.api,
     required this.authContext,
     required this.store,
-    required this.cipher,
   });
 
   final SyncApi api;
   final AuthContext authContext;
   final AccountScopedStore store;
-  final PayloadCipher cipher;
 }
 
 final Provider<AppSyncDependencies?> appSyncDependenciesProvider =
@@ -32,7 +29,6 @@ final Provider<SyncEngine?> syncEngineProvider = Provider<SyncEngine?>((ref) {
     api: dependencies.api,
     authContext: dependencies.authContext,
     store: dependencies.store,
-    cipher: dependencies.cipher,
   );
   ref.onDispose(engine.dispose);
   return engine;

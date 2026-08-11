@@ -1,25 +1,20 @@
 import 'package:flutter/material.dart';
 
-enum AuthMode { login, bootstrap, pair, recovery }
+import 'auth_repository.dart';
+import 'email_auth_models.dart';
+
+enum AuthMode { login, register }
 
 final class AuthScreen extends StatefulWidget {
   const AuthScreen({
     required this.onLogin,
-    required this.onBootstrap,
-    required this.onPair,
-    this.recoveryAccountId,
-    this.onRecovery,
-    this.onUseLocal,
+    required this.onRegister,
     this.initialMessage,
     super.key,
   });
 
-  final Future<void> Function(String password) onLogin;
-  final Future<void> Function(String token, String password) onBootstrap;
-  final Future<void> Function(String code) onPair;
-  final String? recoveryAccountId;
-  final Future<void> Function(String recoveryKey)? onRecovery;
-  final Future<void> Function()? onUseLocal;
+  final Future<void> Function(String email, String password) onLogin;
+  final Future<void> Function(String email, String password) onRegister;
   final String? initialMessage;
 
   @override
@@ -28,10 +23,10 @@ final class AuthScreen extends StatefulWidget {
 
 final class _AuthScreenState extends State<AuthScreen> {
   AuthMode _mode = AuthMode.login;
+  final _formKey = GlobalKey<FormState>();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _bootstrapTokenController = TextEditingController();
-  final _pairingCodeController = TextEditingController();
-  final _recoveryKeyController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   String? _message;
   bool _busy = false;
 
@@ -43,38 +38,31 @@ final class _AuthScreenState extends State<AuthScreen> {
 
   @override
   void dispose() {
+    _emailController.dispose();
     _passwordController.dispose();
-    _bootstrapTokenController.dispose();
-    _pairingCodeController.dispose();
-    _recoveryKeyController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  void _switchMode(AuthMode mode) {
+    setState(() {
+      _mode = mode;
+      _message = null;
+      _emailController.clear();
+      _passwordController.clear();
+      _confirmPasswordController.clear();
+    });
   }
 
   Future<void> _submit() async {
     if (_busy) {
       return;
     }
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      return;
+    }
+    final email = _emailController.text.trim();
     final password = _passwordController.text;
-    if ((_mode == AuthMode.login || _mode == AuthMode.bootstrap) &&
-        password.isEmpty) {
-      setState(() => _message = 'Password is required.');
-      return;
-    }
-    if (_mode == AuthMode.bootstrap && _bootstrapTokenController.text.isEmpty) {
-      setState(() => _message = 'Bootstrap token is required.');
-      return;
-    }
-    if (_mode == AuthMode.pair &&
-        !RegExp(r'^\d{6}$').hasMatch(_pairingCodeController.text)) {
-      setState(() => _message = 'Enter the 6-digit pairing code.');
-      return;
-    }
-    if (_mode == AuthMode.recovery &&
-        _recoveryKeyController.text.trim().isEmpty) {
-      setState(() => _message = 'Enter the recovery key.');
-      return;
-    }
-
     setState(() {
       _busy = true;
       _message = null;
@@ -82,17 +70,13 @@ final class _AuthScreenState extends State<AuthScreen> {
     try {
       switch (_mode) {
         case AuthMode.login:
-          await widget.onLogin(password);
-        case AuthMode.bootstrap:
-          await widget.onBootstrap(_bootstrapTokenController.text, password);
-        case AuthMode.pair:
-          await widget.onPair(_pairingCodeController.text);
-        case AuthMode.recovery:
-          await widget.onRecovery!(_recoveryKeyController.text.trim());
+          await widget.onLogin(email, password);
+        case AuthMode.register:
+          await widget.onRegister(email, password);
       }
     } on Object catch (error) {
       if (mounted) {
-        setState(() => _message = 'Authentication failed: $error');
+        setState(() => _message = _friendlySubmissionError(error));
       }
     } finally {
       if (mounted) {
@@ -101,23 +85,20 @@ final class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
-  Future<void> _useLocal() async {
-    if (widget.onUseLocal == null || _busy) {
-      return;
+  String _friendlySubmissionError(Object error) {
+    if (error is AuthApiException) {
+      return error.friendlyMessage;
     }
-    setState(() => _busy = true);
-    try {
-      await widget.onUseLocal!();
-    } finally {
-      if (mounted) {
-        setState(() => _busy = false);
-      }
+    if (error is AuthScopeException) {
+      return '登录已过期，请重新登录';
     }
+    return '网络连接失败，请检查网络后重试';
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: const Key('auth-screen'),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 460),
@@ -132,95 +113,100 @@ final class _AuthScreenState extends State<AuthScreen> {
               ),
               const SizedBox(height: 24),
               SegmentedButton<AuthMode>(
-                segments: <ButtonSegment<AuthMode>>[
-                  const ButtonSegment<AuthMode>(
+                segments: const <ButtonSegment<AuthMode>>[
+                  ButtonSegment<AuthMode>(
                     value: AuthMode.login,
                     label: Text('Sign in'),
                     icon: Icon(Icons.login),
                   ),
-                  const ButtonSegment<AuthMode>(
-                    value: AuthMode.bootstrap,
-                    label: Text('Initialize'),
+                  ButtonSegment<AuthMode>(
+                    value: AuthMode.register,
+                    label: Text('Create account'),
                     icon: Icon(Icons.person_add),
                   ),
-                  const ButtonSegment<AuthMode>(
-                    value: AuthMode.pair,
-                    label: Text('Pair'),
-                    icon: Icon(Icons.devices),
-                  ),
-                  if (widget.onRecovery != null)
-                    const ButtonSegment<AuthMode>(
-                      value: AuthMode.recovery,
-                      label: Text('Recover'),
-                      icon: Icon(Icons.key),
-                    ),
                 ],
                 selected: <AuthMode>{_mode},
-                onSelectionChanged: (selection) => setState(() {
-                  _mode = selection.single;
-                  _message = null;
-                }),
+                onSelectionChanged: (selection) =>
+                    _switchMode(selection.single),
               ),
               const SizedBox(height: 20),
-              if (_mode == AuthMode.bootstrap)
-                TextField(
-                  key: const Key('bootstrap-token-field'),
-                  controller: _bootstrapTokenController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'One-time bootstrap token',
-                  ),
+              Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    TextFormField(
+                      key: const Key('auth-email-field'),
+                      controller: _emailController,
+                      enabled: !_busy,
+                      keyboardType: TextInputType.emailAddress,
+                      autofillHints: const <String>[AutofillHints.email],
+                      decoration: const InputDecoration(
+                        labelText: 'Email',
+                        prefixIcon: Icon(Icons.mail_outline),
+                      ),
+                      validator: validateEmailField,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      key: const Key('auth-password-field'),
+                      controller: _passwordController,
+                      enabled: !_busy,
+                      obscureText: true,
+                      autofillHints: const <String>[AutofillHints.password],
+                      decoration: const InputDecoration(
+                        labelText: 'Password',
+                        prefixIcon: Icon(Icons.lock_outline),
+                      ),
+                      validator: validatePasswordField,
+                    ),
+                    if (_mode == AuthMode.register) ...<Widget>[
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        key: const Key('auth-confirm-password-field'),
+                        controller: _confirmPasswordController,
+                        enabled: !_busy,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Confirm password',
+                          prefixIcon: Icon(Icons.lock_outline),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Confirm your password';
+                          }
+                          if (value != _passwordController.text) {
+                            return 'Passwords do not match';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      key: const Key('auth-submit-button'),
+                      onPressed: _busy ? null : _submit,
+                      child: _busy
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(_submitLabel),
+                    ),
+                  ],
                 ),
-              if (_mode == AuthMode.bootstrap) const SizedBox(height: 12),
-              if (_mode == AuthMode.login || _mode == AuthMode.bootstrap)
-                TextField(
-                  key: const Key('auth-password-field'),
-                  controller: _passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Password'),
-                ),
-              if (_mode == AuthMode.pair)
-                TextField(
-                  key: const Key('pairing-code-field'),
-                  controller: _pairingCodeController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: '6-digit pairing code',
-                  ),
-                ),
-              if (_mode == AuthMode.recovery) ...<Widget>[
-                if (widget.recoveryAccountId != null)
-                  Text(
-                    'Account: ${widget.recoveryAccountId}',
-                    key: const Key('recovery-account-id'),
-                  ),
-                const SizedBox(height: 12),
-                TextField(
-                  key: const Key('recovery-key-field'),
-                  controller: _recoveryKeyController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Recovery key',
-                  ),
-                ),
-              ],
-              const SizedBox(height: 16),
-              FilledButton(
-                key: const Key('auth-submit-button'),
-                onPressed: _busy ? null : _submit,
-                child: Text(_busy ? 'Working…' : _submitLabel),
               ),
-              if (widget.onUseLocal != null) ...<Widget>[
-                const SizedBox(height: 8),
-                OutlinedButton(
-                  key: const Key('local-mode-button'),
-                  onPressed: _busy ? null : _useLocal,
-                  child: const Text('Use local offline mode'),
-                ),
-              ],
               if (_message != null) ...<Widget>[
                 const SizedBox(height: 16),
-                Text(_message!, textAlign: TextAlign.center),
+                Text(
+                  _message!,
+                  key: const Key('auth-error-message'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                ),
               ],
             ],
           ),
@@ -229,10 +215,6 @@ final class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  String get _submitLabel => switch (_mode) {
-        AuthMode.login => 'Sign in',
-        AuthMode.bootstrap => 'Initialize account',
-        AuthMode.pair => 'Pair device',
-        AuthMode.recovery => 'Restore account key',
-      };
+  String get _submitLabel =>
+      _mode == AuthMode.login ? 'Sign in' : 'Create account';
 }
