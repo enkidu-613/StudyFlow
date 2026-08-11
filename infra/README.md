@@ -51,20 +51,116 @@ docker-compose version
 Debian 12 的官方软件源使用 docker-compose 命令；本项目的部署命令均按此
 命令编写，不要把它替换成当前 VPS 软件源中不存在的 docker-compose-v2。
 
-## 二、准备 Cloudflare 域名
+## 二、将 Cloudflare 域名指向 VPS
 
-在 Cloudflare 中添加一个 A 记录：
+假设你的域名是 example.com，API 使用 api.example.com。不要把端口号写进
+域名，也不要在 DNS 记录中填写 https://。
+
+### 2.1 确认域名已经由 Cloudflare 托管
+
+1. 登录 Cloudflare 控制台。
+2. 在首页选择你的域名。
+3. 如果状态显示为 Active，说明 Cloudflare 已经接管 DNS，可以继续。
+4. 如果状态不是 Active，打开 Overview，复制 Cloudflare 分配的两个
+   Nameserver，然后到域名注册商后台替换原来的 Nameserver。
+5. 等待 Cloudflare 显示 Active。未完成这一步时，在 Cloudflare 添加的
+   DNS 记录不会真正生效。
+
+### 2.2 创建 API 的 A 记录
+
+在 Cloudflare 控制台依次进入：
 
 ~~~text
-主机名：api
-目标：VPS 公网 IPv4 地址
-代理：开启
+选择域名 → DNS → Records → Add record
 ~~~
 
-例如，最终 API 域名为 api.example.com。
+填写：
 
-Cloudflare 的 SSL/TLS 模式设置为 Full (strict)。Caddy 会在 80、443
-端口可访问后自动申请和续期 HTTPS 证书。
+~~~text
+Type（类型）：A
+Name（名称）：api
+IPv4 address（IPv4 地址）：你的 VPS 公网 IPv4
+TTL：Auto
+Proxy status：先选择 DNS only（灰云）
+~~~
+
+例如，如果你的 VPS 公网 IP 仍然是 YOUR_VPS_PUBLIC_IPV4，填写：
+
+~~~text
+Type: A
+Name: api
+IPv4 address: YOUR_VPS_PUBLIC_IPV4
+TTL: Auto
+Proxy status: DNS only
+~~~
+
+最后点击 Save。不要同时为 api 添加一个指向错误地址的 AAAA 记录；如果
+VPS 没有可用 IPv6，应删除旧的 api AAAA 记录，否则部分客户端可能优先走
+IPv6 而连接失败。
+
+Cloudflare 的 DNS 页面可以通过 Add record 创建 A、AAAA、CNAME 等记录；
+A 记录用于把子域名指向 IPv4 地址。[Cloudflare DNS 官方说明](https://developers.cloudflare.com/dns/manage-dns-records/how-to/create-dns-records/)
+
+### 2.3 检查域名解析
+
+在 Mac 上执行：
+
+~~~bash
+dig +short api.example.com
+~~~
+
+灰云状态下，结果应包含你的 VPS 公网 IP。如果没有结果，先检查域名的
+Nameserver 是否已切换到 Cloudflare，以及 A 记录的 Name 是否填写为 api。
+
+### 2.4 先让 Caddy 申请 HTTPS 证书
+
+确认 VPS 的 80、443 端口已经开放，并启动 Caddy：
+
+~~~bash
+cd /home/studyflow/app/infra
+docker-compose --env-file .env up -d --build
+docker-compose --env-file .env logs --tail=100 caddy
+~~~
+
+日志中应能看到 Caddy 为 api.example.com 申请或加载证书。然后在 Mac
+上验证：
+
+~~~bash
+curl -fsS https://api.example.com/health/live
+~~~
+
+如果证书申请失败，优先检查域名解析、VPS 防火墙和服务商安全组是否放行
+80、443。保持灰云状态直到 Caddy 成功取得证书。
+
+### 2.5 打开 Cloudflare 代理并设置 Full (strict)
+
+证书验证成功后，回到：
+
+~~~text
+Cloudflare → 域名 → DNS → Records
+~~~
+
+找到 api 的 A 记录，把 Proxy status 从 DNS only（灰云）切换为 Proxied
+（橙云），然后保存。橙云表示 HTTP/HTTPS 流量经过 Cloudflare；DNS 查询
+结果会显示 Cloudflare 地址，而不是直接显示 VPS IP。[Cloudflare 代理状态说明](https://developers.cloudflare.com/dns/proxy-status/)
+
+接着进入：
+
+~~~text
+SSL/TLS → Overview → Encryption mode
+~~~
+
+选择 Full (strict)。该模式会验证 Cloudflare 到 Caddy 的源站证书，Caddy
+使用 Let's Encrypt 证书时可以正常工作。[Cloudflare SSL/TLS 模式说明](https://developers.cloudflare.com/ssl/origin-configuration/ssl-modes/)
+
+最终应为：
+
+~~~text
+Cloudflare DNS：api → VPS 公网 IP，Proxy status = Proxied（橙云）
+Cloudflare SSL/TLS：Full (strict)
+VPS：Caddy 监听 80、443
+Docker：API 仅在私有网络监听 8000
+~~~
 
 ## 三、上传代码
 
