@@ -2,12 +2,27 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hmac
 from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
-from sqlalchemy import DateTime, ForeignKey, ForeignKeyConstraint, Index, LargeBinary, String, Text, Uuid
+from cryptography.hazmat.primitives.asymmetric.x25519 import (
+    X25519PrivateKey,
+    X25519PublicKey,
+)
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    ForeignKeyConstraint,
+    Index,
+    Integer,
+    LargeBinary,
+    String,
+    Text,
+    Uuid,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from server.app.db.models import Account, Base, Device, TimestampedModel
@@ -28,8 +43,17 @@ def _canonical_base64(value: str) -> str:
 
 def _x25519_public_key(value: str) -> str:
     value = _canonical_base64(value)
-    if len(base64.b64decode(value)) != 32:
+    public_key_bytes = base64.b64decode(value)
+    if len(public_key_bytes) != 32:
         raise ValueError("must contain a 32-byte X25519 public key")
+    try:
+        shared_secret = X25519PrivateKey.generate().exchange(
+            X25519PublicKey.from_public_bytes(public_key_bytes),
+        )
+    except ValueError as exc:
+        raise ValueError("must contain a valid X25519 public key") from exc
+    if hmac.compare_digest(shared_secret, bytes(32)):
+        raise ValueError("must not derive an all-zero X25519 shared secret")
     return value
 
 
@@ -88,6 +112,12 @@ class PairingCode(TimestampedModel, Base):
     encrypted_account_data_key_envelope: Mapped[str] = mapped_column(Text, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    failed_attempts: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
 
 
 class StrictRequest(BaseModel):

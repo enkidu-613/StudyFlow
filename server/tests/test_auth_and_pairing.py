@@ -3,18 +3,24 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Annotated
 from uuid import UUID, uuid4
 
 import pytest
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from httpx import ASGITransport, AsyncClient, Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
 from server.app.auth.models import PairingCode, RefreshSession
-from server.app.auth.routes import get_auth_service, router as auth_router
+from server.app.auth.routes import (
+    get_account_context,
+    get_auth_service,
+    router as auth_router,
+)
 from server.app.auth.service import AccessTokenCodec, AuthService, AuthSettings
+from server.app.db.context import AccountContext
 from server.app.db.models import Account, Base, Device, SyncOperation
 
 
@@ -24,6 +30,8 @@ PASSWORD = "correct horse battery staple"
 ACCOUNT_ENVELOPE = "ZW5jcnlwdGVkLWFjY291bnQtZGF0YS1rZXk="
 FIRST_DEVICE_PUBLIC_KEY = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="
 SECOND_DEVICE_PUBLIC_KEY = "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI="
+ALL_ZERO_X25519_PUBLIC_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+LOW_ORDER_X25519_PUBLIC_KEY = "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
 
 @dataclass
@@ -51,11 +59,13 @@ class AuthClient:
     def __init__(
         self,
         client: AsyncClient,
+        application: FastAPI,
         service: AuthService,
         clock: MutableClock,
         session_factory: async_sessionmaker[AsyncSession],
     ) -> None:
         self.client = client
+        self.application = application
         self.service = service
         self.clock = clock
         self.session_factory = session_factory
@@ -70,6 +80,7 @@ class AuthClient:
         bootstrap_token: str = BOOTSTRAP_TOKEN,
         device_id: str | None = None,
         password: str = PASSWORD,
+        device_public_key: str = FIRST_DEVICE_PUBLIC_KEY,
     ) -> Response:
         selected_device_id = device_id or str(uuid4())
         response = await self.client.post(
@@ -78,7 +89,7 @@ class AuthClient:
             json={
                 "password": password,
                 "device_id": selected_device_id,
-                "device_public_key": FIRST_DEVICE_PUBLIC_KEY,
+                "device_public_key": device_public_key,
                 "encrypted_account_data_key_envelope": ACCOUNT_ENVELOPE,
             },
         )
@@ -138,6 +149,31 @@ class AuthClient:
             },
         )
 
+    async def pair_from(
+        self,
+        source_ip: str,
+        code: str,
+        target_device_id: str,
+        *,
+        target_device_public_key: str = SECOND_DEVICE_PUBLIC_KEY,
+    ) -> Response:
+        transport = ASGITransport(
+            app=self.application,
+            client=(source_ip, 42_000),
+        )
+        async with AsyncClient(
+            transport=transport,
+            base_url="http://testserver",
+        ) as source_client:
+            return await source_client.post(
+                "/v1/devices/pair",
+                json={
+                    "code": code,
+                    "device_id": target_device_id,
+                    "device_public_key": target_device_public_key,
+                },
+            )
+
     @property
     def authorization_headers(self) -> dict[str, str]:
         assert self.access_token is not None
@@ -178,11 +214,21 @@ async def auth_client() -> AsyncIterator[AuthClient]:
     )
     application = FastAPI()
     application.include_router(auth_router)
+
+    @application.get("/test/account-context")
+    async def account_context_endpoint(
+        context: Annotated[AccountContext, Depends(get_account_context)],
+    ) -> dict[str, str]:
+        return {
+            "account_id": str(context.account_id),
+            "device_id": str(context.device_id),
+        }
+
     application.dependency_overrides[get_auth_service] = lambda: service
     transport = ASGITransport(app=application)
 
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-        yield AuthClient(client, service, clock, session_factory)
+        yield AuthClient(client, application, service, clock, session_factory)
 
     application.dependency_overrides.clear()
     await engine.dispose()
@@ -211,6 +257,17 @@ async def test_bootstrap_requires_server_token_and_can_run_only_once(auth_client
 
 
 @pytest.mark.anyio
+async def test_bootstrap_rejects_all_zero_x25519_public_key(
+    auth_client: AuthClient,
+) -> None:
+    response = await auth_client.bootstrap(
+        device_public_key=ALL_ZERO_X25519_PUBLIC_KEY,
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
 async def test_login_returns_device_bound_tokens_and_rejects_wrong_password(
     auth_client: AuthClient,
 ) -> None:
@@ -228,6 +285,32 @@ async def test_login_returns_device_bound_tokens_and_rejects_wrong_password(
     assert body["encrypted_account_data_key_envelope"] == ACCOUNT_ENVELOPE
     assert body["token_type"] == "bearer"
     assert body["expires_in"] == 900
+
+
+@pytest.mark.anyio
+async def test_account_context_dependency_verifies_device_ownership_and_revocation(
+    auth_client: AuthClient,
+) -> None:
+    await auth_client.bootstrap()
+    assert auth_client.access_token is not None
+    assert auth_client.device_id is not None
+    headers = {"Authorization": f"Bearer {auth_client.access_token}"}
+
+    accepted = await auth_client.client.get("/test/account-context", headers=headers)
+    revoked = await auth_client.client.post(
+        "/v1/devices/revoke",
+        headers=headers,
+        json={"device_id": auth_client.device_id},
+    )
+    rejected = await auth_client.client.get("/test/account-context", headers=headers)
+
+    assert accepted.status_code == 200
+    assert accepted.json() == {
+        "account_id": auth_client.account_id,
+        "device_id": auth_client.device_id,
+    }
+    assert revoked.status_code == 204
+    assert rejected.status_code == 401
 
 
 @pytest.mark.anyio
@@ -254,7 +337,59 @@ async def test_refresh_token_rotates_and_the_previous_token_cannot_be_reused(
     async with auth_client.session_factory() as session:
         sessions = list((await session.execute(select(RefreshSession))).scalars())
     assert len(sessions) == 2
-    assert sum(session.revoked_at is not None for session in sessions) == 1
+    assert sum(session.revoked_at is not None for session in sessions) == 2
+
+
+@pytest.mark.anyio
+async def test_attacker_first_refresh_replay_revokes_the_issued_replacement(
+    auth_client: AuthClient,
+) -> None:
+    await auth_client.bootstrap()
+    stolen_token = auth_client.refresh_token
+    assert stolen_token is not None
+
+    attacker_rotation = await auth_client.client.post(
+        "/v1/auth/refresh",
+        json={"refresh_token": stolen_token},
+    )
+    legitimate_replay = await auth_client.client.post(
+        "/v1/auth/refresh",
+        json={"refresh_token": stolen_token},
+    )
+    attacker_replacement = await auth_client.client.post(
+        "/v1/auth/refresh",
+        json={"refresh_token": attacker_rotation.json()["refresh_token"]},
+    )
+
+    assert attacker_rotation.status_code == 200
+    assert legitimate_replay.status_code == 401
+    assert attacker_replacement.status_code == 401
+
+
+@pytest.mark.anyio
+async def test_legitimate_first_refresh_replay_revokes_the_issued_replacement(
+    auth_client: AuthClient,
+) -> None:
+    await auth_client.bootstrap()
+    shared_token = auth_client.refresh_token
+    assert shared_token is not None
+
+    legitimate_rotation = await auth_client.client.post(
+        "/v1/auth/refresh",
+        json={"refresh_token": shared_token},
+    )
+    attacker_replay = await auth_client.client.post(
+        "/v1/auth/refresh",
+        json={"refresh_token": shared_token},
+    )
+    legitimate_replacement = await auth_client.client.post(
+        "/v1/auth/refresh",
+        json={"refresh_token": legitimate_rotation.json()["refresh_token"]},
+    )
+
+    assert legitimate_rotation.status_code == 200
+    assert attacker_replay.status_code == 401
+    assert legitimate_replacement.status_code == 401
 
 
 @pytest.mark.anyio
@@ -310,9 +445,90 @@ async def test_pairing_code_is_bound_to_target_device_and_public_key(
     )
     accepted = await auth_client.pair(code, target_device_id)
 
-    assert wrong_device.status_code == 403
-    assert wrong_key.status_code == 403
+    assert wrong_device.status_code == 410
+    assert wrong_key.status_code == 410
+    assert wrong_device.json() == wrong_key.json() == {
+        "detail": "Pairing request denied.",
+    }
     assert accepted.status_code == 200
+
+
+@pytest.mark.anyio
+async def test_pairing_code_attempt_cap_blocks_later_correct_use(
+    auth_client: AuthClient,
+) -> None:
+    await auth_client.bootstrap()
+    created, target_device_id = await auth_client.create_pairing_code()
+    code = created.json()["code"]
+
+    failures = [
+        await auth_client.pair(code, str(uuid4()))
+        for _ in range(5)
+    ]
+    correct_after_cap = await auth_client.pair(code, target_device_id)
+
+    assert {response.status_code for response in failures} == {410}
+    assert correct_after_cap.status_code == 410
+    assert all(
+        response.json() == {"detail": "Pairing request denied."}
+        for response in [*failures, correct_after_cap]
+    )
+
+    async with auth_client.session_factory() as session:
+        pairing = (await session.execute(select(PairingCode))).scalar_one()
+    assert pairing.failed_attempts == 5
+    assert pairing.consumed_at is not None
+
+
+@pytest.mark.anyio
+async def test_pairing_source_throttle_blocks_one_source_without_blocking_another(
+    auth_client: AuthClient,
+) -> None:
+    await auth_client.bootstrap()
+    created, target_device_id = await auth_client.create_pairing_code()
+    valid_code = created.json()["code"]
+
+    for offset in range(20):
+        response = await auth_client.pair_from(
+            "198.51.100.10",
+            f"{900000 + offset:06d}",
+            str(uuid4()),
+        )
+        assert response.status_code == 410
+
+    blocked_valid = await auth_client.pair_from(
+        "198.51.100.10",
+        valid_code,
+        target_device_id,
+    )
+    other_source_valid = await auth_client.pair_from(
+        "198.51.100.11",
+        valid_code,
+        target_device_id,
+    )
+
+    assert blocked_valid.status_code == 410
+    assert blocked_valid.json() == {"detail": "Pairing request denied."}
+    assert other_source_valid.status_code == 200
+
+
+@pytest.mark.anyio
+async def test_unknown_and_target_mismatch_pairing_responses_are_indistinguishable(
+    auth_client: AuthClient,
+) -> None:
+    await auth_client.bootstrap()
+    created, _ = await auth_client.create_pairing_code()
+
+    unknown = await auth_client.pair("999999", str(uuid4()))
+    target_mismatch = await auth_client.pair(
+        created.json()["code"],
+        str(uuid4()),
+    )
+
+    assert unknown.status_code == target_mismatch.status_code == 410
+    assert unknown.json() == target_mismatch.json() == {
+        "detail": "Pairing request denied.",
+    }
 
 
 @pytest.mark.anyio
@@ -321,6 +537,19 @@ async def test_pairing_rejects_a_non_x25519_public_key(auth_client: AuthClient) 
 
     response, _ = await auth_client.create_pairing_code(
         target_device_public_key="dG9vLXNob3J0",
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_pairing_rejects_low_order_x25519_public_key(
+    auth_client: AuthClient,
+) -> None:
+    await auth_client.bootstrap()
+
+    response, _ = await auth_client.create_pairing_code(
+        target_device_public_key=LOW_ORDER_X25519_PUBLIC_KEY,
     )
 
     assert response.status_code == 422
@@ -437,3 +666,43 @@ async def test_revocation_invalidates_access_and_refresh_without_deleting_encryp
         )
     assert account_count == 1
     assert operation_count == 1
+
+
+@pytest.mark.anyio
+@pytest.mark.integration
+async def test_auth_tables_enable_and_force_row_level_security(database) -> None:
+    expected_policies = {
+        "auth_bootstrap_state": {
+            "auth_bootstrap_state_select_policy",
+            "auth_bootstrap_state_insert_policy",
+        },
+        "auth_refresh_sessions": {
+            "auth_refresh_sessions_select_policy",
+            "auth_refresh_sessions_insert_policy",
+            "auth_refresh_sessions_update_policy",
+        },
+        "auth_pairing_codes": {
+            "auth_pairing_codes_select_policy",
+            "auth_pairing_codes_insert_policy",
+            "auth_pairing_codes_update_policy",
+        },
+    }
+
+    for table_name, policy_names in expected_policies.items():
+        assert await database.row_security(table_name) == (True, True)
+        assert policy_names.issubset(await database.policy_names(table_name))
+
+
+@pytest.mark.anyio
+@pytest.mark.integration
+async def test_supabase_data_api_roles_have_no_application_table_privileges(database) -> None:
+    protected_tables = {
+        "accounts",
+        "devices",
+        "sync_operations",
+        "auth_bootstrap_state",
+        "auth_refresh_sessions",
+        "auth_pairing_codes",
+    }
+
+    assert await database.data_api_privileges(protected_tables) == set()

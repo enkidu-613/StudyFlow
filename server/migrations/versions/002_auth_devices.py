@@ -13,6 +13,12 @@ depends_on = None
 
 ACCOUNT_ID_RLS_EXPRESSION = "NULLIF(current_setting('app.account_id', true), '')::uuid"
 DEVICE_ID_RLS_EXPRESSION = "NULLIF(current_setting('app.device_id', true), '')::uuid"
+REFRESH_DIGEST_RLS_EXPRESSION = (
+    "decode(NULLIF(current_setting('app.refresh_token_digest', true), ''), 'hex')"
+)
+PAIRING_DIGEST_RLS_EXPRESSION = (
+    "decode(NULLIF(current_setting('app.pairing_code_digest', true), ''), 'hex')"
+)
 
 
 def upgrade() -> None:
@@ -82,6 +88,12 @@ def upgrade() -> None:
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("consumed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
+            "failed_attempts",
+            sa.Integer(),
+            nullable=False,
+            server_default=sa.text("0"),
+        ),
+        sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
             nullable=False,
@@ -98,12 +110,148 @@ def upgrade() -> None:
     op.create_index("ix_pairing_codes_digest", "auth_pairing_codes", ["code_digest"])
     op.create_index("ix_pairing_codes_account", "auth_pairing_codes", ["account_id"])
 
+    for table_name in (
+        "auth_bootstrap_state",
+        "auth_refresh_sessions",
+        "auth_pairing_codes",
+    ):
+        op.execute(sa.text(f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY"))
+        op.execute(sa.text(f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY"))
+
+    op.execute(
+        sa.text(
+            """
+            CREATE POLICY auth_bootstrap_state_select_policy ON auth_bootstrap_state
+            FOR SELECT
+            USING (state_key = 'primary-account')
+            """,
+        ),
+    )
+    op.execute(
+        sa.text(
+            f"""
+            CREATE POLICY auth_bootstrap_state_insert_policy ON auth_bootstrap_state
+            FOR INSERT
+            WITH CHECK (
+                state_key = 'primary-account'
+                AND account_id = {ACCOUNT_ID_RLS_EXPRESSION}
+            )
+            """,
+        ),
+    )
+    op.execute(
+        sa.text(
+            f"""
+            CREATE POLICY auth_refresh_sessions_select_policy ON auth_refresh_sessions
+            FOR SELECT
+            USING (
+                account_id = {ACCOUNT_ID_RLS_EXPRESSION}
+                OR token_digest = {REFRESH_DIGEST_RLS_EXPRESSION}
+            )
+            """,
+        ),
+    )
+    op.execute(
+        sa.text(
+            f"""
+            CREATE POLICY auth_refresh_sessions_insert_policy ON auth_refresh_sessions
+            FOR INSERT
+            WITH CHECK (account_id = {ACCOUNT_ID_RLS_EXPRESSION})
+            """,
+        ),
+    )
+    op.execute(
+        sa.text(
+            f"""
+            CREATE POLICY auth_refresh_sessions_update_policy ON auth_refresh_sessions
+            FOR UPDATE
+            USING (account_id = {ACCOUNT_ID_RLS_EXPRESSION})
+            WITH CHECK (account_id = {ACCOUNT_ID_RLS_EXPRESSION})
+            """,
+        ),
+    )
+    op.execute(
+        sa.text(
+            f"""
+            CREATE POLICY auth_pairing_codes_select_policy ON auth_pairing_codes
+            FOR SELECT
+            USING (
+                account_id = {ACCOUNT_ID_RLS_EXPRESSION}
+                OR code_digest = {PAIRING_DIGEST_RLS_EXPRESSION}
+            )
+            """,
+        ),
+    )
+    op.execute(
+        sa.text(
+            f"""
+            CREATE POLICY auth_pairing_codes_insert_policy ON auth_pairing_codes
+            FOR INSERT
+            WITH CHECK (account_id = {ACCOUNT_ID_RLS_EXPRESSION})
+            """,
+        ),
+    )
+    op.execute(
+        sa.text(
+            f"""
+            CREATE POLICY auth_pairing_codes_update_policy ON auth_pairing_codes
+            FOR UPDATE
+            USING (account_id = {ACCOUNT_ID_RLS_EXPRESSION})
+            WITH CHECK (account_id = {ACCOUNT_ID_RLS_EXPRESSION})
+            """,
+        ),
+    )
+
     op.execute(
         sa.text(
             f"""
             CREATE POLICY devices_auth_lookup_policy ON devices
             FOR SELECT
             USING (device_id = {DEVICE_ID_RLS_EXPRESSION})
+            """,
+        ),
+    )
+    op.execute(
+        sa.text(
+            f"""
+            CREATE POLICY accounts_update_policy ON accounts
+            FOR UPDATE
+            USING (account_id = {ACCOUNT_ID_RLS_EXPRESSION})
+            WITH CHECK (account_id = {ACCOUNT_ID_RLS_EXPRESSION})
+            """,
+        ),
+    )
+
+    op.execute(
+        sa.text(
+            """
+            DO $$
+            DECLARE
+                data_api_role text;
+                protected_table text;
+            BEGIN
+                FOREACH data_api_role IN ARRAY ARRAY['anon', 'authenticated', 'service_role']
+                LOOP
+                    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = data_api_role) THEN
+                        FOREACH protected_table IN ARRAY ARRAY[
+                            'accounts',
+                            'devices',
+                            'sync_operations',
+                            'auth_bootstrap_state',
+                            'auth_refresh_sessions',
+                            'auth_pairing_codes'
+                        ]
+                        LOOP
+                            EXECUTE format(
+                                'REVOKE ALL PRIVILEGES ON TABLE public.%I FROM %I',
+                                protected_table,
+                                data_api_role
+                            );
+                        END LOOP;
+                    END IF;
+                END LOOP;
+            END
+            $$
             """,
         ),
     )
@@ -120,8 +268,20 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.execute(sa.text("DROP POLICY IF EXISTS accounts_update_policy ON accounts"))
     op.execute(sa.text("DROP POLICY IF EXISTS devices_update_policy ON devices"))
     op.execute(sa.text("DROP POLICY IF EXISTS devices_auth_lookup_policy ON devices"))
+    for policy_name, table_name in (
+        ("auth_pairing_codes_update_policy", "auth_pairing_codes"),
+        ("auth_pairing_codes_insert_policy", "auth_pairing_codes"),
+        ("auth_pairing_codes_select_policy", "auth_pairing_codes"),
+        ("auth_refresh_sessions_update_policy", "auth_refresh_sessions"),
+        ("auth_refresh_sessions_insert_policy", "auth_refresh_sessions"),
+        ("auth_refresh_sessions_select_policy", "auth_refresh_sessions"),
+        ("auth_bootstrap_state_insert_policy", "auth_bootstrap_state"),
+        ("auth_bootstrap_state_select_policy", "auth_bootstrap_state"),
+    ):
+        op.execute(sa.text(f"DROP POLICY IF EXISTS {policy_name} ON {table_name}"))
     op.drop_index("ix_pairing_codes_account", table_name="auth_pairing_codes")
     op.drop_index("ix_pairing_codes_digest", table_name="auth_pairing_codes")
     op.drop_table("auth_pairing_codes")

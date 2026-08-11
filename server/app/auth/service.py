@@ -4,6 +4,7 @@ import asyncio
 import hmac
 import os
 import secrets
+from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -29,6 +30,10 @@ class AuthSettings:
     access_token_ttl: timedelta = timedelta(minutes=15)
     refresh_token_ttl: timedelta = timedelta(days=30)
     pairing_code_ttl: timedelta = timedelta(minutes=10)
+    pairing_code_attempt_limit: int = 5
+    pairing_source_attempt_limit: int = 20
+    pairing_source_window: timedelta = timedelta(minutes=10)
+    pairing_source_cache_size: int = 4096
 
     @classmethod
     def from_env(cls) -> AuthSettings:
@@ -75,6 +80,54 @@ class AuthServiceError(RuntimeError):
         self.status_code = status_code
         self.detail = detail
         super().__init__(detail)
+
+
+@dataclass(slots=True)
+class _PairingSourceWindow:
+    started_at: datetime
+    attempts: int
+
+
+class PairingSourceLimiter:
+    def __init__(
+        self,
+        signing_key: str,
+        *,
+        attempt_limit: int,
+        window: timedelta,
+        max_sources: int,
+    ) -> None:
+        if attempt_limit < 1 or window <= timedelta(0) or max_sources < 1:
+            raise ValueError("Pairing source limiter settings must be positive.")
+        self._signing_key = signing_key.encode("utf-8")
+        self._attempt_limit = attempt_limit
+        self._window = window
+        self._max_sources = max_sources
+        self._windows: OrderedDict[bytes, _PairingSourceWindow] = OrderedDict()
+        self._lock = asyncio.Lock()
+
+    async def consume(self, source: str, now: datetime) -> bool:
+        source_digest = hmac.new(
+            self._signing_key,
+            f"pairing-source\x00{source}".encode("utf-8"),
+            sha256,
+        ).digest()
+        async with self._lock:
+            current = self._windows.get(source_digest)
+            if current is None or now - current.started_at >= self._window:
+                self._windows[source_digest] = _PairingSourceWindow(
+                    started_at=now,
+                    attempts=1,
+                )
+                self._windows.move_to_end(source_digest)
+                while len(self._windows) > self._max_sources:
+                    self._windows.popitem(last=False)
+                return True
+            self._windows.move_to_end(source_digest)
+            if current.attempts >= self._attempt_limit:
+                return False
+            current.attempts += 1
+            return True
 
 
 class AccessTokenCodec:
@@ -147,6 +200,12 @@ class AuthService:
         self._clock = clock or (lambda: datetime.now(UTC))
         self._pairing_code_generator = pairing_code_generator or _random_pairing_code
         self._password_hasher = PasswordHasher(type=Type.ID)
+        self._pairing_source_limiter = PairingSourceLimiter(
+            settings.token_signing_key,
+            attempt_limit=settings.pairing_source_attempt_limit,
+            window=settings.pairing_source_window,
+            max_sources=settings.pairing_source_cache_size,
+        )
         self.access_tokens = AccessTokenCodec(
             settings.token_signing_key,
             clock=self._clock,
@@ -238,44 +297,68 @@ class AuthService:
     async def refresh(self, refresh_token: str) -> AuthSession:
         now = self._now()
         digest = self._secret_digest(refresh_token, purpose="refresh")
+        replacement: AuthSession | None = None
+        unauthorized = False
         async with self._session_factory() as session:
             async with session.begin():
+                await _set_postgres_context(session, refresh_token_digest=digest)
                 refresh_session = await session.scalar(
                     select(RefreshSession)
                     .where(RefreshSession.token_digest == digest)
                     .with_for_update(),
                 )
-                if (
-                    refresh_session is None
-                    or refresh_session.revoked_at is not None
-                    or _aware_utc(refresh_session.expires_at) <= now
-                ):
-                    raise AuthServiceError(401, "Invalid or expired refresh token.")
-                await _set_postgres_context(session, account_id=refresh_session.account_id)
-                device = await session.get(
-                    Device,
-                    {
-                        "account_id": refresh_session.account_id,
-                        "device_id": refresh_session.device_id,
-                    },
-                )
-                if device is None or device.revoked_at is not None:
-                    refresh_session.revoked_at = now
-                    raise AuthServiceError(401, "Invalid or expired refresh token.")
-                refresh_session.revoked_at = now
-                replacement = await self._issue_session(session, device, now)
-                replacement_row = await session.scalar(
-                    select(RefreshSession)
-                    .where(
-                        RefreshSession.account_id == device.account_id,
-                        RefreshSession.device_id == device.device_id,
-                        RefreshSession.token_digest
-                        == self._secret_digest(replacement.refresh_token, purpose="refresh"),
-                    ),
-                )
-                assert replacement_row is not None
-                refresh_session.replacement_session_id = replacement_row.session_id
-                return replacement
+                if refresh_session is None or _aware_utc(refresh_session.expires_at) <= now:
+                    unauthorized = True
+                elif refresh_session.revoked_at is not None:
+                    await _set_postgres_context(
+                        session,
+                        account_id=refresh_session.account_id,
+                    )
+                    await self._revoke_active_refresh_sessions(
+                        session,
+                        account_id=refresh_session.account_id,
+                        device_id=refresh_session.device_id,
+                        revoked_at=now,
+                    )
+                    unauthorized = True
+                else:
+                    await _set_postgres_context(session, account_id=refresh_session.account_id)
+                    device = await session.get(
+                        Device,
+                        {
+                            "account_id": refresh_session.account_id,
+                            "device_id": refresh_session.device_id,
+                        },
+                    )
+                    if device is None or device.revoked_at is not None:
+                        await self._revoke_active_refresh_sessions(
+                            session,
+                            account_id=refresh_session.account_id,
+                            device_id=refresh_session.device_id,
+                            revoked_at=now,
+                        )
+                        unauthorized = True
+                    else:
+                        refresh_session.revoked_at = now
+                        replacement = await self._issue_session(session, device, now)
+                        replacement_row = await session.scalar(
+                            select(RefreshSession)
+                            .where(
+                                RefreshSession.account_id == device.account_id,
+                                RefreshSession.device_id == device.device_id,
+                                RefreshSession.token_digest
+                                == self._secret_digest(
+                                    replacement.refresh_token,
+                                    purpose="refresh",
+                                ),
+                            ),
+                        )
+                        assert replacement_row is not None
+                        refresh_session.replacement_session_id = replacement_row.session_id
+
+        if unauthorized or replacement is None:
+            raise AuthServiceError(401, "Invalid or expired refresh token.")
+        return replacement
 
     async def authenticate_access_token(self, token: str) -> AuthIdentity:
         identity = self.access_tokens.decode(token)
@@ -332,11 +415,17 @@ class AuthService:
         code: str,
         device_id: UUID,
         device_public_key: str,
+        source: str,
     ) -> AuthSession:
         now = self._now()
+        if not await self._pairing_source_limiter.consume(source, now):
+            raise _pairing_denied()
         digest = self._secret_digest(code, purpose="pairing")
+        authenticated: AuthSession | None = None
+        denied = False
         async with self._session_factory() as session:
             async with session.begin():
+                await _set_postgres_context(session, pairing_code_digest=digest)
                 pairing = await session.scalar(
                     select(PairingCode)
                     .where(PairingCode.code_digest == digest)
@@ -348,32 +437,42 @@ class AuthService:
                     pairing is None
                     or pairing.consumed_at is not None
                     or _aware_utc(pairing.expires_at) <= now
+                    or pairing.failed_attempts >= self._settings.pairing_code_attempt_limit
                 ):
-                    raise AuthServiceError(410, "Pairing code is expired or already used.")
-                if (
+                    denied = True
+                elif (
                     pairing.target_device_id != device_id
                     or not hmac.compare_digest(
                         pairing.target_device_public_key,
                         device_public_key,
                     )
                 ):
-                    raise AuthServiceError(403, "Pairing request does not match the enrolled device.")
-                await _set_postgres_context(session, device_id=device_id)
-                if await self._find_device_by_id(session, device_id) is not None:
-                    raise AuthServiceError(409, "Device registration is unavailable.")
-                await _set_postgres_context(session, account_id=pairing.account_id)
-                device = Device(
-                    account_id=pairing.account_id,
-                    device_id=device_id,
-                    public_key=device_public_key,
-                    encrypted_account_data_key_envelope=(
-                        pairing.encrypted_account_data_key_envelope
-                    ),
-                )
-                session.add(device)
-                pairing.consumed_at = now
-                await session.flush()
-                return await self._issue_session(session, device, now)
+                    await _set_postgres_context(session, account_id=pairing.account_id)
+                    pairing.failed_attempts += 1
+                    if pairing.failed_attempts >= self._settings.pairing_code_attempt_limit:
+                        pairing.consumed_at = now
+                    denied = True
+                else:
+                    await _set_postgres_context(session, device_id=device_id)
+                    if await self._find_device_by_id(session, device_id) is not None:
+                        raise AuthServiceError(409, "Device registration is unavailable.")
+                    await _set_postgres_context(session, account_id=pairing.account_id)
+                    device = Device(
+                        account_id=pairing.account_id,
+                        device_id=device_id,
+                        public_key=device_public_key,
+                        encrypted_account_data_key_envelope=(
+                            pairing.encrypted_account_data_key_envelope
+                        ),
+                    )
+                    session.add(device)
+                    pairing.consumed_at = now
+                    await session.flush()
+                    authenticated = await self._issue_session(session, device, now)
+
+        if denied or authenticated is None:
+            raise _pairing_denied()
+        return authenticated
 
     async def revoke_device(self, identity: AuthIdentity, device_id: UUID) -> None:
         now = self._now()
@@ -427,6 +526,24 @@ class AuthService:
             encrypted_account_data_key_envelope=envelope,
         )
 
+    async def _revoke_active_refresh_sessions(
+        self,
+        session: AsyncSession,
+        *,
+        account_id: UUID,
+        device_id: UUID,
+        revoked_at: datetime,
+    ) -> None:
+        await session.execute(
+            update(RefreshSession)
+            .where(
+                RefreshSession.account_id == account_id,
+                RefreshSession.device_id == device_id,
+                RefreshSession.revoked_at.is_(None),
+            )
+            .values(revoked_at=revoked_at),
+        )
+
     async def _available_pairing_code(
         self,
         session: AsyncSession,
@@ -471,6 +588,8 @@ async def _set_postgres_context(
     *,
     account_id: UUID | None = None,
     device_id: UUID | None = None,
+    refresh_token_digest: bytes | None = None,
+    pairing_code_digest: bytes | None = None,
 ) -> None:
     bind = session.get_bind()
     if bind.dialect.name != "postgresql":
@@ -485,6 +604,22 @@ async def _set_postgres_context(
             text("SELECT set_config('app.device_id', :device_id, true)"),
             {"device_id": str(device_id)},
         )
+    if refresh_token_digest is not None:
+        await session.execute(
+            text(
+                "SELECT set_config('app.refresh_token_digest', "
+                ":refresh_token_digest, true)",
+            ),
+            {"refresh_token_digest": refresh_token_digest.hex()},
+        )
+    if pairing_code_digest is not None:
+        await session.execute(
+            text(
+                "SELECT set_config('app.pairing_code_digest', "
+                ":pairing_code_digest, true)",
+            ),
+            {"pairing_code_digest": pairing_code_digest.hex()},
+        )
 
 
 def _aware_utc(value: datetime) -> datetime:
@@ -495,3 +630,7 @@ def _aware_utc(value: datetime) -> datetime:
 
 def _random_pairing_code() -> str:
     return f"{secrets.randbelow(1_000_000):06d}"
+
+
+def _pairing_denied() -> AuthServiceError:
+    return AuthServiceError(410, "Pairing request denied.")

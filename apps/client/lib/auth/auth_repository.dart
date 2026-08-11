@@ -354,7 +354,15 @@ final class AuthRepository {
 
   Future<AuthContext> refresh() async {
     final current = _requireActiveContext();
-    final refreshed = await _api.refresh(refreshToken: current.refreshToken);
+    late final AuthContext refreshed;
+    try {
+      refreshed = await _api.refresh(refreshToken: current.refreshToken);
+    } on AuthApiException catch (error) {
+      if (error.statusCode == 401) {
+        await _clearActiveContext();
+      }
+      rethrow;
+    }
     if (refreshed.accountId != current.accountId ||
         refreshed.deviceId != current.deviceId) {
       await logout();
@@ -382,18 +390,27 @@ final class AuthRepository {
   Future<void> revokeDevice(String deviceId) async {
     final current = _requireActiveContext();
     final normalizedDeviceId = _normalizedUuid(deviceId, 'deviceId');
-    await _api.revokeDevice(
-      accessToken: current.accessToken,
-      deviceId: normalizedDeviceId,
-    );
+    try {
+      await _api.revokeDevice(
+        accessToken: current.accessToken,
+        deviceId: normalizedDeviceId,
+      );
+    } on AuthApiException catch (error) {
+      if (error.statusCode == 401) {
+        await _clearActiveContext();
+      }
+      rethrow;
+    }
     if (normalizedDeviceId == current.deviceId) {
       await logout();
     }
   }
 
-  Future<void> logout() async {
-    await _store.delete();
+  Future<void> logout() => _clearActiveContext();
+
+  Future<void> _clearActiveContext() async {
     _activeContext = null;
+    await _store.delete();
   }
 
   Future<AuthContext> _persist(AuthContext context) async {

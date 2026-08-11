@@ -14,6 +14,8 @@ const accountB = '22222222-2222-4222-8222-222222222222';
 const deviceA = '33333333-3333-4333-8333-333333333333';
 const deviceB = '44444444-4444-4444-8444-444444444444';
 const envelopeA = 'ZW5jcnlwdGVkLWVudmVsb3BlLWE=';
+const allZeroX25519PublicKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+const lowOrderX25519PublicKey = 'AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
 
 void main() {
   group('AuthRepository', () {
@@ -68,6 +70,23 @@ void main() {
       expect(store.serialized, isNull);
     });
 
+    test('refresh 401 clears stale in-memory and persisted auth context',
+        () async {
+      final store = MemoryAuthContextStore()..seed(contextA());
+      final api = FakeAuthApi()
+        ..refreshError = const AuthApiException(401, 'revoked');
+      final repository = AuthRepository(api: api, store: store);
+      await repository.restoreActiveContext();
+
+      await expectLater(
+        repository.refresh(),
+        throwsA(isA<AuthApiException>()),
+      );
+
+      expect(repository.activeContext, isNull);
+      expect(store.serialized, isNull);
+    });
+
     test('logout removes the whole active context', () async {
       final store = MemoryAuthContextStore()..seed(contextA());
       final repository = AuthRepository(api: FakeAuthApi(), store: store);
@@ -80,6 +99,20 @@ void main() {
       expect(store.deleteCount, 1);
     });
 
+    test('secure-store deletion failure still clears in-memory auth context',
+        () async {
+      final store = MemoryAuthContextStore()
+        ..seed(contextA())
+        ..deleteError = StateError('secure storage unavailable');
+      final repository = AuthRepository(api: FakeAuthApi(), store: store);
+      await repository.restoreActiveContext();
+
+      await expectLater(repository.logout(), throwsStateError);
+
+      expect(repository.activeContext, isNull);
+      expect(store.serialized, isNotNull);
+    });
+
     test('revoking the active device also clears local active context',
         () async {
       final store = MemoryAuthContextStore()..seed(contextA());
@@ -90,6 +123,22 @@ void main() {
       await repository.revokeDevice(deviceA);
 
       expect(api.revokedDeviceId, deviceA);
+      expect(repository.activeContext, isNull);
+      expect(store.serialized, isNull);
+    });
+
+    test('revocation 401 clears stale active context', () async {
+      final store = MemoryAuthContextStore()..seed(contextA());
+      final api = FakeAuthApi()
+        ..revokeError = const AuthApiException(401, 'revoked');
+      final repository = AuthRepository(api: api, store: store);
+      await repository.restoreActiveContext();
+
+      await expectLater(
+        repository.revokeDevice(deviceB),
+        throwsA(isA<AuthApiException>()),
+      );
+
       expect(repository.activeContext, isNull);
       expect(store.serialized, isNull);
     });
@@ -106,6 +155,29 @@ void main() {
   });
 
   group('device enrollment envelope', () {
+    test('envelope sealing rejects all-zero and low-order target public keys',
+        () async {
+      final source = DeviceEnrollmentCrypto(
+        accountId: accountA,
+        store: MemorySecureKeyStore(),
+      );
+      final accountDataKey = SecretKey(List<int>.filled(32, 7));
+
+      for (final publicKey in <String>[
+        allZeroX25519PublicKey,
+        lowOrderX25519PublicKey,
+      ]) {
+        await expectLater(
+          source.sealAccountDataKey(
+            accountDataKey: accountDataKey,
+            targetDeviceId: deviceB,
+            targetDevicePublicKey: publicKey,
+          ),
+          throwsA(isA<DeviceEnrollmentException>()),
+        );
+      }
+    });
+
     test('account data key opens only on the enrolled target device', () async {
       final sourceStore = MemorySecureKeyStore();
       final targetStore = MemorySecureKeyStore();
@@ -273,6 +345,8 @@ AuthContext contextA(
 
 class FakeAuthApi implements AuthApi {
   AuthContext? nextContext;
+  AuthApiException? refreshError;
+  AuthApiException? revokeError;
   int pairCallCount = 0;
   String? revokedDeviceId;
 
@@ -294,8 +368,13 @@ class FakeAuthApi implements AuthApi {
   }
 
   @override
-  Future<AuthContext> refresh({required String refreshToken}) async =>
-      _response;
+  Future<AuthContext> refresh({required String refreshToken}) async {
+    final error = refreshError;
+    if (error != null) {
+      throw error;
+    }
+    return _response;
+  }
 
   @override
   Future<PairingCodeResult> createPairingCode({
@@ -314,6 +393,10 @@ class FakeAuthApi implements AuthApi {
     required String accessToken,
     required String deviceId,
   }) async {
+    final error = revokeError;
+    if (error != null) {
+      throw error;
+    }
     revokedDeviceId = deviceId;
   }
 }
@@ -322,6 +405,7 @@ class MemoryAuthContextStore implements AuthContextStore {
   String? serialized;
   int writeCount = 0;
   int deleteCount = 0;
+  Object? deleteError;
 
   void seed(AuthContext context) => serialized = jsonEncode(context.toJson());
 
@@ -331,6 +415,10 @@ class MemoryAuthContextStore implements AuthContextStore {
   @override
   Future<void> delete() async {
     deleteCount += 1;
+    final error = deleteError;
+    if (error != null) {
+      throw error;
+    }
     serialized = null;
   }
 

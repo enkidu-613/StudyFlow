@@ -58,6 +58,59 @@ class DatabaseProbe:
 
         return set(result.scalars().all())
 
+    async def row_security(self, table_name: str) -> tuple[bool, bool]:
+        connection = await asyncpg.connect(self._database_url)
+        try:
+            row = await connection.fetchrow(
+                """
+                SELECT relrowsecurity, relforcerowsecurity
+                FROM pg_class
+                WHERE oid = to_regclass($1)
+                """,
+                f"public.{table_name}",
+            )
+        finally:
+            await connection.close()
+        if row is None:
+            raise AssertionError(f"Table {table_name} does not exist.")
+        return row["relrowsecurity"], row["relforcerowsecurity"]
+
+    async def policy_names(self, table_name: str) -> set[str]:
+        connection = await asyncpg.connect(self._database_url)
+        try:
+            rows = await connection.fetch(
+                """
+                SELECT policyname
+                FROM pg_policies
+                WHERE schemaname = 'public' AND tablename = $1
+                """,
+                table_name,
+            )
+        finally:
+            await connection.close()
+        return {row["policyname"] for row in rows}
+
+    async def data_api_privileges(self, table_names: set[str]) -> set[tuple[str, str, str]]:
+        connection = await asyncpg.connect(self._database_url)
+        try:
+            rows = await connection.fetch(
+                """
+                SELECT grantee, table_name, privilege_type
+                FROM information_schema.table_privileges
+                WHERE table_schema = 'public'
+                  AND grantee = ANY($1::text[])
+                  AND table_name = ANY($2::text[])
+                """,
+                ["anon", "authenticated", "service_role"],
+                sorted(table_names),
+            )
+        finally:
+            await connection.close()
+        return {
+            (row["grantee"], row["table_name"], row["privilege_type"])
+            for row in rows
+        }
+
 
 class TransactionReadinessProbe:
     def __init__(self, connection: AsyncConnection) -> None:

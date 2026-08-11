@@ -113,15 +113,41 @@ final class DeviceEnrollmentCrypto {
     required SimplePublicKey remotePublicKey,
     required String targetDeviceId,
   }) async {
-    final sharedSecret = await _keyExchange.sharedSecretKey(
-      keyPair: keyPair,
-      remotePublicKey: remotePublicKey,
-    );
-    return _keyDerivation.deriveKey(
-      secretKey: sharedSecret,
-      nonce: utf8.encode('$accountId\u0000$targetDeviceId'),
-      info: utf8.encode('studyflow-device-envelope-v1'),
-    );
+    try {
+      final sharedSecret = await _keyExchange.sharedSecretKey(
+        keyPair: keyPair,
+        remotePublicKey: remotePublicKey,
+      );
+      final sharedSecretBytes = Uint8List.fromList(
+        await sharedSecret.extractBytes(),
+      );
+      try {
+        var nonZeroAccumulator = 0;
+        for (final byte in sharedSecretBytes) {
+          nonZeroAccumulator |= byte;
+        }
+        if (sharedSecretBytes.length != 32 || nonZeroAccumulator == 0) {
+          throw const DeviceEnrollmentException(
+            'Device public key produced an invalid shared secret.',
+          );
+        }
+        return await _keyDerivation.deriveKey(
+          secretKey: SecretKey(sharedSecretBytes),
+          nonce: utf8.encode('$accountId\u0000$targetDeviceId'),
+          info: utf8.encode('studyflow-device-envelope-v1'),
+        );
+      } finally {
+        sharedSecretBytes.fillRange(0, sharedSecretBytes.length, 0);
+        sharedSecret.destroy();
+      }
+    } on DeviceEnrollmentException {
+      rethrow;
+    } on Object catch (error) {
+      throw DeviceEnrollmentException(
+        'Device public key exchange failed.',
+        cause: error,
+      );
+    }
   }
 
   List<int> _associatedData(String targetDeviceId) => utf8.encode(

@@ -17,6 +17,7 @@ from server.app.auth.models import (
     SessionResponse,
 )
 from server.app.auth.service import AuthIdentity, AuthService, AuthServiceError
+from server.app.db.context import AccountContext
 
 
 router = APIRouter()
@@ -47,6 +48,16 @@ async def get_auth_identity(
         return await service.authenticate_access_token(credentials.credentials)
     except AuthServiceError as exc:
         raise _http_error(exc) from exc
+
+
+async def get_account_context(
+    identity: Annotated[AuthIdentity, Depends(get_auth_identity)],
+) -> AccountContext:
+    """Return the verified account/device boundary for protected data routes."""
+    return AccountContext(
+        account_id=identity.account_id,
+        device_id=identity.device_id,
+    )
 
 
 @router.post(
@@ -128,14 +139,16 @@ async def create_pairing_code(
 
 @router.post("/v1/devices/pair", response_model=AuthResponse)
 async def pair_device(
-    request: PairDeviceRequest,
+    payload: PairDeviceRequest,
+    request: Request,
     service: Annotated[AuthService, Depends(get_auth_service)],
 ) -> AuthResponse:
     try:
         authenticated = await service.pair(
-            code=request.code,
-            device_id=request.device_id,
-            device_public_key=request.device_public_key,
+            code=payload.code,
+            device_id=payload.device_id,
+            device_public_key=payload.device_public_key,
+            source=request.client.host if request.client is not None else "unknown",
         )
     except AuthServiceError as exc:
         raise _http_error(exc) from exc

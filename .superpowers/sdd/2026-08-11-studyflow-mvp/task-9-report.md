@@ -210,3 +210,90 @@ tests all ran successfully.
   boundary before exposing the endpoint publicly.
 - Android Keystore and macOS Keychain behavior still requires native runner
   validation when the Android SDK and full Xcode toolchain are available.
+
+## Fix round 1 — 2026-08-11
+
+### Review findings addressed
+
+- Hardened X25519 input validation on bootstrap and pairing. The server now
+  performs a safe ephemeral exchange and rejects exchange errors or an
+  all-zero shared secret, rather than accepting any 32-byte value. The Flutter
+  envelope code applies the same fail-closed checks before HKDF and clears its
+  extracted shared-secret buffer. Regression coverage includes all-zero and
+  low-order inputs for bootstrap, pairing, and client envelope sealing.
+- Changed refresh-token replay handling so reuse of any rotated token revokes
+  every still-active refresh session for that account/device. Both
+  attacker-first and legitimate-first orderings prove the issued replacement
+  can no longer refresh after replay is detected.
+- Enabled and forced PostgreSQL RLS on bootstrap, refresh-session, and pairing
+  tables; added capability-digest/account-scoped policies; added the account
+  update policy needed for Argon2 rehashing; and revoked application-table
+  privileges from Supabase Data API roles when those roles exist. Deployment
+  documentation now requires a dedicated non-BYPASSRLS server LOGIN role.
+- Made client cleanup fail closed. Refresh/revocation HTTP 401 responses clear
+  the in-memory `AuthContext`, and all cleanup paths clear memory before secure
+  storage deletion, so a storage failure cannot leave stale credentials active.
+- Added a persistent per-code failure count capped at five attempts and a
+  bounded in-memory per-source limiter of twenty attempts per ten minutes.
+  Unknown, expired, consumed, throttled, and target-mismatch attempts return the
+  same HTTP 410 pairing denial where practical.
+- Added `get_account_context` for future protected routes. It is derived only
+  after access-token validation rechecks the exact account/device ownership row
+  and rejects a revoked device. No sync routes were implemented.
+
+### TDD and verification evidence
+
+The new regressions failed before implementation: low-order keys were accepted,
+rotated replacements remained usable after replay, pairing attempts had no cap
+or source throttle, client memory retained stale auth state, and the
+`get_account_context` dependency did not exist.
+
+Final bounded verification used only mise-managed commands:
+
+```text
+mise exec -- poetry --directory server run pytest -q
+36 passed, 8 skipped in 1.18s
+
+mise exec -- poetry --directory server run pytest -q -rs
+36 passed, 8 skipped in 0.91s
+
+mise exec -- flutter test
+38 tests passed
+
+mise exec -- flutter analyze
+No issues found! (ran in 4.9s)
+
+mise exec -- poetry --directory server check
+Exit 0; only Poetry metadata deprecation warnings
+
+mise exec -- poetry --directory server run alembic heads
+002_auth_devices (head)
+
+git diff --check
+No output
+```
+
+The eight server skips are all isolated PostgreSQL integration checks because
+`STUDYFLOW_TEST_DATABASE_URL` is absent. Two of those new checks assert RLS,
+force-RLS, expected auth policies, and absence of Data API role privileges.
+No database or production credentials were used.
+
+### Security self-review and remaining concerns
+
+- Access and refresh identities remain account/device-bound; all device reads
+  used for authentication or mutation verify the owning account and revocation
+  state. Refresh replay response mutations commit before returning HTTP 401.
+- Pairing codes and refresh tokens remain server-side HMAC digests; source
+  identifiers are also HMAC-digested before entering the bounded limiter.
+- Pairing response bodies no longer distinguish unknown codes from known-code
+  target mismatches. No secrets, raw recovery keys, or credentials are logged.
+- The PostgreSQL migration and policy assertions could not execute without the
+  isolated test database configuration. They must pass against a non-production
+  PostgreSQL instance before deployment.
+- The source limiter is process-local. Multi-worker deployment should use a
+  shared limiter or enforce an equivalent limit at the trusted reverse proxy,
+  and must ensure FastAPI receives the intended client IP rather than an
+  untrusted forwarded value or only the proxy address.
+- Native Keychain/Keystore checks remain unavailable under the previously
+  recorded environment constraints (no full Xcode toolchain or Android SDK);
+  this round did not wait on or use those unavailable checks.
