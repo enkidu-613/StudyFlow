@@ -7,13 +7,19 @@ from server.app.db.engine import (
     create_engine_from_env,
     create_session_factory,
 )
-from server.app.db.repositories import InsertResult, SyncOperationPayload, SyncOperationRepository
+from server.app.db.repositories import (
+    DeviceOwnershipConflictError,
+    InsertResult,
+    SyncOperationPayload,
+    SyncOperationRepository,
+)
 
 __all__ = [
     "AccountContext",
     "DatabaseConfigurationError",
     "DatabaseReadinessProbe",
     "DatabaseReadinessResult",
+    "DeviceOwnershipConflictError",
     "InsertResult",
     "MissingDatabaseReadinessProbe",
     "SyncOperationPayload",

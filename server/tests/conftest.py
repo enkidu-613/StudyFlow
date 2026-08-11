@@ -76,20 +76,29 @@ def _build_alembic_config(database_url: str) -> Config:
     return config
 
 
-@pytest.fixture(scope="session")
-def anyio_backend() -> str:
-    return "asyncio"
-
-
-@pytest.fixture(scope="session")
-async def database() -> AsyncIterator[DatabaseProbe]:
+def _require_test_database_url() -> str:
     database_url = os.getenv("STUDYFLOW_TEST_DATABASE_URL")
     if not database_url:
         pytest.skip(
             "STUDYFLOW_TEST_DATABASE_URL is not set; configure an isolated "
             "PostgreSQL database for integration tests.",
         )
+    return database_url
 
+
+@pytest.fixture(scope="session")
+def anyio_backend() -> str:
+    return "asyncio"
+
+
+@pytest.fixture(scope="session")
+def test_database_url() -> str:
+    return _require_test_database_url()
+
+
+@pytest.fixture(scope="session")
+async def database() -> AsyncIterator[DatabaseProbe]:
+    database_url = _require_test_database_url()
     command.upgrade(_build_alembic_config(database_url), "head")
     engine = create_engine_from_env(database_url)
     try:

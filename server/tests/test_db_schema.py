@@ -1,9 +1,41 @@
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import UniqueConstraint
 
+from server.app.db.models import Device, SyncOperation
 from server.app.db.context import AccountContext
-from server.app.db.repositories import SyncOperationPayload, SyncOperationRepository
+from server.app.db.repositories import (
+    DeviceOwnershipConflictError,
+    SyncOperationPayload,
+    SyncOperationRepository,
+)
+
+
+def test_device_table_scopes_ownership_by_account_and_keeps_device_id_globally_unique() -> None:
+    primary_key_columns = {column.name for column in Device.__table__.primary_key.columns}
+    unique_constraints = {
+        tuple(column.name for column in constraint.columns)
+        for constraint in Device.__table__.constraints
+        if isinstance(constraint, UniqueConstraint)
+    }
+
+    assert primary_key_columns == {"account_id", "device_id"}
+    assert ("device_id",) in unique_constraints
+
+
+def test_sync_operations_reference_the_account_device_pair() -> None:
+    device_foreign_keys = [
+        constraint
+        for constraint in SyncOperation.__table__.foreign_key_constraints
+        if constraint.referred_table is Device.__table__
+    ]
+
+    assert len(device_foreign_keys) == 1
+    assert {element.parent.name for element in device_foreign_keys[0].elements} == {
+        "account_id",
+        "device_id",
+    }
 
 
 @pytest.mark.anyio
@@ -90,3 +122,34 @@ async def test_insert_operation_is_idempotent_per_account_and_operation(database
     assert first_insert.server_sequence is not None
     assert second_insert.inserted is False
     assert second_insert.server_sequence is None
+
+
+@pytest.mark.anyio
+@pytest.mark.integration
+async def test_reusing_a_device_id_for_another_account_raises_an_explicit_conflict(database) -> None:
+    repository = SyncOperationRepository(database.session_factory)
+    shared_device_id = uuid4()
+
+    first_context = AccountContext(account_id=uuid4(), device_id=shared_device_id)
+    second_context = AccountContext(account_id=uuid4(), device_id=shared_device_id)
+
+    await repository.insert_operation(
+        first_context,
+        SyncOperationPayload(
+            operation_id=uuid4(),
+            record_id=uuid4(),
+            payload_nonce=b"nonce-owner-a",
+            payload_ciphertext=b"ciphertext-owner-a",
+        ),
+    )
+
+    with pytest.raises(DeviceOwnershipConflictError, match="already belongs to account"):
+        await repository.insert_operation(
+            second_context,
+            SyncOperationPayload(
+                operation_id=uuid4(),
+                record_id=uuid4(),
+                payload_nonce=b"nonce-owner-b",
+                payload_ciphertext=b"ciphertext-owner-b",
+            ),
+        )

@@ -36,8 +36,8 @@ def upgrade() -> None:
 
     op.create_table(
         "devices",
-        sa.Column("device_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("account_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("device_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -45,7 +45,8 @@ def upgrade() -> None:
             server_default=sa.text("timezone('utc', now())"),
         ),
         sa.ForeignKeyConstraint(["account_id"], ["accounts.account_id"], ondelete="CASCADE"),
-        sa.PrimaryKeyConstraint("device_id"),
+        sa.PrimaryKeyConstraint("account_id", "device_id", name="pk_devices"),
+        sa.UniqueConstraint("device_id", name="uq_devices_device_id"),
     )
     op.create_index("ix_devices_account_id", "devices", ["account_id"], unique=False)
 
@@ -71,7 +72,12 @@ def upgrade() -> None:
             server_default=sa.text("timezone('utc', now())"),
         ),
         sa.ForeignKeyConstraint(["account_id"], ["accounts.account_id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(["device_id"], ["devices.device_id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["account_id", "device_id"],
+            ["devices.account_id", "devices.device_id"],
+            ondelete="CASCADE",
+            name="fk_sync_operations_account_device",
+        ),
         sa.PrimaryKeyConstraint("server_sequence"),
         sa.UniqueConstraint("account_id", "operation_id", name="uq_sync_operations_account_operation"),
     )

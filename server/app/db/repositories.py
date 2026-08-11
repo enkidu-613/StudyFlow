@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -24,6 +24,15 @@ class SyncOperationPayload:
 class InsertResult:
     inserted: bool
     server_sequence: int | None
+
+
+class DeviceOwnershipConflictError(RuntimeError):
+    def __init__(self, device_id: UUID, owner_account_id: UUID) -> None:
+        self.device_id = device_id
+        self.owner_account_id = owner_account_id
+        super().__init__(
+            f"Device {device_id} already belongs to account {owner_account_id}.",
+        )
 
 
 class SyncOperationRepository:
@@ -66,7 +75,10 @@ class SyncOperationRepository:
 
 
 async def _set_account_context(session: AsyncSession, context: AccountContext) -> None:
-    await session.execute(text(f"SET LOCAL app.account_id = '{context.account_id}'"))
+    await session.execute(
+        text("SELECT set_config('app.account_id', :account_id, true)"),
+        {"account_id": str(context.account_id)},
+    )
 
 
 async def _ensure_account_and_device(session: AsyncSession, context: AccountContext) -> None:
@@ -75,8 +87,19 @@ async def _ensure_account_and_device(session: AsyncSession, context: AccountCont
         .values(account_id=context.account_id)
         .on_conflict_do_nothing(index_elements=["account_id"]),
     )
-    await session.execute(
+    insert_result = await session.execute(
         insert(Device)
         .values(device_id=context.device_id, account_id=context.account_id)
         .on_conflict_do_nothing(index_elements=["device_id"]),
+        execution_options={"populate_existing": True},
     )
+    if insert_result.rowcount and insert_result.rowcount > 0:
+        return
+
+    owner_account_id = await session.scalar(
+        select(Device.account_id).where(Device.device_id == context.device_id),
+    )
+    if owner_account_id is None:
+        raise RuntimeError(f"Device ownership lookup failed for {context.device_id}.")
+    if owner_account_id != context.account_id:
+        raise DeviceOwnershipConflictError(context.device_id, owner_account_id)

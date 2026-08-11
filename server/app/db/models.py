@@ -3,7 +3,18 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Identity, Index, LargeBinary, UniqueConstraint, func
+from sqlalchemy import (
+    BigInteger,
+    DateTime,
+    ForeignKey,
+    ForeignKeyConstraint,
+    Identity,
+    Index,
+    LargeBinary,
+    PrimaryKeyConstraint,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -28,13 +39,20 @@ class Account(TimestampedModel, Base):
 
 class Device(TimestampedModel, Base):
     __tablename__ = "devices"
+    __table_args__ = (
+        PrimaryKeyConstraint("account_id", "device_id", name="pk_devices"),
+        UniqueConstraint("device_id", name="uq_devices_device_id"),
+    )
 
-    device_id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), primary_key=True)
     account_id: Mapped[UUID] = mapped_column(
         PostgreSQLUUID(as_uuid=True),
         ForeignKey("accounts.account_id", ondelete="CASCADE"),
+        primary_key=True,
         nullable=False,
-        index=True,
+    )
+    device_id: Mapped[UUID] = mapped_column(
+        PostgreSQLUUID(as_uuid=True),
+        primary_key=True,
     )
 
 
@@ -43,6 +61,12 @@ class SyncOperation(TimestampedModel, Base):
     __table_args__ = (
         UniqueConstraint("account_id", "operation_id", name="uq_sync_operations_account_operation"),
         Index("ix_sync_operations_account_server_sequence", "account_id", "server_sequence"),
+        ForeignKeyConstraint(
+            ["account_id", "device_id"],
+            ["devices.account_id", "devices.device_id"],
+            ondelete="CASCADE",
+            name="fk_sync_operations_account_device",
+        ),
     )
 
     server_sequence: Mapped[int] = mapped_column(
@@ -58,7 +82,6 @@ class SyncOperation(TimestampedModel, Base):
     )
     device_id: Mapped[UUID] = mapped_column(
         PostgreSQLUUID(as_uuid=True),
-        ForeignKey("devices.device_id", ondelete="CASCADE"),
         nullable=False,
     )
     operation_id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), nullable=False)
