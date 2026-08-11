@@ -1,0 +1,6 @@
+name: studyflow_platform_contract
+description: Shared StudyFlow platform contracts.
+version: 0.1.0
+publish_to: none
+environment:
+  sdk: ">=3.0.0 <4.0.0"

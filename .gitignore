@@ -1,24 +1,23 @@
-.worktrees/
-.DS_Store
-
-# Local environment and secrets
+.dart_tool/
+.idea/
+.vscode/
+build/
+coverage/
+*.iml
+*.log
+*.py[cod]
+__pycache__/
+.venv/
+poetry.lock
+*.sqlite3
 .env
 .env.*
 !.env.example
-
-# Python
-__pycache__/
+**/.DS_Store
+.worktrees/
+artifacts/
 .pytest_cache/
 .mypy_cache/
-.venv/
 server/.venv/
-
-# Flutter/Dart
-.dart_tool/
-apps/client/build/
 apps/client/.flutter-plugins
 apps/client/.flutter-plugins-dependencies
-
-# Local test artifacts
-artifacts/
-coverage/

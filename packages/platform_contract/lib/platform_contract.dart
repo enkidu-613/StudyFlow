@@ -1,0 +1,1 @@
+library studyflow_platform_contract;
