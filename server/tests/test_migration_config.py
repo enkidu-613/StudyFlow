@@ -46,28 +46,28 @@ def _alembic_config(database_url: str) -> Config:
     return config
 
 
-def test_alembic_offline_configuration_rejects_transaction_pooler_port() -> None:
+LOCAL_DATABASE_URL = "postgresql://studyflow:password@postgres:5432/studyflow"
+
+
+def test_alembic_offline_configuration_rejects_supabase_pooler_url() -> None:
     with pytest.raises(
         RuntimeError,
-        match="Supavisor session pooler.*port 5432",
+        match="Supabase URLs are no longer supported",
     ):
         command.upgrade(
             _alembic_config(
                 "postgresql://studyflow_server.project-ref:password"
-                "@aws-0-us-east-1.pooler.supabase.com:6543/postgres",
+                "@aws-0-us-east-1.pooler.supabase.com:5432/postgres",
             ),
             "head",
             sql=True,
         )
 
 
-def test_alembic_offline_configuration_accepts_session_pooler_port(
+def test_alembic_offline_configuration_accepts_local_postgres(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    config = _alembic_config(
-        "postgresql://studyflow_server.project-ref:password"
-        "@aws-0-us-east-1.pooler.supabase.com:5432/postgres",
-    )
+    config = _alembic_config(LOCAL_DATABASE_URL)
 
     command.upgrade(config, "head", sql=True)
 
@@ -93,10 +93,7 @@ def test_alembic_online_configuration_uses_async_engine_and_run_sync() -> None:
         ),
     ):
         command.upgrade(
-            _alembic_config(
-                "postgresql://studyflow_server.project-ref:password"
-                "@aws-0-us-east-1.pooler.supabase.com:5432/postgres",
-            ),
+            _alembic_config(LOCAL_DATABASE_URL),
             "head",
         )
 

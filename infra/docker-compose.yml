@@ -1,4 +1,21 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${STUDYFLOW_POSTGRES_DB}
+      POSTGRES_USER: ${STUDYFLOW_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${STUDYFLOW_POSTGRES_PASSWORD}
+    volumes:
+      - studyflow_postgres:/var/lib/postgresql/data
+    networks:
+      - studyflow
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   api:
     build:
       context: ..
@@ -9,9 +26,11 @@ services:
       - "8000"
     networks:
       - studyflow
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
       STUDYFLOW_DATABASE_URL: ${STUDYFLOW_DATABASE_URL}
-      STUDYFLOW_BOOTSTRAP_TOKEN: ${STUDYFLOW_BOOTSTRAP_TOKEN}
       STUDYFLOW_TOKEN_SIGNING_KEY: ${STUDYFLOW_TOKEN_SIGNING_KEY}
     healthcheck:
       test:
@@ -44,5 +63,6 @@ networks:
     driver: bridge
 
 volumes:
+  studyflow_postgres:
   caddy_data:
   caddy_config:

@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy import text
 
-from server.app.db.config import load_database_settings
+from server.app.db.config import load_database_settings, normalize_database_url
 from server.app.db.engine import DatabaseConfigurationError, create_engine_from_env
 
 
@@ -25,45 +25,44 @@ def test_create_engine_rejects_sqlite_urls() -> None:
 
 @pytest.mark.parametrize(
     "runtime_role",
-    ["postgres", "postgres.project-ref", "anon", "authenticated", "service_role"],
+    ["postgres", "anon", "authenticated", "service_role"],
 )
 def test_create_engine_rejects_privileged_or_data_api_runtime_roles(
     runtime_role: str,
 ) -> None:
     with pytest.raises(
         DatabaseConfigurationError,
-        match="dedicated non-BYPASSRLS application role",
+        match="dedicated application role",
     ):
         create_engine_from_env(
-            f"postgresql://{runtime_role}:password@pooler.example.test:5432/postgres",
+            f"postgresql://{runtime_role}:password@db.example.test:5432/studyflow",
         )
 
 
-def test_create_engine_rejects_supavisor_transaction_pooler_port() -> None:
+def test_create_engine_rejects_supabase_pooler_urls() -> None:
     with pytest.raises(
         DatabaseConfigurationError,
-        match="Supavisor session pooler.*port 5432",
+        match="Supabase URLs are no longer supported",
     ):
         create_engine_from_env(
             "postgresql://studyflow_server.project-ref:password"
-            "@aws-0-us-east-1.pooler.supabase.com:6543/postgres",
+            "@aws-0-us-east-1.pooler.supabase.com:5432/postgres",
         )
 
 
-def test_load_database_settings_accepts_supavisor_session_pooler_port() -> None:
+def test_load_database_settings_accepts_local_postgres() -> None:
     settings = load_database_settings(
-        "postgresql://studyflow_server.project-ref:password"
-        "@aws-0-us-east-1.pooler.supabase.com:5432/postgres",
+        "postgresql://studyflow:password@postgres:5432/studyflow",
     )
 
-    assert settings.url.startswith("postgresql+asyncpg://")
-    assert ":5432/postgres" in settings.url
+    assert settings.url == (
+        "postgresql+asyncpg://studyflow:password@postgres:5432/studyflow"
+    )
 
 
 def test_load_database_settings_translates_postgres_sslmode_for_asyncpg() -> None:
     settings = load_database_settings(
-        "postgresql://studyflow_server.project-ref:password"
-        "@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require",
+        "postgresql://studyflow:password@db.example.test:5432/studyflow?sslmode=require",
     )
 
     assert "ssl=require" in settings.url
@@ -72,11 +71,11 @@ def test_load_database_settings_translates_postgres_sslmode_for_asyncpg() -> Non
 
 def test_load_database_settings_preserves_direct_postgres_connectivity() -> None:
     settings = load_database_settings(
-        "postgresql://studyflow_server:password@db.example.test:6543/postgres",
+        "postgresql://studyflow:password@db.example.test:5432/studyflow",
     )
 
     assert settings.url == (
-        "postgresql+asyncpg://studyflow_server:password@db.example.test:6543/postgres"
+        "postgresql+asyncpg://studyflow:password@db.example.test:5432/studyflow"
     )
 
 
