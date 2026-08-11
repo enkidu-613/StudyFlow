@@ -18,6 +18,15 @@ alembic = "^1.13.0"
 pytest = "^8.3.0"
 httpx = "^0.27.0"
 
+[tool.pytest.ini_options]
+markers = [
+    "integration: requires STUDYFLOW_TEST_DATABASE_URL and applies real PostgreSQL migrations",
+]
+
+[tool.alembic]
+script_location = "migrations"
+prepend_sys_path = ".."
+
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"

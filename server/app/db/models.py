@@ -1,0 +1,68 @@
+from __future__ import annotations
+
+from datetime import datetime
+from uuid import UUID
+
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Identity, Index, LargeBinary, UniqueConstraint, func
+from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class TimestampedModel:
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+
+class Account(TimestampedModel, Base):
+    __tablename__ = "accounts"
+
+    account_id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), primary_key=True)
+
+
+class Device(TimestampedModel, Base):
+    __tablename__ = "devices"
+
+    device_id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), primary_key=True)
+    account_id: Mapped[UUID] = mapped_column(
+        PostgreSQLUUID(as_uuid=True),
+        ForeignKey("accounts.account_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+
+class SyncOperation(TimestampedModel, Base):
+    __tablename__ = "sync_operations"
+    __table_args__ = (
+        UniqueConstraint("account_id", "operation_id", name="uq_sync_operations_account_operation"),
+        Index("ix_sync_operations_account_server_sequence", "account_id", "server_sequence"),
+    )
+
+    server_sequence: Mapped[int] = mapped_column(
+        BigInteger,
+        Identity(always=False),
+        primary_key=True,
+    )
+    account_id: Mapped[UUID] = mapped_column(
+        PostgreSQLUUID(as_uuid=True),
+        ForeignKey("accounts.account_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    device_id: Mapped[UUID] = mapped_column(
+        PostgreSQLUUID(as_uuid=True),
+        ForeignKey("devices.device_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    operation_id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), nullable=False)
+    record_id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), nullable=False)
+    payload_nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    payload_ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    is_tombstone: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="false")
