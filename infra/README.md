@@ -388,11 +388,17 @@ bash ../../tool/flutter run \
 
 ## 九、备份与恢复检查
 
+从 Supabase 切换到本地 PostgreSQL 前，如需保留旧数据，先按
+`docs/superpowers/specs/2026-08-12-local-postgres-migration-boundary.md`
+执行独立加密归档：在当前 shell 设置 `OLD_DATABASE_URL`（标准
+`postgresql://` URL，不要用 `postgresql+asyncpg://`）和
+`STUDYFLOW_BACKUP_PASSPHRASE` 后执行备份。旧 Supabase URL 不写入 `.env`。
+
 执行加密备份：
 
 ~~~bash
 export STUDYFLOW_BACKUP_PASSPHRASE='你的备份密码'
-export STUDYFLOW_DATABASE_URL='postgresql://...pooler.supabase.com:5432/postgres?sslmode=require'
+export STUDYFLOW_DATABASE_URL='postgresql://...'
 sudo -E /home/studyflow/app/infra/backup/backup.sh
 ~~~
 

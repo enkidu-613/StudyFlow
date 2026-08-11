@@ -4,7 +4,7 @@
 # Requirements:
 #   - psql/pg_dump (PostgreSQL client tools)
 #   - openssl (encryption)
-#   - STUDYFLOW_DATABASE_URL (Supabase session pooler URL)
+#   - STUDYFLOW_DATABASE_URL or OLD_DATABASE_URL (standard postgresql:// URL)
 #   - STUDYFLOW_BACKUP_PASSPHRASE
 #
 # Behavior:
@@ -15,7 +15,7 @@
 set -euo pipefail
 
 BACKUP_DIR="${STUDYFLOW_BACKUP_DIR:-/var/backups/studyflow}"
-DATABASE_URL="${STUDYFLOW_DATABASE_URL:-}"
+DATABASE_URL="${OLD_DATABASE_URL:-${STUDYFLOW_DATABASE_URL:-}}"
 PASSPHRASE="${STUDYFLOW_BACKUP_PASSPHRASE:-}"
 
 if [[ -z "$PASSPHRASE" ]]; then
@@ -23,7 +23,12 @@ if [[ -z "$PASSPHRASE" ]]; then
     exit 1
 fi
 if [[ -z "$DATABASE_URL" ]]; then
-    echo "STUDYFLOW_DATABASE_URL is required." >&2
+    echo "STUDYFLOW_DATABASE_URL or OLD_DATABASE_URL is required." >&2
+    exit 1
+fi
+if [[ "$DATABASE_URL" == postgresql+asyncpg://* ]]; then
+    echo "DATABASE_URL must be a standard postgresql:// URL for pg_dump; " \
+        "do not use postgresql+asyncpg://." >&2
     exit 1
 fi
 

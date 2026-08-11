@@ -51,6 +51,12 @@ if [[ -z "$target_url" ]]; then
     exit 0
 fi
 
+if [[ "$target_url" == postgresql+asyncpg://* ]]; then
+    echo "target-db-url must be a standard postgresql:// URL for psql; " \
+        "do not use postgresql+asyncpg://." >&2
+    exit 1
+fi
+
 if ! psql --dbname="$target_url" --set ON_ERROR_STOP=1 --quiet < "$plaintext" >/dev/null; then
     echo "Restore into target failed." >&2
     exit 1
