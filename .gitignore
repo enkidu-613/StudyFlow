@@ -10,6 +10,8 @@ __pycache__/
 .venv/
 poetry.lock
 !server/poetry.lock
+**/pubspec.lock
+!apps/client/pubspec.lock
 *.sqlite3
 .env
 .env.*
