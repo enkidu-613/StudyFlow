@@ -35,8 +35,8 @@ def get_database_url() -> str:
         return environment_url
 
     raise RuntimeError(
-        "STUDYFLOW_DATABASE_URL is not set. Configure the Supabase session pooler "
-        "URL before running Alembic commands.",
+        "STUDYFLOW_DATABASE_URL is not set. Configure the Supavisor session pooler "
+        "URL on port 5432 before running Alembic commands.",
     )
 
 

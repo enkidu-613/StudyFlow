@@ -1,6 +1,7 @@
 import pytest
 from sqlalchemy import text
 
+from server.app.db.config import load_database_settings
 from server.app.db.engine import DatabaseConfigurationError, create_engine_from_env
 
 
@@ -34,8 +35,39 @@ def test_create_engine_rejects_privileged_or_data_api_runtime_roles(
         match="dedicated non-BYPASSRLS application role",
     ):
         create_engine_from_env(
-            f"postgresql://{runtime_role}:password@pooler.example.test:6543/postgres",
+            f"postgresql://{runtime_role}:password@pooler.example.test:5432/postgres",
         )
+
+
+def test_create_engine_rejects_supavisor_transaction_pooler_port() -> None:
+    with pytest.raises(
+        DatabaseConfigurationError,
+        match="Supavisor session pooler.*port 5432",
+    ):
+        create_engine_from_env(
+            "postgresql://studyflow_server.project-ref:password"
+            "@aws-0-us-east-1.pooler.supabase.com:6543/postgres",
+        )
+
+
+def test_load_database_settings_accepts_supavisor_session_pooler_port() -> None:
+    settings = load_database_settings(
+        "postgresql://studyflow_server.project-ref:password"
+        "@aws-0-us-east-1.pooler.supabase.com:5432/postgres",
+    )
+
+    assert settings.url.startswith("postgresql+asyncpg://")
+    assert ":5432/postgres" in settings.url
+
+
+def test_load_database_settings_preserves_direct_postgres_connectivity() -> None:
+    settings = load_database_settings(
+        "postgresql://studyflow_server:password@db.example.test:6543/postgres",
+    )
+
+    assert settings.url == (
+        "postgresql+asyncpg://studyflow_server:password@db.example.test:6543/postgres"
+    )
 
 
 @pytest.mark.anyio
