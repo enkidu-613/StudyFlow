@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from logging.config import fileConfig
-import os
 from pathlib import Path
 import sys
 
@@ -14,6 +13,7 @@ WORKSPACE_ROOT = SERVER_ROOT.parent
 if str(WORKSPACE_ROOT) not in sys.path:
     sys.path.insert(0, str(WORKSPACE_ROOT))
 
+from server.app.db.config import load_database_settings  # noqa: E402
 from server.app.db.models import Base  # noqa: E402
 
 
@@ -27,17 +27,10 @@ target_metadata = Base.metadata
 
 def get_database_url() -> str:
     configured_url = config.get_main_option("sqlalchemy.url")
-    if configured_url:
-        return configured_url
-
-    environment_url = os.getenv("STUDYFLOW_DATABASE_URL")
-    if environment_url:
-        return environment_url
-
-    raise RuntimeError(
-        "STUDYFLOW_DATABASE_URL is not set. Configure the Supavisor session pooler "
-        "URL on port 5432 before running Alembic commands.",
-    )
+    try:
+        return load_database_settings(configured_url or None).url
+    except ValueError as exc:
+        raise RuntimeError(str(exc)) from exc
 
 
 def run_migrations_offline() -> None:
