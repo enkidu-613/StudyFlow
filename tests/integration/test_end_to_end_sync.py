@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
@@ -9,36 +8,30 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from server.app.db.context import AccountContext
-from server.app.db.models import Account, Base, Device, SyncOperation
+from server.app.db.context import UserContext
+from server.app.db.models import Base, User
 from server.app.sync.repository import SyncOperationRepository
-from server.app.sync.schemas import SyncOperationV1
+from server.app.sync.schemas import SyncOperationV2
 from server.app.sync.service import SyncService
 
 
 @dataclass(frozen=True, slots=True)
 class DeviceContext:
     name: str
-    account_id: UUID
-    device_id: UUID
-    context: AccountContext
-    local_operations: list[SyncOperationV1] = field(default_factory=list)
+    context: UserContext
+    local_operations: list[SyncOperationV2] = field(default_factory=list)
 
     def create_task_offline(self, title: str) -> UUID:
         """Offline task creation: the operation is queued locally and never
         reaches the server until reconnect_and_sync."""
         record_id = uuid4()
-        operation = SyncOperationV1.model_validate(
+        operation = SyncOperationV2.model_validate(
             {
                 "operationId": str(uuid4()),
                 "recordId": str(record_id),
-                "deviceId": str(self.device_id),
                 "logicalClock": len(self.local_operations) + 1,
                 "entityType": "task",
-                "payloadNonce": "bm9uY2UtdjE=",
-                "payloadCiphertext": base64.b64encode(
-                    f'{{"title":"{title}"}}'.encode("utf-8")
-                ).decode("ascii"),
+                "payload": {"title": title},
                 "isTombstone": False,
                 "schemaVersion": 1,
             }
@@ -53,9 +46,9 @@ class DeviceContext:
         await service.push(self.context, self.local_operations)
         self.local_operations.clear()
 
-    async def sync(self, service: SyncService) -> list[SyncOperationV1]:
+    async def sync(self, service: SyncService) -> list[SyncOperationV2]:
         """Pull operations from the server (with pagination)."""
-        operations: list[SyncOperationV1] = []
+        operations: list[SyncOperationV2] = []
         after = 0
         while True:
             result = await service.pull(self.context, after=after, limit=50)
@@ -100,44 +93,28 @@ async def two_devices() -> AsyncIterator[TwoDevices]:
         await connection.run_sync(Base.metadata.create_all)
 
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
-    shared_account_id = uuid4()
-    android_context = AccountContext(
-        account_id=shared_account_id, device_id=uuid4()
-    )
-    macos_context = AccountContext(
-        account_id=shared_account_id, device_id=uuid4()
-    )
+    shared_user_id = uuid4()
     async with session_factory.begin() as session:
         session.add_all(
             [
-                Account(account_id=shared_account_id),
-                Device(
-                    account_id=android_context.account_id,
-                    device_id=android_context.device_id,
-                ),
-                Device(
-                    account_id=macos_context.account_id,
-                    device_id=macos_context.device_id,
+                User(
+                    user_id=shared_user_id,
+                    email="user@example.com",
+                    email_normalized="user@example.com",
+                    password_hash="$argon2id$test",
                 ),
             ],
         )
+
+    android_context = UserContext(user_id=shared_user_id, email="user@example.com")
+    macos_context = UserContext(user_id=shared_user_id, email="user@example.com")
 
     service = SyncService(SyncOperationRepository(session_factory))
     yield TwoDevices(
         session_factory=session_factory,
         service=service,
-        android=DeviceContext(
-            name="android",
-            account_id=android_context.account_id,
-            device_id=android_context.device_id,
-            context=android_context,
-        ),
-        macos=DeviceContext(
-            name="macos",
-            account_id=macos_context.account_id,
-            device_id=macos_context.device_id,
-            context=macos_context,
-        ),
+        android=DeviceContext(name="android", context=android_context),
+        macos=DeviceContext(name="macos", context=macos_context),
     )
     await engine.dispose()
 
@@ -187,15 +164,13 @@ async def test_tombstone_hides_task_from_other_device(
     assert await two_devices.macos.has_task(two_devices.service, task_id)
 
     # Android deletes the task offline, then reconnects.
-    tombstone = SyncOperationV1.model_validate(
+    tombstone = SyncOperationV2.model_validate(
         {
             "operationId": str(uuid4()),
             "recordId": str(task_id),
-            "deviceId": str(two_devices.android.device_id),
             "logicalClock": 2,
             "entityType": "task",
-            "payloadNonce": "bm9uY2UtdjE=",
-            "payloadCiphertext": "ZGVsZXRlZA==",
+            "payload": {},
             "isTombstone": True,
             "schemaVersion": 1,
         }
@@ -251,3 +226,16 @@ async def test_pull_cursor_is_monotonic_across_devices(
     )
     assert third.operations == []
     assert third.next_cursor == second.next_cursor
+
+
+@pytest.mark.anyio
+async def test_json_payload_is_transported_without_encryption(
+    two_devices: TwoDevices,
+) -> None:
+    task_id = two_devices.android.create_task_offline("Plain JSON title")
+    await two_devices.android.reconnect_and_sync(two_devices.service)
+    pulled = await two_devices.macos.sync(two_devices.service)
+
+    matching = [op for op in pulled if op.record_id == task_id]
+    assert matching
+    assert matching[-1].payload == {"title": "Plain JSON title"}
