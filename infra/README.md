@@ -51,6 +51,34 @@ docker-compose version
 Debian 12 的官方软件源使用 docker-compose 命令；本项目的部署命令均按此
 命令编写，不要把它替换成当前 VPS 软件源中不存在的 docker-compose-v2。
 
+### 1.1 Docker Hub 网络受限时
+
+如果构建时报 `registry-1.docker.io` 连接超时，先确认阿里云 ACR 控制台的
+“镜像工具 → 镜像加速器”地址，并在 VPS 上配置 Docker。该地址属于你的阿里云
+账号，不要写入 Git 仓库：
+
+~~~bash
+sudo mkdir -p /etc/docker
+sudo tee /etc/docker/daemon.json >/dev/null <<'EOF'
+{"registry-mirrors":["你的阿里云ACR镜像加速器地址"]}
+EOF
+sudo systemctl restart docker
+~~~
+
+如果 ACR 加速器没有同步当前标签，可以先从可访问的镜像源拉取并改成本地
+标签，再执行本目录的 Compose 命令：
+
+~~~bash
+docker pull docker.m.daocloud.io/library/python:3.12-slim
+docker pull docker.m.daocloud.io/library/caddy:2.9-alpine
+docker tag docker.m.daocloud.io/library/python:3.12-slim python:3.12-slim
+docker tag docker.m.daocloud.io/library/caddy:2.9-alpine caddy:2.9-alpine
+~~~
+
+上述镜像源只是网络故障时的临时拉取来源；生产环境应优先使用阿里云 ACR
+制品订阅或你自己的私有镜像仓库。`api.Dockerfile` 已使用阿里云 PyPI 镜像
+安装 Poetry 和 Python 依赖。
+
 ## 二、将 Cloudflare 域名指向 VPS
 
 假设你的域名是 example.com，API 使用 api.example.com。不要把端口号写进
