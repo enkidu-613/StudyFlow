@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
+import 'package:analyzer/dart/analysis/results.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studyflow/security/key_manager.dart';
 import 'package:studyflow/storage/app_database.dart';
@@ -10,13 +12,11 @@ const accountB = '22222222-2222-4222-8222-222222222222';
 
 void main() {
   late Directory temporaryDirectory;
-  late EncryptedDatabaseOpener opener;
   late MemorySecureKeyStore keyStore;
   late KeyManager keyManager;
 
   setUp(() async {
     temporaryDirectory = await Directory.systemTemp.createTemp('studyflow-db-');
-    opener = EncryptedDatabaseOpener(baseDirectory: temporaryDirectory);
     keyStore = MemorySecureKeyStore();
     keyManager = KeyManager(accountId: accountA, store: keyStore);
     await keyManager.createAccountDataKey();
@@ -28,17 +28,17 @@ void main() {
 
   test('pending operation survives close and reopen in encrypted storage',
       () async {
-    final store = await openStore(keyManager, opener);
+    final store = await openStore(keyManager, temporaryDirectory);
     await store.operations.enqueue(operation(accountId: accountA));
     await store.close();
 
-    final databaseBytes = await opener.databaseFileFor(accountA).readAsBytes();
+    final databaseBytes = await databaseFile(temporaryDirectory).readAsBytes();
     expect(
       databaseBytes.take(16),
       isNot('SQLite format 3\u0000'.codeUnits),
     );
 
-    final reopened = await openStore(keyManager, opener);
+    final reopened = await openStore(keyManager, temporaryDirectory);
     addTearDown(reopened.close);
 
     expect(await reopened.operations.pending(10), <EncryptedOperation>[
@@ -47,7 +47,7 @@ void main() {
   });
 
   test('duplicate operation id does not create a second local row', () async {
-    final store = await openStore(keyManager, opener);
+    final store = await openStore(keyManager, temporaryDirectory);
     addTearDown(store.close);
 
     await store.operations.enqueue(operation(accountId: accountA));
@@ -67,7 +67,7 @@ void main() {
   });
 
   test('operation store rejects a write outside the active account', () async {
-    final store = await openStore(keyManager, opener);
+    final store = await openStore(keyManager, temporaryDirectory);
     addTearDown(store.close);
 
     await expectLater(
@@ -78,7 +78,7 @@ void main() {
   });
 
   test('wrong or unavailable database key fails closed', () async {
-    final store = await openStore(keyManager, opener);
+    final store = await openStore(keyManager, temporaryDirectory);
     await store.operations.enqueue(operation(accountId: accountA));
     await store.close();
 
@@ -88,7 +88,7 @@ void main() {
     );
     await wrongKeyManager.createAccountDataKey();
     await expectLater(
-      openStore(wrongKeyManager, opener),
+      openStore(wrongKeyManager, temporaryDirectory),
       throwsA(isA<DatabaseRecoveryException>()),
     );
 
@@ -97,7 +97,7 @@ void main() {
       store: MemorySecureKeyStore(),
     );
     await expectLater(
-      openStore(missingKeyManager, opener),
+      openStore(missingKeyManager, temporaryDirectory),
       throwsA(isA<KeyRecoveryException>()),
     );
   });
@@ -107,19 +107,75 @@ void main() {
     await accountBManager.createAccountDataKey();
 
     await expectLater(
-      AccountScopedStore.open(
+      AccountScopedStore.openForTesting(
         activeAccountId: accountA,
         keyManager: accountBManager,
-        opener: opener,
+        baseDirectory: temporaryDirectory,
       ),
       throwsA(isA<StorageAccountScopeException>()),
     );
-    expect(opener.databaseFileFor(accountA).existsSync(), isFalse);
+    expect(databaseFile(temporaryDirectory).existsSync(), isFalse);
+  });
+
+  test('public storage API cannot compile a raw SQL opener bypass', () async {
+    final probe = File(
+      '${Directory.current.path}/.dart_tool/'
+      'task4_public_api_probe_${DateTime.now().microsecondsSinceEpoch}.dart',
+    );
+    await probe.writeAsString(r'''
+import 'dart:io';
+
+import 'package:drift/drift.dart' as drift;
+import 'package:studyflow/security/key_manager.dart';
+import 'package:studyflow/storage/app_database.dart' as storage;
+
+Future<drift.QueryExecutor> bypass(AccountDatabaseKey key) {
+  final storage.DatabaseOpener opener = storage.EncryptedDatabaseOpener(
+    baseDirectory: Directory.systemTemp,
+  );
+  return opener.open(databaseKey: key);
+}
+
+Future<drift.QueryExecutor> obtainAndBypass(KeyManager manager) async {
+  return bypass(await manager.loadDatabaseKey());
+}
+''');
+    addTearDown(() async {
+      if (await probe.exists()) {
+        await probe.delete();
+      }
+    });
+
+    final analysisContexts = AnalysisContextCollection(
+      includedPaths: <String>[probe.path],
+      sdkPath: _dartSdkPath(),
+    );
+    addTearDown(analysisContexts.dispose);
+    final result = await analysisContexts
+        .contextFor(probe.path)
+        .currentSession
+        .getResolvedUnit(probe.path);
+
+    expect(result, isA<ResolvedUnitResult>());
+    final diagnostics = (result as ResolvedUnitResult)
+        .diagnostics
+        .map(
+          (diagnostic) => diagnostic.problemMessage.messageText(
+            includeUrl: false,
+          ),
+        )
+        .join('\n');
+    expect(diagnostics, isNotEmpty,
+        reason: 'A production caller compiled a raw QueryExecutor bypass.');
+    expect(diagnostics, contains('AccountDatabaseKey'));
+    expect(diagnostics, contains('DatabaseOpener'));
+    expect(diagnostics, contains('EncryptedDatabaseOpener'));
+    expect(diagnostics, contains('loadDatabaseKey'));
   });
 
   test('all encrypted record stores reject cross-account writes and reads',
       () async {
-    final store = await openStore(keyManager, opener);
+    final store = await openStore(keyManager, temporaryDirectory);
     addTearDown(store.close);
     final recordIds = <String>[
       '10000000-0000-4000-8000-000000000001',
@@ -161,17 +217,42 @@ void main() {
       );
     }
   });
+
+  test('encrypted record timestamps round trip to the millisecond', () async {
+    final store = await openStore(keyManager, temporaryDirectory);
+    addTearDown(store.close);
+    final timestamp = DateTime.utc(2026, 8, 11, 12, 34, 56, 789);
+    final record = encryptedRecord(
+      accountId: accountA,
+      recordId: '20000000-0000-4000-8000-000000000001',
+      entityType: EncryptedEntityType.task,
+      updatedAt: timestamp,
+    );
+
+    await store.records(EncryptedEntityType.task).put(record);
+    final stored = await store.records(EncryptedEntityType.task).get(
+          accountId: accountA,
+          recordId: record.recordId,
+        );
+
+    expect(stored, isNotNull);
+    expect(stored!.updatedAt, timestamp);
+    expect(stored.updatedAt.millisecond, 789);
+  });
 }
 
 Future<AccountScopedStore> openStore(
   KeyManager keyManager,
-  DatabaseOpener opener,
+  Directory baseDirectory,
 ) =>
-    AccountScopedStore.open(
+    AccountScopedStore.openForTesting(
       activeAccountId: accountA,
       keyManager: keyManager,
-      opener: opener,
+      baseDirectory: baseDirectory,
     );
+
+File databaseFile(Directory baseDirectory) =>
+    File('${baseDirectory.path}/studyflow-$accountA.sqlite3');
 
 EncryptedOperation operation({required String accountId}) => EncryptedOperation(
       accountId: accountId,
@@ -193,6 +274,7 @@ EncryptedLocalRecord encryptedRecord({
   required String accountId,
   required String recordId,
   required EncryptedEntityType entityType,
+  DateTime? updatedAt,
 }) =>
     EncryptedLocalRecord(
       accountId: accountId,
@@ -204,7 +286,7 @@ EncryptedLocalRecord encryptedRecord({
       payloadCiphertext: Uint8List.fromList(
         List<int>.generate(48, (index) => 255 - index),
       ),
-      updatedAt: DateTime.utc(2026, 8, 11),
+      updatedAt: updatedAt ?? DateTime.utc(2026, 8, 11),
     );
 
 class MemorySecureKeyStore implements SecureKeyStore {
@@ -225,4 +307,16 @@ class MemorySecureKeyStore implements SecureKeyStore {
   }) async {
     _values['$accountId:${keyName.name}'] = value;
   }
+}
+
+String _dartSdkPath() {
+  var directory = File(Platform.resolvedExecutable).parent;
+  while (directory.parent.path != directory.path) {
+    final candidate = Directory('${directory.path}/dart-sdk');
+    if (File('${candidate.path}/lib/libraries.json').existsSync()) {
+      return candidate.path;
+    }
+    directory = directory.parent;
+  }
+  throw StateError('The Flutter test Dart SDK could not be located.');
 }

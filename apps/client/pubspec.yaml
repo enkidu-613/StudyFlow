@@ -28,6 +28,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  analyzer: 13.0.0
   build_runner: ^2.7.1
   drift_dev: ^2.34.3
   flutter_lints: ^4.0.0

@@ -24,16 +24,6 @@ abstract interface class PayloadKeyProvider {
   Future<SecretKey> loadAccountDataKey();
 }
 
-final class AccountDatabaseKey {
-  AccountDatabaseKey._({required this.accountId, required SecretKey key})
-      : _key = key;
-
-  final String accountId;
-  final SecretKey _key;
-
-  Future<List<int>> extractBytes() => _key.extractBytes();
-}
-
 class FlutterSecureKeyStore implements SecureKeyStore {
   FlutterSecureKeyStore({FlutterSecureStorage? storage})
       : _storage = storage ??
@@ -130,17 +120,6 @@ final class KeyManager implements PayloadKeyProvider {
   Future<SecretKey> loadAccountDataKey() =>
       _accountDataKeyFuture ??= _accountDataKeyBootstraps[accountId] ??
           _loadRequired(StoredKeyName.accountData);
-
-  Future<AccountDatabaseKey> loadDatabaseKey() async {
-    final accountDataKey = await loadAccountDataKey();
-    final derivedKey =
-        await Hkdf(hmac: Hmac.sha256(), outputLength: 32).deriveKey(
-      secretKey: accountDataKey,
-      nonce: utf8.encode('StudyFlow database key salt v1'),
-      info: utf8.encode(accountId),
-    );
-    return AccountDatabaseKey._(accountId: accountId, key: derivedKey);
-  }
 
   Future<SecretKey> _loadOrCreate(StoredKeyName keyName) async {
     final existing = await _read(keyName);

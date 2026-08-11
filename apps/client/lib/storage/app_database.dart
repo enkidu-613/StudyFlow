@@ -1,7 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:cryptography/cryptography.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
@@ -11,18 +14,28 @@ part 'app_database.g.dart';
 part 'operation_dao.dart';
 part 'tables.dart';
 
-abstract interface class DatabaseOpener {
+final class _AccountDatabaseKey {
+  _AccountDatabaseKey({required this.accountId, required SecretKey key})
+      : _key = key;
+
+  final String accountId;
+  final SecretKey _key;
+
+  Future<List<int>> extractBytes() => _key.extractBytes();
+}
+
+abstract interface class _DatabaseOpener {
   Future<QueryExecutor> open({
-    required AccountDatabaseKey? databaseKey,
+    required _AccountDatabaseKey databaseKey,
   });
 }
 
-class EncryptedDatabaseOpener implements DatabaseOpener {
-  EncryptedDatabaseOpener({required this.baseDirectory});
+class _EncryptedDatabaseOpener implements _DatabaseOpener {
+  _EncryptedDatabaseOpener({required this.baseDirectory});
 
-  static Future<EncryptedDatabaseOpener> forApplicationSupport() async {
+  static Future<_EncryptedDatabaseOpener> forApplicationSupport() async {
     final supportDirectory = await getApplicationSupportDirectory();
-    return EncryptedDatabaseOpener(
+    return _EncryptedDatabaseOpener(
       baseDirectory: Directory(path.join(supportDirectory.path, 'encrypted')),
     );
   }
@@ -38,15 +51,8 @@ class EncryptedDatabaseOpener implements DatabaseOpener {
 
   @override
   Future<QueryExecutor> open({
-    required AccountDatabaseKey? databaseKey,
+    required _AccountDatabaseKey databaseKey,
   }) async {
-    if (databaseKey == null) {
-      throw const DatabaseRecoveryException(
-        'The encrypted database key is unavailable. Restore the account key '
-        'before opening local data.',
-      );
-    }
-
     final extractedKeyBytes = await databaseKey.extractBytes();
     if (extractedKeyBytes.length != 32) {
       throw const DatabaseRecoveryException(
@@ -97,8 +103,8 @@ class _AccountDatabase extends _$_AccountDatabase {
 
   static Future<_AccountDatabase> open({
     required String activeAccountId,
-    required AccountDatabaseKey databaseKey,
-    required DatabaseOpener opener,
+    required _AccountDatabaseKey databaseKey,
+    required _DatabaseOpener opener,
   }) async {
     final normalizedAccountId = _normalizedAccountId(activeAccountId);
     if (databaseKey.accountId != normalizedAccountId) {
@@ -149,7 +155,30 @@ class AccountScopedStore {
   static Future<AccountScopedStore> open({
     required String activeAccountId,
     required KeyManager keyManager,
-    required DatabaseOpener opener,
+  }) async {
+    return _open(
+      activeAccountId: activeAccountId,
+      keyManager: keyManager,
+      opener: await _EncryptedDatabaseOpener.forApplicationSupport(),
+    );
+  }
+
+  @visibleForTesting
+  static Future<AccountScopedStore> openForTesting({
+    required String activeAccountId,
+    required KeyManager keyManager,
+    required Directory baseDirectory,
+  }) =>
+      _open(
+        activeAccountId: activeAccountId,
+        keyManager: keyManager,
+        opener: _EncryptedDatabaseOpener(baseDirectory: baseDirectory),
+      );
+
+  static Future<AccountScopedStore> _open({
+    required String activeAccountId,
+    required KeyManager keyManager,
+    required _DatabaseOpener opener,
   }) async {
     final normalizedAccountId = _normalizedAccountId(activeAccountId);
     if (keyManager.accountId != normalizedAccountId) {
@@ -158,7 +187,7 @@ class AccountScopedStore {
       );
     }
 
-    final databaseKey = await keyManager.loadDatabaseKey();
+    final databaseKey = await _deriveDatabaseKey(keyManager);
     if (databaseKey.accountId != normalizedAccountId) {
       throw const StorageAccountScopeException(
         'Derived database key does not match the active account.',
@@ -297,7 +326,7 @@ class EncryptedRecordRepository {
           record.schemaVersion,
           record.payloadNonce,
           record.payloadCiphertext,
-          record.updatedAt.millisecondsSinceEpoch ~/ 1000,
+          record.updatedAt.millisecondsSinceEpoch,
         ],
       );
     });
@@ -332,7 +361,7 @@ class EncryptedRecordRepository {
         payloadNonce: row.read<Uint8List>('payload_nonce'),
         payloadCiphertext: row.read<Uint8List>('payload_ciphertext'),
         updatedAt: DateTime.fromMillisecondsSinceEpoch(
-          row.read<int>('updated_at') * 1000,
+          row.read<int>('updated_at'),
           isUtc: true,
         ),
       );
@@ -369,6 +398,20 @@ class StorageAccountScopeException implements Exception {
 
 String _normalizedAccountId(String accountId) =>
     _normalizedUuid(accountId, 'accountId');
+
+Future<_AccountDatabaseKey> _deriveDatabaseKey(KeyManager keyManager) async {
+  final accountDataKey = await keyManager.loadAccountDataKey();
+  final derivedKey =
+      await Hkdf(hmac: Hmac.sha256(), outputLength: 32).deriveKey(
+    secretKey: accountDataKey,
+    nonce: utf8.encode('StudyFlow database key salt v1'),
+    info: utf8.encode(keyManager.accountId),
+  );
+  return _AccountDatabaseKey(
+    accountId: keyManager.accountId,
+    key: derivedKey,
+  );
+}
 
 String _toHex(List<int> bytes) =>
     bytes.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();

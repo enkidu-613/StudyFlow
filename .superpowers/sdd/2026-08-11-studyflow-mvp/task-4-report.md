@@ -249,3 +249,90 @@ The previously recorded native build limitations are unchanged: macOS runner com
 
 - Android Keystore and macOS Keychain integration still require native runner/device verification when their missing host toolchains become available.
 - The account bootstrap single-flight covers all `KeyManager` instances in the Flutter application's Dart isolate. A future architecture that performs account bootstrap from multiple independent Dart isolates or processes would require a platform-level compare-and-set or cross-isolate coordinator.
+
+## Fix round 2 (scoped re-review)
+
+This section supersedes the round-1 description of the database opener and database-key API. The raw executor/key pairing is no longer public.
+
+### 1. Raw database-opening capability is library-private
+
+- Removed public `AccountDatabaseKey` and `KeyManager.loadDatabaseKey()` from the security API.
+- Database-key derivation now occurs only inside `app_database.dart`, after `AccountScopedStore` verifies that the supplied `KeyManager.accountId` matches the normalized active account.
+- The derived `_AccountDatabaseKey`, `_DatabaseOpener`, `_EncryptedDatabaseOpener`, `QueryExecutor` return path, database filename selection, and sqlite3mc setup are all library-private.
+- Production `AccountScopedStore.open()` accepts only `activeAccountId` and its account-scoped `KeyManager`; it creates the private application-support opener internally and returns only `AccountScopedStore`.
+- `AccountScopedStore.openForTesting()` accepts a temporary base directory but still returns only the same account-scoped façade. It is annotated `visibleForTesting` and does not expose a key, executor, Drift database, table, or arbitrary-SQL method.
+- Existing on-disk durability, encrypted-header, wrong-key, missing-key, cross-account key-manager, record isolation, and operation isolation tests now enter through that façade.
+
+The public-API regression uses analyzer 13.0.0 as a direct dev dependency. It resolves a synthetic external package import that attempts the former `AccountDatabaseKey` + `DatabaseOpener` + `EncryptedDatabaseOpener` + `loadDatabaseKey()` bypass. The test requires compile diagnostics for all four removed API names, so reintroducing the complete raw executor route makes the probe compile and fails the regression.
+
+### Bounded static probe and exact limitation
+
+The first probe implementations launched `dart analyze` and then `dart compile kernel` as child processes from inside `flutter test`. Both contended with the active Flutter frontend and hit Flutter test's 30-second timeout instead of producing a trustworthy compile result. One orphaned public-API analyzer process, PID 48006, continued for approximately seven minutes and was terminated externally. No child-process probe remains, and a process audit after replacement found no matching process.
+
+The replacement uses `AnalysisContextCollection` in-process with the bundled Flutter Dart SDK path discovered from the running test executable. It performs no shell/process launch, is bounded by Flutter test's standard 30-second timeout, and completed in approximately three seconds in the final runs.
+
+### 2. Encrypted-record timestamp precision
+
+- `EncryptedRecordRepository.put()` now stores `updatedAt.millisecondsSinceEpoch` directly.
+- `EncryptedRecordRepository.get()` passes the stored integer directly to `DateTime.fromMillisecondsSinceEpoch(..., isUtc: true)`.
+- The regression writes `2026-08-11T12:34:56.789Z`, reads it through the real encrypted sqlite3mc store, and asserts both exact `DateTime` equality and millisecond value `789`.
+- No plaintext columns or timestamp-content fields were added; only the integer unit of the existing encrypted-record `updated_at` metadata changed.
+
+### Round 2 TDD evidence
+
+Public API RED:
+
+```text
+public storage API cannot compile a raw SQL opener bypass
+Expected: non-empty diagnostics
+Actual: empty diagnostics
+Reason: A production caller compiled a raw QueryExecutor bypass.
+```
+
+The wished-for integration API also failed to compile before implementation because `AccountScopedStore.openForTesting` did not exist.
+
+Timestamp RED:
+
+```text
+encrypted record timestamps round trip to the millisecond
+Expected: 2026-08-11 12:34:56.789Z
+Actual:   2026-08-11 12:34:56.000Z
+```
+
+Both regressions passed after their minimal production changes.
+
+### Round 2 final verification
+
+All commands ran from `apps/client` through mise after the final code change:
+
+```text
+mise exec -- flutter test test/security/key_manager_test.dart test/storage/operation_dao_test.dart
+22 tests passed
+
+mise exec -- flutter test test/storage -r expanded
+9 tests passed
+
+mise exec -- flutter test
+23 tests passed
+
+mise exec -- flutter analyze
+No issues found
+
+mise exec -- git diff --check
+No output
+```
+
+### Round 2 security self-review
+
+- Public production imports cannot obtain a StudyFlow database key, opener, raw Drift executor, generated database, table accessor, or arbitrary-SQL method.
+- The only directory-selecting test façade still enforces active-account/key-manager equality and returns only account-scoped repositories and the transactional operation DAO.
+- Database-key derivation remains HKDF-SHA256 with account-specific info; XChaCha20-Poly1305, fresh nonces, fixed vector, all four AAD authentication assertions, pre-await plaintext snapshot, and key-bootstrap single-flight are unchanged.
+- Wrong account, missing key, wrong key, altered AAD, changed secure-store write, and cross-account record/operation access remain fail-closed.
+- No key bytes, credentials, plaintext payloads, or key-bearing SQL are printed or logged.
+- Task, schedule-block, focus-session, check-in, and pending-operation schemas still contain no plaintext content columns.
+
+### Round 2 concerns
+
+- The prior native validation limitations remain: macOS runner compilation cannot start because `xcodebuild` is unavailable, and Android runner compilation cannot start because no Android SDK/`ANDROID_HOME` is installed.
+- The application-isolate boundary for account-key bootstrap remains as documented in round 1.
+- Round 2 changes the unit of existing encrypted-record `updated_at` integers from seconds to milliseconds without a schema migration. StudyFlow MVP has not released this Task 4 schema; any developer database created by the pre-round-2 seconds-based implementation should be recreated.
