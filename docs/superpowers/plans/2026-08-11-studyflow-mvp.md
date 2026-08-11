@@ -16,6 +16,8 @@
 - Flutter clients never connect directly to Supabase and never contain database passwords, `service_role`, or other management keys.
 - Task text, schedule notes, check-in text, and AI input text are encrypted on the client before upload.
 - The server stores only synchronization metadata and opaque encrypted payloads; AI requests receive only the minimum structured data needed for the current suggestion.
+- `account_id` is the top-level isolation boundary: every device, sync operation, authentication session, and future AI audit record belongs to exactly one account; every protected request derives its account scope from authenticated identity and verifies device ownership before reading or writing.
+- The client keeps an active account identity with its account-data-key envelope and never merges local records or keys across accounts; sign-out clears the active account context without exposing another account's records.
 - LLM output is never allowed to write the database directly; Pydantic validation and deterministic policy checks precede every user-visible recommendation or schedule change.
 - L0/L1 suggestions require no automatic device takeover; L2 schedule mutation requires confirmation; L3 requires at least 14 consecutive days of valid records and a new explicit authorization.
 - Device-control work is limited to reminders, focus mode, and user-revocable restrictions; arbitrary remote control, screen contents, window contents, and raw browsing history are out of scope.
@@ -302,6 +304,7 @@ git commit -m "feat: add encrypted local database and operation queue"
 - `SyncService.pull(context, after, limit) -> PullResult` returns only operations for the authenticated account and advances by `server_sequence`.
 - `POST /v1/sync/push` requires a bearer access token and `X-Device-Id`.
 - `GET /v1/sync/pull` requires the same identity and never returns plaintext payload fields.
+- The auth dependency must derive `AccountContext(account_id, device_id)` from the verified token and reject an `X-Device-Id` that is not owned by that account before the repository runs.
 
 - [ ] **Step 1: Write service tests for first insert, duplicate, and cursor isolation**
 
@@ -516,6 +519,8 @@ git commit -m "feat: add Android macOS shell and focus workflow"
 - `POST /v1/auth/login` returns a short-lived access token and rotating refresh token; passwords are stored as Argon2id hashes.
 - `POST /v1/devices/pair` consumes a one-time six-digit code that expires after 10 minutes and returns the encrypted account-data-key envelope.
 - `POST /v1/devices/revoke` revokes one device without deleting the account's encrypted records.
+- The account relationship is explicit in every auth response: login returns `account_id` and `device_id`, pairing creates a device row under the authenticated `account_id`, and a token from one account cannot be used with another account's device ID.
+- `auth_repository.dart` keeps the active account, access/refresh tokens, device ID, and encrypted account-data-key envelope together; logout removes the active account context and leaves no plaintext key material in ordinary app state.
 - `server/tests/test_auth_and_pairing.py` defines the `auth_client` fixture, which uses an isolated database and a deterministic test clock; it never contacts the production Supabase project.
 
 - [ ] **Step 1: Write one-time bootstrap and pairing tests**
@@ -718,6 +723,7 @@ git commit -m "ops: add Docker Caddy and encrypted backup deployment"
 - The acceptance scripts exercise the public API and local clients without exposing secrets.
 - The documented MVP supports offline task creation, focus recording, encrypted synchronization, conflict visibility, L1 AI suggestions, and user-confirmed L2 changes.
 - `tests/integration/test_end_to_end_sync.py` defines the `two_devices` fixture as two isolated local client stores sharing a fake API backed by the real sync service; it does not require a physical device.
+- The acceptance fixture includes two accounts and verifies that account A cannot pull, push, pair, or revoke account B's device or operation metadata.
 
 - [ ] **Step 1: Write the end-to-end acceptance tests**
 
