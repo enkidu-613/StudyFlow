@@ -163,6 +163,81 @@ void main() {
   });
 
   test(
+      'lower partial merge keeps the max record stamp and blocks a stale tombstone',
+      () async {
+    final api = PagedSyncApi();
+    final fixture = await testEngine(api: api, seedPendingTask: false);
+    await fixture.taskRepository.save(
+      testTask(),
+      write: EncryptedWrite(
+        operationId: '23232323-2323-4323-8323-232323232323',
+        deviceId: _deviceId,
+        logicalClock: 1,
+      ),
+    );
+    await fixture.engine.runOnce();
+
+    await fixture.taskRepository.save(
+      testTask(title: 'Local title at 10'),
+      write: EncryptedWrite(
+        operationId: '24242424-2424-4424-8424-242424242424',
+        deviceId: _deviceId,
+        logicalClock: 10,
+      ),
+    );
+    final statusAt5 = await fixture.encryptOperation(
+      operationId: '25252525-2525-4525-8525-252525252525',
+      recordId: _taskId,
+      deviceId: '66666666-6666-4666-8666-666666666666',
+      logicalClock: 5,
+      entityType: 'task',
+      payload: testTask(status: TaskStatus.completed).toJson(),
+    );
+    final tombstoneAt7 = await fixture.encryptOperation(
+      operationId: '26262626-2626-4626-8626-262626262626',
+      recordId: _taskId,
+      deviceId: '66666666-6666-4666-8666-666666666666',
+      logicalClock: 7,
+      entityType: 'task',
+      payload: testTask(status: TaskStatus.completed).toJson(),
+      isTombstone: true,
+    );
+    api.pages = <List<SyncOperationV1>>[
+      <SyncOperationV1>[statusAt5],
+      <SyncOperationV1>[tombstoneAt7],
+    ];
+
+    await fixture.engine.runOnce();
+    await fixture.engine.runOnce();
+
+    final task = await fixture.taskRepository.get(_taskId);
+    expect(task, isNotNull);
+    expect(task!.title, 'Local title at 10');
+    expect(task.status, TaskStatus.completed);
+    expect(
+      await fixture.store.operations.retainedTombstoneCount(_taskId),
+      1,
+    );
+    final titleStamp = await fixture.store.operations.taskFieldVersion(
+      _taskId,
+      'title',
+    );
+    final statusStamp = await fixture.store.operations.taskFieldVersion(
+      _taskId,
+      'status',
+    );
+    expect(titleStamp!.logicalClock, 10);
+    expect(titleStamp.deviceId, _deviceId);
+    expect(statusStamp!.logicalClock, 5);
+    final current = await fixture.store.operations.snapshotFor(
+      fixture.asEncrypted(tombstoneAt7),
+    );
+    expect(current.currentVersion!.logicalClock, 10);
+    expect(current.currentVersion!.deviceId, _deviceId);
+    expect(current.currentVersion!.isTombstone, isFalse);
+  });
+
+  test(
       'malformed push acknowledgement retains queue and exposes protocol retry',
       () async {
     final fixture = await testEngine(api: MalformedAckApi());
@@ -173,6 +248,28 @@ void main() {
     expect(fixture.engine.status.value.kind, SyncStatusKind.failed);
     expect(fixture.engine.status.value.retry, isNotNull);
     expect(await fixture.engine.pendingCount(), 1);
+  });
+
+  test('omitted push acknowledgement retains the entire queue', () async {
+    final fixture = await testEngine(api: OmittedAckApi());
+
+    final result = await fixture.engine.runOnce();
+
+    expect(result.failureCategory, SyncFailureCategory.protocol);
+    expect(await fixture.engine.pendingCount(), 1);
+    expect(fixture.engine.status.value.kind, SyncStatusKind.failed);
+    expect(fixture.engine.status.value.retry, isNotNull);
+  });
+
+  test('duplicate push acknowledgement ID is a protocol failure', () async {
+    final fixture = await testEngine(api: DuplicateAckApi());
+
+    final result = await fixture.engine.runOnce();
+
+    expect(result.failureCategory, SyncFailureCategory.protocol);
+    expect(await fixture.engine.pendingCount(), 1);
+    expect(fixture.engine.status.value.kind, SyncStatusKind.failed);
+    expect(fixture.engine.status.value.retry, isNotNull);
   });
 
   test('simultaneous schedule edits preserve a conflict copy', () async {
@@ -567,6 +664,24 @@ void main() {
     expect(captured, isNot(contains('Algebra')));
     expect(captured, isNot(contains('Chapter 1')));
   });
+
+  test('sync logging exposes metadata only, never decrypted plaintext',
+      () async {
+    final logger = CapturingSyncLogger();
+    final fixture = await testEngine(
+      api: ScriptedSyncApi(),
+      logger: logger,
+    );
+
+    await fixture.engine.runOnce();
+
+    final captured = jsonEncode(
+      logger.events.map((event) => event.toJson()).toList(growable: false),
+    );
+    expect(captured, contains(_operationId));
+    expect(captured, isNot(contains('Algebra')));
+    expect(captured, isNot(contains('Chapter 1')));
+  });
 }
 
 Future<void> expectFailureRetainsQueue(
@@ -697,6 +812,58 @@ final class MalformedAckApi implements SyncApi {
       SyncPullResult(nextCursor: after, operations: const []);
 }
 
+final class OmittedAckApi implements SyncApi {
+  @override
+  Future<SyncPushResult> push({
+    required AuthContext authContext,
+    required List<SyncOperationV1> operations,
+  }) async =>
+      SyncPushResult(
+        accepted: const <String>[],
+        duplicates: const <String>[],
+        rejected: const <String>[],
+      );
+
+  @override
+  Future<SyncPullResult> pull({
+    required AuthContext authContext,
+    required int after,
+    int limit = 50,
+  }) async =>
+      SyncPullResult(nextCursor: after, operations: const []);
+}
+
+final class DuplicateAckApi implements SyncApi {
+  @override
+  Future<SyncPushResult> push({
+    required AuthContext authContext,
+    required List<SyncOperationV1> operations,
+  }) async =>
+      SyncPushResult(
+        accepted: <String>[
+          operations.single.operationId,
+          operations.single.operationId,
+        ],
+        duplicates: const <String>[],
+        rejected: const <String>[],
+      );
+
+  @override
+  Future<SyncPullResult> pull({
+    required AuthContext authContext,
+    required int after,
+    int limit = 50,
+  }) async =>
+      SyncPullResult(nextCursor: after, operations: const []);
+}
+
+final class CapturingSyncLogger implements SyncLogger {
+  final List<SyncLogEvent> events = <SyncLogEvent>[];
+
+  @override
+  void write(SyncLogEvent event) => events.add(event);
+}
+
 final class PushThenPullFailureApi implements SyncApi {
   @override
   Future<SyncPushResult> push({
@@ -742,6 +909,7 @@ final class AlwaysFailingSyncApi implements SyncApi {
 Future<TestEngineFixture> testEngine({
   required SyncApi api,
   bool seedPendingTask = true,
+  SyncLogger? logger,
 }) async {
   final temporaryDirectory =
       await Directory.systemTemp.createTemp('studyflow-sync-engine-');
@@ -779,6 +947,7 @@ Future<TestEngineFixture> testEngine({
     authContext: testAuthContext(),
     store: store,
     cipher: cipher,
+    logger: logger,
   );
   addTearDown(engine.dispose);
   return TestEngineFixture(
@@ -891,6 +1060,20 @@ final class TestEngineFixture {
       schemaVersion: 1,
     );
   }
+
+  EncryptedOperation asEncrypted(SyncOperationV1 operation) =>
+      EncryptedOperation(
+        accountId: _accountId,
+        operationId: operation.operationId,
+        recordId: operation.recordId,
+        deviceId: operation.deviceId,
+        logicalClock: operation.logicalClock,
+        entityType: operation.entityType,
+        payloadNonce: base64Decode(operation.payloadNonce),
+        payloadCiphertext: base64Decode(operation.payloadCiphertext),
+        isTombstone: operation.isTombstone,
+        schemaVersion: operation.schemaVersion,
+      );
 
   Future<void> seedEncryptedRecord({
     required String operationId,

@@ -418,7 +418,7 @@ class OperationDao {
       'entity_type, payload_nonce, payload_ciphertext, is_tombstone, '
       'schema_version FROM sync_record_versions '
       'WHERE account_id = ? AND record_id = ? '
-      'ORDER BY local_sequence DESC LIMIT 2',
+      'ORDER BY logical_clock DESC, device_id DESC, operation_id DESC LIMIT 2',
       variables: <Variable<Object>>[
         Variable<String>(_database.activeAccountId),
         Variable<String>(recordId),

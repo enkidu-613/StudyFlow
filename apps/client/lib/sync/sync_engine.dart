@@ -6,9 +6,12 @@ import 'package:studyflow/auth/auth_repository.dart';
 import 'package:studyflow/security/payload_cipher.dart';
 import 'package:studyflow/storage/app_database.dart';
 import 'package:studyflow/sync/sync_api.dart';
+import 'package:studyflow/sync/sync_logger.dart';
 import 'package:studyflow/sync/sync_status.dart';
 import 'package:studyflow_domain/domain.dart';
 import 'package:studyflow_sync_contract/sync_contract.dart';
+
+export 'sync_logger.dart';
 
 const Set<String> _taskFields = <String>{
   'title',
@@ -26,11 +29,13 @@ final class SyncEngine {
     required AuthContext authContext,
     required AccountScopedStore store,
     required PayloadCipher cipher,
+    SyncLogger? logger,
     this.batchSize = 50,
   })  : _api = api,
         _authContext = authContext,
         _store = store,
         _cipher = cipher,
+        _logger = logger ?? const NoopSyncLogger(),
         _status =
             ValueNotifier<SyncStatus>(const SyncStatus.idle(pendingCount: 0)) {
     if (store.activeAccountId != authContext.accountId) {
@@ -48,6 +53,7 @@ final class SyncEngine {
   final AuthContext _authContext;
   final AccountScopedStore _store;
   final PayloadCipher _cipher;
+  final SyncLogger _logger;
   final int batchSize;
   final ValueNotifier<SyncStatus> _status;
 
@@ -62,6 +68,12 @@ final class SyncEngine {
     var cursor = await _store.operations.lastCommittedCursor();
     try {
       final pending = await _store.operations.pending(batchSize);
+      _log(
+        SyncLogEventKind.started,
+        operationIds: pending.map((operation) => operation.operationId),
+        pendingCount: queuedBefore,
+        cursor: cursor,
+      );
       if (pending.isNotEmpty) {
         final taskFieldsByOperation = await _taskFieldsByOperation(pending);
         final pushResult = await _api.push(
@@ -83,6 +95,12 @@ final class SyncEngine {
           taskFieldsByOperation: taskFieldsByOperation,
         );
         pushedCount = acknowledged.length;
+        _log(
+          SyncLogEventKind.pushSucceeded,
+          operationIds: acknowledged,
+          pushedCount: pushedCount,
+          pendingCount: queuedBefore - pushedCount,
+        );
       }
 
       final pullResult = await _api.pull(
@@ -97,6 +115,14 @@ final class SyncEngine {
       );
       cursor = pullResult.nextCursor;
       final remaining = await pendingCount();
+      _log(
+        SyncLogEventKind.pullApplied,
+        operationIds:
+            pullResult.operations.map((operation) => operation.operationId),
+        pulledCount: applied.appliedCount,
+        pendingCount: remaining,
+        cursor: cursor,
+      );
       _status.value = SyncStatus.idle(pendingCount: remaining);
       return SyncRunResult(
         outcome: SyncRunOutcome.succeeded,
@@ -170,6 +196,10 @@ final class SyncEngine {
     if (accepted.intersection(duplicates).isNotEmpty ||
         accepted.intersection(rejected).isNotEmpty ||
         duplicates.intersection(rejected).isNotEmpty ||
+        result.accepted.length != accepted.length ||
+        result.duplicates.length != duplicates.length ||
+        result.rejected.length != rejected.length ||
+        acknowledged.length + rejected.length != pendingIds.length ||
         !pendingIds.containsAll(<String>{...acknowledged, ...rejected})) {
       throw const SyncProtocolFailure(
         'Synchronization acknowledgement does not match the pending queue.',
@@ -186,16 +216,16 @@ final class SyncEngine {
         continue;
       }
       final snapshot = await _store.operations.snapshotFor(operation);
-      final previous = snapshot.previousVersion;
-      if (previous == null) {
+      final baseVersion = snapshot.previousVersion ?? snapshot.currentVersion;
+      if (baseVersion == null) {
         result[operation.operationId] = Set<String>.from(_taskFields);
         continue;
       }
       final currentJson = _jsonObject(await _decryptOperation(operation));
-      final previousJson = _jsonObject(await _decryptOperation(previous));
+      final baseJson = _jsonObject(await _decryptOperation(baseVersion));
       result[operation.operationId] = <String>{
         for (final field in _taskFields)
-          if (!_jsonValueEquals(currentJson[field], previousJson[field])) field,
+          if (!_jsonValueEquals(currentJson[field], baseJson[field])) field,
       };
     }
     return result;
@@ -208,6 +238,12 @@ final class SyncEngine {
     int cursor,
   ) async {
     final remaining = await pendingCount();
+    _log(
+      SyncLogEventKind.failed,
+      pendingCount: remaining,
+      cursor: cursor,
+      failureCategory: category,
+    );
     _status.value = SyncStatus(
       kind: kind,
       pendingCount: remaining,
@@ -241,6 +277,28 @@ final class SyncEngine {
       payloadCiphertext: base64Encode(operation.payloadCiphertext),
       isTombstone: operation.isTombstone,
       schemaVersion: operation.schemaVersion,
+    );
+  }
+
+  void _log(
+    SyncLogEventKind kind, {
+    Iterable<String> operationIds = const <String>[],
+    int? pushedCount,
+    int? pulledCount,
+    int? pendingCount,
+    int? cursor,
+    SyncFailureCategory? failureCategory,
+  }) {
+    _logger.write(
+      SyncLogEvent(
+        kind: kind,
+        operationIds: operationIds.toList(growable: false),
+        pushedCount: pushedCount,
+        pulledCount: pulledCount,
+        pendingCount: pendingCount,
+        cursor: cursor,
+        failureCategory: failureCategory,
+      ),
     );
   }
 
@@ -318,6 +376,7 @@ final class SyncEngine {
       return SyncRecordMutation(
         recordIdsToDelete:
             shouldDelete ? <String>[operation.recordId] : const <String>[],
+        recordIncomingVersion: false,
       );
     }
 

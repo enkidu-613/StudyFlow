@@ -410,7 +410,7 @@ git commit -m "feat: add StudyFlow domain rules"
 - `SyncApi.push()` and `SyncApi.pull()` use the Task 3 contract and return typed failures.
 - `apps/client/test/sync/sync_engine_test.dart` defines `FailingSyncApi` and `testEngine(...)` as test-only implementations; production code must not depend on either helper.
 
-- [ ] **Step 1: Write offline and retry tests**
+- [x] **Step 1: Write offline and retry tests**
 
 ```dart
 test('network failure leaves the operation queued and exposes failure', () async {
@@ -422,21 +422,21 @@ test('network failure leaves the operation queued and exposes failure', () async
 });
 ```
 
-- [ ] **Step 2: Run the sync engine tests before implementation**
+- [x] **Step 2: Run the sync engine tests before implementation**
 
 Run: `flutter test apps/client/test/sync/sync_engine_test.dart`
 
 Expected: FAIL because the engine, typed API, and status model are missing.
 
-- [ ] **Step 3: Implement operation ordering and retry behavior**
+- [x] **Step 3: Implement operation ordering and retry behavior**
 
 Push pending local operations first; do not delete them until the server confirms acceptance or duplicate status. Pull after the last committed cursor, decrypt locally, apply idempotently, and commit the cursor in the same local transaction as the applied records. On network, authentication, decryption, or schema errors, retain the queue and expose a categorized status with a retry action.
 
-- [ ] **Step 4: Verify multi-device conflict behavior**
+- [x] **Step 4: Verify multi-device conflict behavior**
 
 Add tests for duplicate pulls, task field-level last-write merge, simultaneous schedule-block edits producing a conflict copy, tombstone retention, and append-only focus sessions. Run `flutter test apps/client/test/sync -r expanded`.
 
-- [ ] **Step 5: Commit the offline sync engine**
+- [x] **Step 5: Commit the offline sync engine**
 
 ```bash
 git add apps/client/lib/sync apps/client/lib/providers apps/client/test/sync
