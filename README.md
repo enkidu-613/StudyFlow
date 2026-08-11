@@ -79,17 +79,15 @@ cd apps/client && bash ../../tool/flutter run \
 Device acceptance matrices: `tests/device/android-originos6-matrix.md`
 (iQOO Z9 Turbo) and `tests/device/macos-matrix.md`.
 
-## Deployment
+## 部署
 
-See `infra/README.md` for the Docker/Caddy/Cloudflare topology, firewall
-rules, and encrypted backup workflow. The VPS target is a fresh Debian 12
-install; the provider's Fedora 34 image is out of support and must not be
-used for production.
+完整的 Debian 12、Docker、Caddy、Cloudflare、防火墙和加密备份步骤请阅读
+`infra/README.md`。生产环境不要使用已经停止维护的 Fedora 34 镜像。
 
-Generate the two server-only authentication values on the VPS with
-`openssl rand -hex 32` and fill them into `infra/.env` as
-`STUDYFLOW_BOOTSTRAP_TOKEN` and `STUDYFLOW_TOKEN_SIGNING_KEY`. The client only
-receives the public `STUDYFLOW_API_BASE_URL` through `--dart-define`.
+在 VPS 上使用 `openssl rand -hex 32` 分别生成
+`STUDYFLOW_BOOTSTRAP_TOKEN` 和 `STUDYFLOW_TOKEN_SIGNING_KEY`。客户端只需要
+通过 `--dart-define` 接收公开的 `STUDYFLOW_API_BASE_URL`，不需要数据库密码、
+Supabase service key 或服务器认证密钥。
 
 ## License boundaries
 
