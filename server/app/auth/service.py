@@ -19,7 +19,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from server.app.auth.models import RegisterRequest
+from server.app.auth.password_blacklist import (
+    BreachedPasswordChecker,
+    HibpBreachedPasswordChecker,
+    check_password_not_common,
+)
 from server.app.auth.password_policy import normalize_email, validate_password
+from server.app.auth.rate_limit import LoginRateLimiter
 from server.app.db.context import UserContext
 from server.app.db.models import User, UserSession
 
@@ -29,6 +35,8 @@ class AuthSettings:
     token_signing_key: str
     access_token_ttl: timedelta = timedelta(minutes=15)
     refresh_token_ttl: timedelta = timedelta(days=30)
+    login_attempt_limit: int = 5
+    login_rate_limit_window: timedelta = timedelta(minutes=10)
 
     @classmethod
     def from_env(cls) -> AuthSettings:
@@ -50,9 +58,16 @@ class AuthSession:
 
 
 class AuthServiceError(RuntimeError):
-    def __init__(self, status_code: int, detail: str) -> None:
+    def __init__(
+        self,
+        status_code: int,
+        detail: str,
+        *,
+        retry_after_seconds: int | None = None,
+    ) -> None:
         self.status_code = status_code
         self.detail = detail
+        self.retry_after_seconds = retry_after_seconds
         super().__init__(detail)
 
 
@@ -119,11 +134,18 @@ class AuthService:
         settings: AuthSettings,
         *,
         clock: Callable[[], datetime] | None = None,
+        breached_checker: BreachedPasswordChecker | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._settings = settings
         self._clock = clock or (lambda: datetime.now(UTC))
         self._password_hasher = PasswordHasher(type=Type.ID)
+        self._breached_checker = breached_checker or HibpBreachedPasswordChecker()
+        self.login_limiter = LoginRateLimiter(
+            attempt_limit=settings.login_attempt_limit,
+            window=settings.login_rate_limit_window,
+            clock=self._clock,
+        )
         self.access_tokens = AccessTokenCodec(
             settings.token_signing_key,
             clock=self._clock,
@@ -136,6 +158,15 @@ class AuthService:
     async def register(self, request: RegisterRequest) -> AuthSession:
         email = normalize_email(request.email)
         validate_password(request.password, email=email)
+        try:
+            check_password_not_common(request.password)
+        except ValueError as exc:
+            raise AuthServiceError(422, str(exc)) from exc
+        if await self._breached_checker.is_breached(request.password):
+            raise AuthServiceError(
+                422,
+                "该密码曾出现在已知的数据泄露事件中",
+            )
         password_hash = await asyncio.to_thread(self.hash_password, request.password)
         user = User(
             user_id=uuid4(),
@@ -155,8 +186,39 @@ class AuthService:
                 "An account with this email already exists.",
             ) from exc
 
-    async def login(self, *, email: str, password: str) -> AuthSession:
+    async def login(
+        self,
+        *,
+        email: str,
+        password: str,
+        source: str = "unknown",
+    ) -> AuthSession:
         email_normalized = normalize_email(email)
+        limiter_key = f"{source}|{email_normalized}"
+        decision = self.login_limiter.check(limiter_key)
+        if not decision.allowed:
+            raise AuthServiceError(
+                429,
+                "登录尝试次数过多，请稍后再试",
+                retry_after_seconds=decision.retry_after_seconds,
+            )
+        try:
+            authenticated = await self._login_with_credentials(
+                email_normalized,
+                password,
+            )
+        except AuthServiceError as exc:
+            if exc.status_code == 401:
+                self.login_limiter.record_failure(limiter_key)
+            raise
+        self.login_limiter.record_success(limiter_key)
+        return authenticated
+
+    async def _login_with_credentials(
+        self,
+        email_normalized: str,
+        password: str,
+    ) -> AuthSession:
         async with self._session_factory() as session:
             async with session.begin():
                 user = await session.scalar(

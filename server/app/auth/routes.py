@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from server.app.auth.dependencies import get_auth_service, get_user_context
 from server.app.auth.models import (
@@ -39,12 +39,19 @@ async def register(
 @router.post("/v1/auth/login", response_model=AuthResponse)
 async def login(
     request: LoginRequest,
+    http_request: Request,
     service: Annotated[AuthService, Depends(get_auth_service)],
 ) -> AuthResponse:
+    source = (
+        http_request.client.host
+        if http_request.client is not None
+        else "unknown"
+    )
     try:
         authenticated = await service.login(
             email=request.email,
             password=request.password,
+            source=source,
         )
     except AuthServiceError as exc:
         raise _http_error(exc) from exc
@@ -83,5 +90,13 @@ async def session(
 
 
 def _http_error(exc: AuthServiceError) -> HTTPException:
-    headers = {"WWW-Authenticate": "Bearer"} if exc.status_code == 401 else None
-    return HTTPException(status_code=exc.status_code, detail=exc.detail, headers=headers)
+    headers: dict[str, str] = {}
+    if exc.status_code == 401:
+        headers["WWW-Authenticate"] = "Bearer"
+    if exc.retry_after_seconds is not None:
+        headers["Retry-After"] = str(exc.retry_after_seconds)
+    return HTTPException(
+        status_code=exc.status_code,
+        detail=exc.detail,
+        headers=headers or None,
+    )

@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
+from server.app.auth.password_blacklist import NoopBreachedPasswordChecker
 from server.app.auth.routes import get_auth_service, router as auth_router
 from server.app.auth.service import AuthService, AuthSettings
 from server.app.db.context import UserContext
@@ -118,7 +119,12 @@ async def sync_harness() -> AsyncIterator[SyncHarness]:
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     clock = MutableClock(datetime(2026, 8, 12, 3, 0, tzinfo=UTC))
     settings = AuthSettings(token_signing_key=TOKEN_SIGNING_KEY)
-    auth_service = AuthService(session_factory, settings, clock=clock.now)
+    auth_service = AuthService(
+        session_factory,
+        settings,
+        clock=clock.now,
+        breached_checker=NoopBreachedPasswordChecker(),
+    )
     sync_service = SyncService(SyncOperationRepository(session_factory))
     application = FastAPI()
     application.include_router(auth_router)

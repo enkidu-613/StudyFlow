@@ -16,6 +16,7 @@ from server.app.auth.routes import (
     get_user_context,
     router as auth_router,
 )
+from server.app.auth.password_blacklist import MemoryBreachedPasswordChecker
 from server.app.auth.service import AuthService, AuthSettings
 from server.app.db.context import UserContext
 from server.app.db.models import Base, User, UserSession
@@ -109,7 +110,12 @@ async def auth_client() -> AsyncIterator[AuthClient]:
         access_token_ttl=timedelta(minutes=15),
         refresh_token_ttl=timedelta(days=30),
     )
-    service = AuthService(session_factory, settings, clock=clock.now)
+    service = AuthService(
+        session_factory,
+        settings,
+        clock=clock.now,
+        breached_checker=MemoryBreachedPasswordChecker(),
+    )
     application = FastAPI()
     application.include_router(auth_router)
 
@@ -291,3 +297,85 @@ async def test_refresh_sessions_are_revoked_on_reuse(
     assert len(sessions) == 2
     revoked = [row for row in sessions if row.revoked_at is not None]
     assert len(revoked) == 1
+
+
+@pytest.mark.anyio
+async def test_login_is_rate_limited_after_five_failures(
+    auth_client: AuthClient,
+) -> None:
+    await auth_client.register()
+
+    for _ in range(5):
+        response = await auth_client.login(password="wrong-password-1")
+        assert response.status_code == 401
+
+    blocked = await auth_client.login(password="wrong-password-2")
+
+    assert blocked.status_code == 429
+    assert blocked.json()["detail"] == "登录尝试次数过多，请稍后再试"
+    assert blocked.headers.get("retry-after") is not None
+
+
+@pytest.mark.anyio
+async def test_rate_limit_recovers_after_window_elapses(
+    auth_client: AuthClient,
+) -> None:
+    await auth_client.register()
+    for _ in range(5):
+        await auth_client.login(password="wrong-password-1")
+
+    blocked = await auth_client.login(password="wrong-password-2")
+    assert blocked.status_code == 429
+
+    auth_client.clock.advance(timedelta(minutes=11))
+    recovered = await auth_client.login()
+
+    assert recovered.status_code == 200
+
+
+@pytest.mark.anyio
+async def test_successful_login_resets_failure_count(
+    auth_client: AuthClient,
+) -> None:
+    await auth_client.register()
+    for _ in range(4):
+        await auth_client.login(password="wrong-password-1")
+
+    await auth_client.login()
+    for _ in range(3):
+        await auth_client.login(password="wrong-password-1")
+
+    assert (await auth_client.login()).status_code == 200
+
+
+@pytest.mark.anyio
+async def test_common_password_is_rejected_on_register(
+    auth_client: AuthClient,
+) -> None:
+    response = await auth_client.register(password="Password1!")
+
+    assert response.status_code == 422
+    assert "公开泄露名单" in response.json()["detail"]
+
+
+@pytest.mark.anyio
+async def test_breached_password_is_rejected_when_checker_reports_it(
+    auth_client: AuthClient,
+) -> None:
+    auth_client.service._breached_checker = MemoryBreachedPasswordChecker(
+        {"Correct-Horse-1"},
+    )
+
+    response = await auth_client.register(password="Correct-Horse-1")
+
+    assert response.status_code == 422
+    assert "数据泄露" in response.json()["detail"]
+
+
+@pytest.mark.anyio
+async def test_password_not_in_common_list_or_breach_corpus_passes(
+    auth_client: AuthClient,
+) -> None:
+    response = await auth_client.register(password="Purple-Zebra-9")
+
+    assert response.status_code == 201
