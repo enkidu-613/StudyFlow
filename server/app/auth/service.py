@@ -135,7 +135,7 @@ class AuthService:
 
     async def register(self, request: RegisterRequest) -> AuthSession:
         email = normalize_email(request.email)
-        validate_password(request.password)
+        validate_password(request.password, email=email)
         password_hash = await asyncio.to_thread(self.hash_password, request.password)
         user = User(
             user_id=uuid4(),

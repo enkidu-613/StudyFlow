@@ -268,9 +268,9 @@ curl -fsS -X POST https://api.example.com/v1/auth/register \
   -d '{"email":"you@example.com","password":"你的密码"}'
 ~~~
 
-密码要求：8–256 位，且必须包含大写字母、小写字母、数字和 ASCII 特殊符号
-（如 `!@#$%^&*`）。响应包含 access_token 和 refresh_token。不要在文档、
-日志或仓库中保存密码。
+密码要求：8–16 位，必须包含大写字母、小写字母、数字和 ASCII 特殊符号
+（如 `!@#$%^&*`）；不能全为纯数字、不能包含空格、不能与注册邮箱相同。
+响应包含 access_token 和 refresh_token。不要在文档、日志或仓库中保存密码。
 
 ## 九、启动客户端
 

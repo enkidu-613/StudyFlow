@@ -81,13 +81,13 @@ void main() {
     );
     await tester.enterText(
       find.byKey(const Key('auth-password-field')),
-      'correct horse battery staple',
+      'correcthorse',
     );
     await tester.tap(find.byKey(const Key('auth-submit-button')));
     await tester.pump();
 
     expect(submittedEmail, 'user@example.com');
-    expect(submittedPassword, 'correct horse battery staple');
+    expect(submittedPassword, 'correcthorse');
   });
 
   testWidgets('register submits email and password', (tester) async {
@@ -211,12 +211,12 @@ void main() {
     );
     await tester.enterText(
       find.byKey(const Key('auth-password-field')),
-      'correct horse battery staple',
+      'correcthorse',
     );
     await tester.tap(find.byKey(const Key('auth-submit-button')));
     await tester.pump();
 
-    expect(submittedPassword, 'correct horse battery staple');
+    expect(submittedPassword, 'correcthorse');
   });
 
   testWidgets('api failure shows friendly Chinese error', (tester) async {
@@ -237,7 +237,7 @@ void main() {
     );
     await tester.enterText(
       find.byKey(const Key('auth-password-field')),
-      'correct horse battery staple',
+      'correcthorse',
     );
     await tester.tap(find.byKey(const Key('auth-submit-button')));
     await tester.pump();
@@ -264,7 +264,7 @@ void main() {
     );
     await tester.enterText(
       find.byKey(const Key('auth-password-field')),
-      'correct horse battery staple',
+      'correcthorse',
     );
     await tester.tap(find.byKey(const Key('auth-submit-button')));
     await tester.pump();

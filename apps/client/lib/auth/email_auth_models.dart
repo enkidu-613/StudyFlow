@@ -69,7 +69,7 @@ String friendlyAuthError(int statusCode, {String? serverDetail}) {
 }
 
 const int passwordMinLength = 8;
-const int passwordMaxLength = 256;
+const int passwordMaxLength = 16;
 
 final RegExp _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 final RegExp _uppercasePattern = RegExp(r'[A-Z]');
@@ -98,7 +98,7 @@ String? validateLoginPasswordField(String? value) {
   return null;
 }
 
-String? validateRegisterPasswordField(String? value) {
+String? validateRegisterPasswordField(String? value, {String? email}) {
   if (value == null || value.isEmpty) {
     return 'Password is required';
   }
@@ -106,7 +106,21 @@ String? validateRegisterPasswordField(String? value) {
     return 'Password must be at least $passwordMinLength characters';
   }
   if (value.length > passwordMaxLength) {
-    return 'Password is too long';
+    return 'Password must be at most $passwordMaxLength characters';
+  }
+  if (value.contains(' ')) {
+    return 'Password must not contain spaces';
+  }
+  if (RegExp(r'^\d+$').hasMatch(value)) {
+    return 'Password must not be all digits';
+  }
+  if (email != null) {
+    final normalizedEmail = email.trim().toLowerCase();
+    final localPart = normalizedEmail.split('@').first;
+    if (value.toLowerCase() == normalizedEmail ||
+        value.toLowerCase() == localPart) {
+      return 'Password must not match the account email';
+    }
   }
   final missing = <String>[
     if (!_uppercasePattern.hasMatch(value)) 'an uppercase letter',

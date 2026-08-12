@@ -22,7 +22,7 @@ from server.app.sync.service import SyncService
 
 
 TOKEN_SIGNING_KEY = "test-signing-key-at-least-32-bytes-long"
-PASSWORD = "Correct-Horse-Battery-1"
+PASSWORD = "Correct-Horse-1"
 
 
 @dataclass

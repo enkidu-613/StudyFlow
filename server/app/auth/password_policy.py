@@ -5,7 +5,7 @@ import string
 
 EMAIL_MAX_LENGTH = 320
 PASSWORD_MIN_LENGTH = 8
-PASSWORD_MAX_LENGTH = 256
+PASSWORD_MAX_LENGTH = 16
 
 _PASSWORD_UPPERCASE = re.compile(r"[A-Z]")
 _PASSWORD_LOWERCASE = re.compile(r"[a-z]")
@@ -35,7 +35,7 @@ def normalize_email(value: str) -> str:
     return normalized
 
 
-def validate_password(value: str) -> str:
+def validate_password(value: str, *, email: str | None = None) -> str:
     if not isinstance(value, str):
         raise ValueError("password must be a string")
     if not (PASSWORD_MIN_LENGTH <= len(value) <= PASSWORD_MAX_LENGTH):
@@ -45,6 +45,15 @@ def validate_password(value: str) -> str:
         )
     if "\x00" in value:
         raise ValueError("NUL bytes are not allowed")
+    if " " in value:
+        raise ValueError("password must not contain spaces")
+    if value.isdigit():
+        raise ValueError("password must not be all digits")
+    if email is not None:
+        normalized_email = email.strip().casefold()
+        local_part = normalized_email.split("@", 1)[0]
+        if value.casefold() in {normalized_email, local_part}:
+            raise ValueError("password must not match the account email")
     missing_categories = _missing_password_categories(value)
     if missing_categories:
         missing_text = ", ".join(

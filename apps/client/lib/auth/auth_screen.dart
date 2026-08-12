@@ -159,7 +159,10 @@ final class _AuthScreenState extends State<AuthScreen> {
                         prefixIcon: Icon(Icons.lock_outline),
                       ),
                       validator: _mode == AuthMode.register
-                          ? validateRegisterPasswordField
+                          ? (value) => validateRegisterPasswordField(
+                                value,
+                                email: _emailController.text,
+                              )
                           : validateLoginPasswordField,
                     ),
                     if (_mode == AuthMode.register) ...<Widget>[

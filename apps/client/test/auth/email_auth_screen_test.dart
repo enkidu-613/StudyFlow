@@ -107,6 +107,10 @@ void main() {
       expect(validateRegisterPasswordField('Ab1!cdef'), isNull);
     });
 
+    test('accepts a password at exactly 16 characters with all categories', () {
+      expect(validateRegisterPasswordField('Ab1!cdefghijklmn'), isNull);
+    });
+
     test('rejects empty value', () {
       expect(validateRegisterPasswordField(null), 'Password is required');
       expect(validateRegisterPasswordField(''), 'Password is required');
@@ -116,6 +120,13 @@ void main() {
       expect(
         validateRegisterPasswordField('short'),
         'Password must be at least 8 characters',
+      );
+    });
+
+    test('rejects a password longer than 16 characters', () {
+      expect(
+        validateRegisterPasswordField('Correct-Horse-Battery-1'),
+        'Password must be at most 16 characters',
       );
     });
 
@@ -135,7 +146,7 @@ void main() {
 
     test('rejects a password missing a digit', () {
       expect(
-        validateRegisterPasswordField('Correct-Horse-Battery'),
+        validateRegisterPasswordField('Correct-Horse-B'),
         'Password must contain a digit',
       );
     });
@@ -147,21 +158,58 @@ void main() {
       );
     });
 
-    test('allows spaces and unicode alongside required categories', () {
+    test('allows unicode alongside required categories', () {
       expect(validateRegisterPasswordField('Café-Macaroon-1'), isNull);
     });
 
-    test('space does not count as a special character', () {
+    test('rejects a password containing spaces', () {
       expect(
-        validateRegisterPasswordField('CorrectHorse1 '),
-        'Password must contain a special character',
+        validateRegisterPasswordField('Correct Horse 1!'),
+        'Password must not contain spaces',
+      );
+    });
+
+    test('rejects an all-digit password', () {
+      expect(
+        validateRegisterPasswordField('12345678'),
+        'Password must not be all digits',
+      );
+    });
+
+    test('rejects a password matching the email', () {
+      expect(
+        validateRegisterPasswordField(
+          'User@Example.Com',
+          email: 'user@example.com',
+        ),
+        'Password must not match the account email',
+      );
+    });
+
+    test('rejects a password matching the email local part', () {
+      expect(
+        validateRegisterPasswordField(
+          'username-1!',
+          email: 'username-1!@example.com',
+        ),
+        'Password must not match the account email',
+      );
+    });
+
+    test('accepts a password different from the email', () {
+      expect(
+        validateRegisterPasswordField(
+          'Correct-Horse-1',
+          email: 'user@example.com',
+        ),
+        isNull,
       );
     });
   });
 
   group('validateLoginPasswordField', () {
     test('accepts a legacy password without composition rules', () {
-      expect(validateLoginPasswordField('correct horse battery'), isNull);
+      expect(validateLoginPasswordField('correcthorse'), isNull);
     });
 
     test('rejects empty value', () {
