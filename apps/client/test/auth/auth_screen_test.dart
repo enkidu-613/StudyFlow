@@ -113,17 +113,17 @@ void main() {
     );
     await tester.enterText(
       find.byKey(const Key('auth-password-field')),
-      'correct horse battery staple',
+      'Correct-Horse-1',
     );
     await tester.enterText(
       find.byKey(const Key('auth-confirm-password-field')),
-      'correct horse battery staple',
+      'Correct-Horse-1',
     );
     await tester.tap(find.byKey(const Key('auth-submit-button')));
     await tester.pump();
 
     expect(submittedEmail, 'new@example.com');
-    expect(submittedPassword, 'correct horse battery staple');
+    expect(submittedPassword, 'Correct-Horse-1');
   });
 
   testWidgets('password mismatch blocks submission and shows inline error',
@@ -148,11 +148,11 @@ void main() {
     );
     await tester.enterText(
       find.byKey(const Key('auth-password-field')),
-      'correct horse battery staple',
+      'Correct-Horse-1',
     );
     await tester.enterText(
       find.byKey(const Key('auth-confirm-password-field')),
-      'different password here',
+      'Different-Pass-2',
     );
     await tester.tap(find.byKey(const Key('auth-submit-button')));
     await tester.pump();
@@ -161,7 +161,7 @@ void main() {
     expect(find.text('Passwords do not match'), findsOneWidget);
   });
 
-  testWidgets('short password shows inline validation error',
+  testWidgets('short password shows inline validation error in register mode',
       (tester) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -172,6 +172,8 @@ void main() {
       ),
     );
 
+    await tester.tap(find.text('Create account'));
+    await tester.pump();
     await tester.enterText(
       find.byKey(const Key('auth-email-field')),
       'user@example.com',
@@ -184,9 +186,37 @@ void main() {
     await tester.pump();
 
     expect(
-      find.text('Password must be at least 12 characters'),
+      find.text('Password must be at least 8 characters'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('login mode accepts legacy passwords without composition rules',
+      (tester) async {
+    String? submittedPassword;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AuthScreen(
+          onLogin: (_, password) async {
+            submittedPassword = password;
+          },
+          onRegister: (_, __) async {},
+        ),
+      ),
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('auth-email-field')),
+      'user@example.com',
+    );
+    await tester.enterText(
+      find.byKey(const Key('auth-password-field')),
+      'correct horse battery staple',
+    );
+    await tester.tap(find.byKey(const Key('auth-submit-button')));
+    await tester.pump();
+
+    expect(submittedPassword, 'correct horse battery staple');
   });
 
   testWidgets('api failure shows friendly Chinese error', (tester) async {

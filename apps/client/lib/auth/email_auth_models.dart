@@ -68,10 +68,14 @@ String friendlyAuthError(int statusCode, {String? serverDetail}) {
   };
 }
 
-const int passwordMinLength = 12;
+const int passwordMinLength = 8;
 const int passwordMaxLength = 256;
 
 final RegExp _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+final RegExp _uppercasePattern = RegExp(r'[A-Z]');
+final RegExp _lowercasePattern = RegExp(r'[a-z]');
+final RegExp _digitPattern = RegExp(r'[0-9]');
+final RegExp _specialPattern = RegExp(r'[!@#$%^&*()_+\-=\[\]{};:' r'"' r',.<>/?\\|`~]');
 
 String? validateEmailField(String? value) {
   final trimmed = value?.trim() ?? '';
@@ -84,7 +88,17 @@ String? validateEmailField(String? value) {
   return null;
 }
 
-String? validatePasswordField(String? value) {
+String? validateLoginPasswordField(String? value) {
+  if (value == null || value.isEmpty) {
+    return 'Password is required';
+  }
+  if (value.length > passwordMaxLength) {
+    return 'Password is too long';
+  }
+  return null;
+}
+
+String? validateRegisterPasswordField(String? value) {
   if (value == null || value.isEmpty) {
     return 'Password is required';
   }
@@ -93,6 +107,15 @@ String? validatePasswordField(String? value) {
   }
   if (value.length > passwordMaxLength) {
     return 'Password is too long';
+  }
+  final missing = <String>[
+    if (!_uppercasePattern.hasMatch(value)) 'an uppercase letter',
+    if (!_lowercasePattern.hasMatch(value)) 'a lowercase letter',
+    if (!_digitPattern.hasMatch(value)) 'a digit',
+    if (!_specialPattern.hasMatch(value)) 'a special character',
+  ];
+  if (missing.isNotEmpty) {
+    return 'Password must contain ${missing.join(', ')}';
   }
   return null;
 }

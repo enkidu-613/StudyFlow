@@ -1,10 +1,23 @@
 from __future__ import annotations
 
 import re
+import string
 
 EMAIL_MAX_LENGTH = 320
-PASSWORD_MIN_LENGTH = 12
+PASSWORD_MIN_LENGTH = 8
 PASSWORD_MAX_LENGTH = 256
+
+_PASSWORD_UPPERCASE = re.compile(r"[A-Z]")
+_PASSWORD_LOWERCASE = re.compile(r"[a-z]")
+_PASSWORD_DIGIT = re.compile(r"[0-9]")
+_PASSWORD_SPECIAL = re.compile(r"[" + re.escape(string.punctuation) + r"]")
+
+_PASSWORD_CATEGORY_LABELS = {
+    "uppercase": "an uppercase letter",
+    "lowercase": "a lowercase letter",
+    "digit": "a digit",
+    "special": "a special character",
+}
 
 
 def normalize_email(value: str) -> str:
@@ -32,4 +45,24 @@ def validate_password(value: str) -> str:
         )
     if "\x00" in value:
         raise ValueError("NUL bytes are not allowed")
+    missing_categories = _missing_password_categories(value)
+    if missing_categories:
+        missing_text = ", ".join(
+            _PASSWORD_CATEGORY_LABELS[category] for category in missing_categories
+        )
+        raise ValueError(f"password must contain {missing_text}")
     return value
+
+
+def _missing_password_categories(value: str) -> list[str]:
+    checks = {
+        "uppercase": _PASSWORD_UPPERCASE,
+        "lowercase": _PASSWORD_LOWERCASE,
+        "digit": _PASSWORD_DIGIT,
+        "special": _PASSWORD_SPECIAL,
+    }
+    return [
+        category
+        for category, pattern in checks.items()
+        if pattern.search(value) is None
+    ]

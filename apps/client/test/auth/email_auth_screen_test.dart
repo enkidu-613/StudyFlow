@@ -98,21 +98,75 @@ void main() {
     });
   });
 
-  group('validatePasswordField', () {
-    test('accepts a password at least 12 characters long', () {
-      expect(validatePasswordField('correct horse battery'), isNull);
+  group('validateRegisterPasswordField', () {
+    test('accepts a password with all required categories', () {
+      expect(validateRegisterPasswordField('Correct-Horse-1'), isNull);
+    });
+
+    test('accepts a password at exactly 8 characters with all categories', () {
+      expect(validateRegisterPasswordField('Ab1!cdef'), isNull);
     });
 
     test('rejects empty value', () {
-      expect(validatePasswordField(null), 'Password is required');
-      expect(validatePasswordField(''), 'Password is required');
+      expect(validateRegisterPasswordField(null), 'Password is required');
+      expect(validateRegisterPasswordField(''), 'Password is required');
     });
 
     test('rejects a short password', () {
       expect(
-        validatePasswordField('short'),
-        'Password must be at least 12 characters',
+        validateRegisterPasswordField('short'),
+        'Password must be at least 8 characters',
       );
+    });
+
+    test('rejects a password missing an uppercase letter', () {
+      expect(
+        validateRegisterPasswordField('correct-horse-1'),
+        'Password must contain an uppercase letter',
+      );
+    });
+
+    test('rejects a password missing a lowercase letter', () {
+      expect(
+        validateRegisterPasswordField('CORRECT-HORSE-1'),
+        'Password must contain a lowercase letter',
+      );
+    });
+
+    test('rejects a password missing a digit', () {
+      expect(
+        validateRegisterPasswordField('Correct-Horse-Battery'),
+        'Password must contain a digit',
+      );
+    });
+
+    test('rejects a password missing a special character', () {
+      expect(
+        validateRegisterPasswordField('CorrectHorse1'),
+        'Password must contain a special character',
+      );
+    });
+
+    test('allows spaces and unicode alongside required categories', () {
+      expect(validateRegisterPasswordField('Café-Macaroon-1'), isNull);
+    });
+
+    test('space does not count as a special character', () {
+      expect(
+        validateRegisterPasswordField('CorrectHorse1 '),
+        'Password must contain a special character',
+      );
+    });
+  });
+
+  group('validateLoginPasswordField', () {
+    test('accepts a legacy password without composition rules', () {
+      expect(validateLoginPasswordField('correct horse battery'), isNull);
+    });
+
+    test('rejects empty value', () {
+      expect(validateLoginPasswordField(null), 'Password is required');
+      expect(validateLoginPasswordField(''), 'Password is required');
     });
   });
 }

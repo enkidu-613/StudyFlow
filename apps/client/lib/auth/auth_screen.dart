@@ -158,7 +158,9 @@ final class _AuthScreenState extends State<AuthScreen> {
                         labelText: 'Password',
                         prefixIcon: Icon(Icons.lock_outline),
                       ),
-                      validator: validatePasswordField,
+                      validator: _mode == AuthMode.register
+                          ? validateRegisterPasswordField
+                          : validateLoginPasswordField,
                     ),
                     if (_mode == AuthMode.register) ...<Widget>[
                       const SizedBox(height: 12),

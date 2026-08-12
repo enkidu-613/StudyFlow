@@ -22,7 +22,7 @@ from server.app.db.models import Base, User, UserSession
 
 
 TOKEN_SIGNING_KEY = "test-signing-key-at-least-32-bytes-long"
-PASSWORD = "correct horse battery staple"
+PASSWORD = "Correct-Horse-Battery-1"
 
 
 @dataclass

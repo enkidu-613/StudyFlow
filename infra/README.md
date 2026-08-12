@@ -265,10 +265,12 @@ live 接口应返回 status 为 ok。ready 接口会检查本地 PostgreSQL 连�
 ~~~bash
 curl -fsS -X POST https://api.example.com/v1/auth/register \
   -H 'Content-Type: application/json' \
-  -d '{"email":"you@example.com","password":"你的至少12位密码"}'
+  -d '{"email":"you@example.com","password":"你的密码"}'
 ~~~
 
-响应包含 access_token 和 refresh_token。不要在文档、日志或仓库中保存密码。
+密码要求：8–256 位，且必须包含大写字母、小写字母、数字和 ASCII 特殊符号
+（如 `!@#$%^&*`）。响应包含 access_token 和 refresh_token。不要在文档、
+日志或仓库中保存密码。
 
 ## 九、启动客户端
 
