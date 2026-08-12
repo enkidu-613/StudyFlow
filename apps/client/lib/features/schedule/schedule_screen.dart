@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:studyflow/app/studyflow_workspace.dart';
+import 'package:studyflow/l10n/l10n_extension.dart';
 import 'package:studyflow/util/uuid.dart';
 import 'package:studyflow_domain/domain.dart';
 
@@ -63,8 +64,9 @@ final class _ScheduleScreenState extends State<ScheduleScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Scaffold(
-      appBar: AppBar(title: const Text('Schedule')),
+      appBar: AppBar(title: Text(l10n.navSchedule)),
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: _loading
@@ -89,16 +91,16 @@ final class _ScheduleScreenState extends State<ScheduleScreen> {
                           : null,
                     ),
                   if (_blocks.isEmpty && _error == null)
-                    const Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Center(child: Text('No schedule blocks')),
+                    Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Center(child: Text(l10n.scheduleEmpty)),
                     ),
                 ],
               ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _openEditor,
-        tooltip: 'New block',
+        tooltip: l10n.blockNew,
         child: const Icon(Icons.add),
       ),
     );
@@ -196,7 +198,7 @@ final class _ScheduleBlockEditorState extends State<_ScheduleBlockEditor> {
 
   Future<void> _save() async {
     if (!_end.isAfter(_start)) {
-      setState(() => _error = 'End must be after start.');
+      setState(() => _error = context.l10n.blockEndAfterStart);
       return;
     }
     final block = ScheduleBlock(
@@ -219,6 +221,7 @@ final class _ScheduleBlockEditorState extends State<_ScheduleBlockEditor> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Padding(
       padding: EdgeInsets.only(
         left: 16,
@@ -230,11 +233,11 @@ final class _ScheduleBlockEditorState extends State<_ScheduleBlockEditor> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          const Text('New block', style: TextStyle(fontSize: 20)),
+          Text(l10n.blockNew, style: const TextStyle(fontSize: 20)),
           const SizedBox(height: 16),
           DropdownButtonFormField<ScheduleBlockKind>(
             initialValue: _kind,
-            decoration: const InputDecoration(labelText: 'Kind'),
+            decoration: InputDecoration(labelText: l10n.blockKindLabel),
             items: <DropdownMenuItem<ScheduleBlockKind>>[
               for (final kind in ScheduleBlockKind.values)
                 DropdownMenuItem<ScheduleBlockKind>(
@@ -272,7 +275,7 @@ final class _ScheduleBlockEditorState extends State<_ScheduleBlockEditor> {
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: _taskId,
-              decoration: const InputDecoration(labelText: 'Task'),
+              decoration: InputDecoration(labelText: l10n.blockTaskLabel),
               items: <DropdownMenuItem<String>>[
                 for (final task in widget.tasks)
                   DropdownMenuItem<String>(
@@ -285,7 +288,7 @@ final class _ScheduleBlockEditorState extends State<_ScheduleBlockEditor> {
           ],
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Locked'),
+            title: Text(l10n.blockLocked),
             value: _locked,
             onChanged: (value) => setState(() => _locked = value),
           ),
@@ -294,7 +297,7 @@ final class _ScheduleBlockEditorState extends State<_ScheduleBlockEditor> {
           FilledButton.icon(
             onPressed: _save,
             icon: const Icon(Icons.save_outlined),
-            label: const Text('Save'),
+            label: Text(l10n.commonSave),
           ),
         ],
       ),

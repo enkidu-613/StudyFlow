@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'ai_repository.dart';
 import 'ai_settings_model.dart';
+import '../../l10n/l10n_extension.dart';
 
 final class AiSettingsScreen extends StatefulWidget {
   const AiSettingsScreen({
@@ -26,6 +27,7 @@ final class _AiSettingsScreenState extends State<AiSettingsScreen> {
   bool _loading = true;
   bool _saving = false;
   String? _testResult;
+  bool _testFailed = false;
 
   @override
   void initState() {
@@ -73,7 +75,10 @@ final class _AiSettingsScreenState extends State<AiSettingsScreen> {
         ),
       );
       if (mounted) {
-        setState(() => _testResult = '已保存');
+        setState(() {
+          _testResult = context.l10n.aiSaved;
+          _testFailed = false;
+        });
       }
     } finally {
       if (mounted) {
@@ -100,15 +105,24 @@ final class _AiSettingsScreenState extends State<AiSettingsScreen> {
         ),
       );
       if (mounted) {
-        setState(() => _testResult = '连接成功');
+        setState(() {
+          _testResult = context.l10n.aiConnectionSuccess;
+          _testFailed = false;
+        });
       }
     } on AiApiFailure catch (error) {
       if (mounted) {
-        setState(() => _testResult = '连接失败：${error.message}');
+        setState(() {
+          _testResult = context.l10n.aiConnectionFailed(error.message);
+          _testFailed = true;
+        });
       }
     } on Object {
       if (mounted) {
-        setState(() => _testResult = '连接失败，请稍后重试');
+        setState(() {
+          _testResult = context.l10n.aiConnectionFailedGeneric;
+          _testFailed = true;
+        });
       }
     } finally {
       if (mounted) {
@@ -121,17 +135,17 @@ final class _AiSettingsScreenState extends State<AiSettingsScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('清除 AI 配置'),
-        content: const Text('将删除本机的 Base URL、模型和 API Key，确定吗？'),
+        title: Text(context.l10n.aiClearTitle),
+        content: Text(context.l10n.aiClearBody),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
+            child: Text(context.l10n.commonCancel),
           ),
           FilledButton(
             key: const Key('ai-clear-confirm-button'),
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('清除'),
+            child: Text(context.l10n.aiClearConfirm),
           ),
         ],
       ),
@@ -150,7 +164,8 @@ final class _AiSettingsScreenState extends State<AiSettingsScreen> {
         _modelController.clear();
         _apiKeyController.clear();
         _enabled = false;
-        _testResult = '已清除';
+        _testResult = context.l10n.aiCleared;
+        _testFailed = false;
       });
     } finally {
       if (mounted) {
@@ -161,8 +176,9 @@ final class _AiSettingsScreenState extends State<AiSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Scaffold(
-      appBar: AppBar(title: const Text('AI 设置')),
+      appBar: AppBar(title: Text(l10n.settingsAiEntry)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Form(
@@ -172,8 +188,8 @@ final class _AiSettingsScreenState extends State<AiSettingsScreen> {
                 children: <Widget>[
                   SwitchListTile(
                     key: const Key('ai-enabled-switch'),
-                    title: const Text('启用 AI 建议'),
-                    subtitle: const Text('API Key 只保存在本机安全存储，不会上传。'),
+                    title: Text(l10n.aiEnabledTitle),
+                    subtitle: Text(l10n.aiEnabledSubtitle),
                     value: _enabled,
                     onChanged: (value) =>
                         setState(() => _enabled = value),
@@ -183,26 +199,28 @@ final class _AiSettingsScreenState extends State<AiSettingsScreen> {
                     controller: _baseUrlController,
                     enabled: !_saving,
                     keyboardType: TextInputType.url,
-                    decoration: const InputDecoration(
-                      labelText: 'Base URL',
+                    decoration: InputDecoration(
+                      labelText: l10n.aiBaseUrlLabel,
                       hintText: 'https://api.openai.com/v1',
-                      prefixIcon: Icon(Icons.link),
+                      prefixIcon: const Icon(Icons.link),
                     ),
-                    validator: validateAiBaseUrl,
+                    validator: (value) =>
+                        _localizedAiBaseUrlError(validateAiBaseUrl(value)),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     key: const Key('ai-model-field'),
                     controller: _modelController,
                     enabled: !_saving,
-                    decoration: const InputDecoration(
-                      labelText: 'Model',
+                    decoration: InputDecoration(
+                      labelText: l10n.aiModelLabel,
                       hintText: 'gpt-4o-mini',
-                      prefixIcon: Icon(Icons.smart_toy_outlined),
+                      prefixIcon: const Icon(Icons.smart_toy_outlined),
                     ),
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? 'Model 名称不能为空'
-                        : null,
+                    validator: (value) =>
+                        value == null || value.trim().isEmpty
+                            ? l10n.aiModelRequired
+                            : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -210,13 +228,14 @@ final class _AiSettingsScreenState extends State<AiSettingsScreen> {
                     controller: _apiKeyController,
                     enabled: !_saving,
                     obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'API Key',
-                      prefixIcon: Icon(Icons.key_outlined),
+                    decoration: InputDecoration(
+                      labelText: l10n.aiApiKeyLabel,
+                      prefixIcon: const Icon(Icons.key_outlined),
                     ),
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? 'API Key 不能为空'
-                        : null,
+                    validator: (value) =>
+                        value == null || value.trim().isEmpty
+                            ? l10n.aiApiKeyRequired
+                            : null,
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -226,7 +245,7 @@ final class _AiSettingsScreenState extends State<AiSettingsScreen> {
                           key: const Key('ai-save-button'),
                           onPressed: _saving ? null : _save,
                           icon: const Icon(Icons.save_outlined),
-                          label: const Text('保存'),
+                          label: Text(l10n.aiSave),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -235,7 +254,7 @@ final class _AiSettingsScreenState extends State<AiSettingsScreen> {
                           key: const Key('ai-test-button'),
                           onPressed: _saving ? null : _test,
                           icon: const Icon(Icons.bolt_outlined),
-                          label: const Text('测试连接'),
+                          label: Text(l10n.aiTestConnection),
                         ),
                       ),
                     ],
@@ -245,7 +264,7 @@ final class _AiSettingsScreenState extends State<AiSettingsScreen> {
                     key: const Key('ai-clear-button'),
                     onPressed: _saving ? null : _clear,
                     icon: const Icon(Icons.delete_outline),
-                    label: const Text('清除配置'),
+                    label: Text(l10n.aiClearConfig),
                     style: TextButton.styleFrom(
                       foregroundColor: Theme.of(context).colorScheme.error,
                     ),
@@ -257,7 +276,7 @@ final class _AiSettingsScreenState extends State<AiSettingsScreen> {
                       key: const Key('ai-test-result'),
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: _testResult!.startsWith('连接失败')
+                        color: _testFailed
                             ? Theme.of(context).colorScheme.error
                             : Theme.of(context).colorScheme.primary,
                       ),
@@ -267,5 +286,18 @@ final class _AiSettingsScreenState extends State<AiSettingsScreen> {
               ),
             ),
     );
+  }
+
+  String? _localizedAiBaseUrlError(String? message) {
+    final l10n = context.l10n;
+    if (message == null) {
+      return null;
+    }
+    return switch (message) {
+      'Base URL is required' => l10n.aiBaseUrlRequired,
+      'Enter a valid URL' => l10n.aiBaseUrlInvalid,
+      'Base URL must use HTTPS' => l10n.aiBaseUrlRequireHttps,
+      _ => message,
+    };
   }
 }

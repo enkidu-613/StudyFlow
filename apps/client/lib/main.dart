@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:studyflow/app/studyflow_workspace.dart';
 import 'package:studyflow/auth/auth_repository.dart';
@@ -14,6 +15,21 @@ import 'package:studyflow/features/schedule/schedule_screen.dart';
 import 'package:studyflow/features/settings/settings_screen.dart';
 import 'package:studyflow/features/shell/studyflow_shell.dart';
 import 'package:studyflow/features/tasks/task_list_screen.dart';
+import 'package:studyflow/l10n/app_localizations.dart';
+import 'package:studyflow/l10n/l10n_extension.dart';
+
+const List<LocalizationsDelegate<dynamic>> _localizationsDelegates = <
+    LocalizationsDelegate<dynamic>>[
+  AppLocalizations.delegate,
+  GlobalMaterialLocalizations.delegate,
+  GlobalWidgetsLocalizations.delegate,
+  GlobalCupertinoLocalizations.delegate,
+];
+
+const List<Locale> _supportedLocales = <Locale>[
+  Locale('zh'),
+  Locale('en'),
+];
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,23 +60,28 @@ final class StudyFlowConfigErrorApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
+      localizationsDelegates: _localizationsDelegates,
+      supportedLocales: _supportedLocales,
       home: Scaffold(
         body: Center(
           child: Padding(
-            padding: EdgeInsets.all(24),
+            padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
-                Icon(Icons.settings_ethernet, size: 48),
-                SizedBox(height: 16),
+                const Icon(Icons.settings_ethernet, size: 48),
+                const SizedBox(height: 16),
                 Text(
-                  'API 地址未配置',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  context.l10n.configErrorTitle,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(
-                  '请使用 --dart-define=STUDYFLOW_API_BASE_URL=https://api.example.com 启动客户端。',
+                  context.l10n.configErrorBody,
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -92,7 +113,7 @@ final class StudyFlowRoot extends StatefulWidget {
 
 final class _StudyFlowRootState extends State<StudyFlowRoot> {
   ClientSession? _session;
-  String? _message;
+  AuthInitialMessage? _initialMessageKind;
   bool _loading = true;
 
   @override
@@ -121,9 +142,9 @@ final class _StudyFlowRootState extends State<StudyFlowRoot> {
           await _openSession(refreshed);
         }
       }
-    } on Object catch (error) {
+    } on Object {
       if (mounted) {
-        setState(() => _message = '无法恢复上次会话：$error');
+        setState(() => _initialMessageKind = AuthInitialMessage.restoreFailed);
       }
     } finally {
       if (mounted) {
@@ -135,16 +156,21 @@ final class _StudyFlowRootState extends State<StudyFlowRoot> {
   Future<AuthContext?> _refreshOrClear(AuthContext context) async {
     try {
       return await widget.authRepository.refresh();
-    } on AuthApiException catch (error) {
+    } on AuthApiException {
       await widget.authRepository.logout();
       if (mounted) {
-        setState(() => _message = '登录已过期，请重新登录（${error.message}）');
+        setState(
+          () => _initialMessageKind = AuthInitialMessage.sessionExpired,
+        );
       }
       return null;
-    } on Object catch (error) {
+    } on Object {
       await widget.authRepository.logout();
       if (mounted) {
-        setState(() => _message = '无法恢复上次会话，请重新登录：$error');
+        setState(
+          () => _initialMessageKind =
+              AuthInitialMessage.restoreFailedAndSignIn,
+        );
       }
       return null;
     }
@@ -160,7 +186,7 @@ final class _StudyFlowRootState extends State<StudyFlowRoot> {
     _session = next;
     await previous?.close();
     if (mounted) {
-      setState(() => _message = null);
+      setState(() => _initialMessageKind = null);
     }
   }
 
@@ -175,7 +201,7 @@ final class _StudyFlowRootState extends State<StudyFlowRoot> {
     await previous?.close();
     await widget.authRepository.logout();
     if (mounted) {
-      setState(() => _message = null);
+      setState(() => _initialMessageKind = null);
     }
   }
 
@@ -183,7 +209,11 @@ final class _StudyFlowRootState extends State<StudyFlowRoot> {
   Widget build(BuildContext context) {
     if (_loading) {
       return const MaterialApp(
-        home: Scaffold(body: Center(child: CircularProgressIndicator())),
+        localizationsDelegates: _localizationsDelegates,
+        supportedLocales: _supportedLocales,
+        home: Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        ),
       );
     }
     final session = _session;
@@ -194,8 +224,10 @@ final class _StudyFlowRootState extends State<StudyFlowRoot> {
       );
     }
     return MaterialApp(
+      localizationsDelegates: _localizationsDelegates,
+      supportedLocales: _supportedLocales,
       home: AuthScreen(
-        initialMessage: _message,
+        initialMessageKind: _initialMessageKind,
         onLogin: (email, password) => _authenticate(
           () => widget.controller.login(email: email, password: password),
         ),
@@ -219,6 +251,8 @@ class StudyFlowApp extends StatelessWidget {
     final activeWorkspace = workspace ?? session?.workspace;
     return MaterialApp.router(
       title: 'StudyFlow',
+      localizationsDelegates: _localizationsDelegates,
+      supportedLocales: _supportedLocales,
       theme: ThemeData(
         colorSchemeSeed: const Color(0xFF356B8C),
         useMaterial3: true,

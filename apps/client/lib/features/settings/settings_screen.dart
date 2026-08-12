@@ -3,6 +3,7 @@ import 'package:studyflow/app/studyflow_workspace.dart';
 import 'package:studyflow/features/ai/ai_repository.dart';
 import 'package:studyflow/features/ai/ai_settings_model.dart';
 import 'package:studyflow/features/ai/ai_settings_screen.dart';
+import 'package:studyflow/l10n/l10n_extension.dart';
 import 'package:studyflow/sync/sync_status.dart';
 import 'package:studyflow_platform_contract/platform_contract.dart';
 
@@ -68,8 +69,9 @@ final class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: Text(l10n.navSettings)),
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: ListView(
@@ -89,7 +91,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
               Card(
                 child: ListTile(
                   leading: const Icon(Icons.bar_chart_outlined),
-                  title: const Text('Usage summary'),
+                  title: Text(l10n.settingsUsageSummary),
                   subtitle: Text(_usageResult!.message),
                   trailing: Icon(
                     _usageResult!.isSupported
@@ -99,8 +101,10 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
             const SizedBox(height: 8),
-            const Text('Permissions',
-                style: TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              l10n.settingsPermissions,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             for (final state in _health?.states ?? const <PermissionState>[])
               Card(
@@ -112,7 +116,11 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   title: Text(state.id.name),
                   subtitle: Text(state.detail),
-                  trailing: Text(state.available ? 'available' : 'unavailable'),
+                  trailing: Text(
+                    state.available
+                        ? l10n.permissionAvailable
+                        : l10n.permissionUnavailable,
+                  ),
                 ),
               ),
             const SizedBox(height: 16),
@@ -120,8 +128,8 @@ final class _SettingsScreenState extends State<SettingsScreen> {
               child: ListTile(
                 key: const Key('open-ai-settings'),
                 leading: const Icon(Icons.auto_awesome_outlined),
-                title: const Text('AI 设置'),
-                subtitle: const Text('配置 Base URL、模型和 API Key'),
+                title: Text(l10n.settingsAiEntry),
+                subtitle: Text(l10n.settingsAiSubtitle),
                 trailing: const Icon(Icons.arrow_forward),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
@@ -139,7 +147,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                 key: const Key('sign-out-button'),
                 onPressed: _busyLogout ? null : _signOut,
                 icon: const Icon(Icons.logout),
-                label: const Text('Sign out'),
+                label: Text(l10n.settingsSignOut),
               ),
             ],
           ],
@@ -182,33 +190,40 @@ final class _SyncStatusCard extends StatelessWidget {
     final listenable = status;
     if (listenable == null) {
       return _buildCard(
+        context,
         const SyncStatus.idle(pendingCount: 0),
         pendingOverride: pendingFallback,
       );
     }
     return ValueListenableBuilder<SyncStatus>(
       valueListenable: listenable,
-      builder: (context, value, child) => _buildCard(value),
+      builder: (context, value, child) => _buildCard(context, value),
     );
   }
 
-  Widget _buildCard(SyncStatus value, {int? pendingOverride}) {
+  Widget _buildCard(
+    BuildContext context,
+    SyncStatus value, {
+    int? pendingOverride,
+  }) {
+    final l10n = context.l10n;
     final pending = pendingOverride ?? value.pendingCount;
     final isIdle = value.kind == SyncStatusKind.idle;
     final isOffline = value.kind == SyncStatusKind.offline;
     final subtitle = switch (value.kind) {
-      SyncStatusKind.idle => 'Synchronized or waiting for changes',
-      SyncStatusKind.syncing => 'Synchronizing encrypted records…',
-      SyncStatusKind.offline => 'Offline; local changes are safe',
-      SyncStatusKind.failed =>
-        'Sync failed: ${value.failureCategory?.name ?? 'unknown'}',
+      SyncStatusKind.idle => l10n.syncIdle,
+      SyncStatusKind.syncing => l10n.syncSyncing,
+      SyncStatusKind.offline => l10n.syncOffline,
+      SyncStatusKind.failed => l10n.syncFailed(
+          value.failureCategory?.name ?? l10n.syncUnknown,
+        ),
     };
     return Card(
       child: ListTile(
         leading: Icon(
           isIdle ? Icons.cloud_done_outlined : Icons.cloud_upload_outlined,
         ),
-        title: const Text('Pending sync'),
+        title: Text(l10n.syncPendingTitle),
         subtitle: Text(subtitle),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
@@ -217,7 +232,7 @@ final class _SyncStatusCard extends StatelessWidget {
             if (onSync != null)
               IconButton(
                 key: const Key('sync-now-button'),
-                tooltip: isOffline ? 'Retry when online' : 'Sync now',
+                tooltip: isOffline ? l10n.syncRetryOnline : l10n.syncNow,
                 onPressed: onSync,
                 icon: Icon(
                   isOffline ? Icons.refresh : Icons.sync,

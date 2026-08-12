@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:studyflow/app/studyflow_workspace.dart';
 import 'package:studyflow/features/settings/settings_screen.dart';
 import 'package:studyflow/sync/sync_status.dart';
+import '../../helpers/l10n_test_app.dart';
 
 void main() {
   late Directory directory;
@@ -30,17 +31,16 @@ void main() {
     );
     var syncCalls = 0;
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: SettingsScreen(
-          workspace: workspace,
-          syncStatus: status,
-          onSync: () async {
-            syncCalls += 1;
-            status.value = const SyncStatus.idle(pendingCount: 0);
-            return null;
-          },
-        ),
+    await pumpWithL10n(
+      tester,
+      SettingsScreen(
+        workspace: workspace,
+        syncStatus: status,
+        onSync: () async {
+          syncCalls += 1;
+          status.value = const SyncStatus.idle(pendingCount: 0);
+          return null;
+        },
       ),
     );
     await tester.pumpAndSettle();
@@ -58,10 +58,9 @@ void main() {
 
   testWidgets('settings no longer offers a recovery key export',
       (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: SettingsScreen(workspace: workspace),
-      ),
+    await pumpWithL10n(
+      tester,
+      SettingsScreen(workspace: workspace),
     );
     await tester.pumpAndSettle();
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:studyflow/features/ai/ai_repository.dart';
+import 'package:studyflow/l10n/l10n_extension.dart';
 
 /// Displays AI recommendations without ever mutating tasks or schedule
 /// blocks. Any applied change must go through the normal user-confirmed flow.
@@ -48,8 +49,9 @@ final class _RecommendationScreenState extends State<RecommendationScreen> {
   @override
   Widget build(BuildContext context) {
     final recommendation = _recommendation;
+    final l10n = context.l10n;
     return Scaffold(
-      appBar: AppBar(title: const Text('AI Recommendations')),
+      appBar: AppBar(title: Text(l10n.aiRecommendTitle)),
       body: RefreshIndicator(
         onRefresh: _request,
         child: ListView(
@@ -59,7 +61,7 @@ final class _RecommendationScreenState extends State<RecommendationScreen> {
               Card(
                 child: ListTile(
                   leading: const Icon(Icons.error_outline),
-                  title: const Text('Recommendation unavailable'),
+                  title: Text(l10n.aiRecommendError),
                   subtitle: Text('$_error'),
                 ),
               ),
@@ -88,9 +90,9 @@ final class _RecommendationScreenState extends State<RecommendationScreen> {
                       ],
                       if (recommendation.candidateChanges.isNotEmpty) ...<Widget>[
                         const SizedBox(height: 12),
-                        const Text(
-                          'Proposed changes (require confirmation)',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                        Text(
+                          l10n.aiProposedChanges,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         for (final change in recommendation.candidateChanges)
                           ListTile(
@@ -98,14 +100,16 @@ final class _RecommendationScreenState extends State<RecommendationScreen> {
                             leading: const Icon(Icons.schedule_outlined),
                             title: Text(change.action),
                             subtitle: Text(
-                              '${change.deltaMinutes} min · ${change.reason}',
+                              l10n.aiChangeRow(
+                                change.deltaMinutes,
+                                change.reason,
+                              ),
                             ),
                           ),
                         const SizedBox(height: 8),
-                        const Text(
-                          'Nothing was changed. Accept these changes in '
-                          'the schedule screen after review.',
-                          style: TextStyle(fontStyle: FontStyle.italic),
+                        Text(
+                          l10n.aiNothingChanged,
+                          style: const TextStyle(fontStyle: FontStyle.italic),
                         ),
                       ],
                     ],
@@ -119,9 +123,7 @@ final class _RecommendationScreenState extends State<RecommendationScreen> {
               onPressed: _loading ? null : _request,
               icon: const Icon(Icons.auto_awesome_outlined),
               label: Text(
-                _recommendation == null
-                    ? 'Request recommendation'
-                    : 'Request another',
+                _recommendation == null ? l10n.aiRequest : l10n.aiRequestAgain,
               ),
             ),
           ],

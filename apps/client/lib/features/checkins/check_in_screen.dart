@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:studyflow/app/studyflow_workspace.dart';
+import 'package:studyflow/l10n/l10n_extension.dart';
 import 'package:studyflow/util/uuid.dart';
 import 'package:studyflow_domain/domain.dart';
 
@@ -63,8 +64,9 @@ final class _CheckInScreenState extends State<CheckInScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Scaffold(
-      appBar: AppBar(title: const Text('Check in')),
+      appBar: AppBar(title: Text(l10n.homeCheckIn)),
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: _loading
@@ -82,8 +84,10 @@ final class _CheckInScreenState extends State<CheckInScreen> {
                       child: ListTile(
                         leading: const Icon(Icons.bedtime_outlined),
                         title: Text(
-                          '${checkIn.sleepMinutes} min sleep '
-                          '· energy ${checkIn.energy}',
+                          l10n.checkInRowTitle(
+                            checkIn.energy,
+                            checkIn.sleepMinutes,
+                          ),
                         ),
                         subtitle: Text(_format(checkIn.recordedAt)),
                         trailing: _RatingDots(
@@ -92,16 +96,16 @@ final class _CheckInScreenState extends State<CheckInScreen> {
                       ),
                     ),
                   if (_checkIns.isEmpty && _error == null)
-                    const Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Center(child: Text('No check-ins yet')),
+                    Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Center(child: Text(l10n.checkInsEmpty)),
                     ),
                 ],
               ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _openEditor,
-        tooltip: 'New check-in',
+        tooltip: l10n.checkInNew,
         child: const Icon(Icons.add),
       ),
     );
@@ -162,8 +166,9 @@ final class _CheckInDialogState extends State<CheckInDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return AlertDialog(
-      title: const Text('Check in'),
+      title: Text(l10n.checkInNew),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -172,23 +177,23 @@ final class _CheckInDialogState extends State<CheckInDialog> {
               key: const Key('check-in-sleep-field'),
               controller: _sleepController,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Sleep minutes',
-                suffixText: 'min',
+              decoration: InputDecoration(
+                labelText: l10n.checkInSleepMinutes,
+                suffixText: l10n.minutesSuffix,
               ),
             ),
             _RatingSlider(
-              label: 'Sleep quality',
+              label: l10n.checkInSleepQuality,
               value: _sleepQuality,
               onChanged: (value) => setState(() => _sleepQuality = value),
             ),
             _RatingSlider(
-              label: 'Energy',
+              label: l10n.checkInEnergy,
               value: _energy,
               onChanged: (value) => setState(() => _energy = value),
             ),
             _RatingSlider(
-              label: 'Mood',
+              label: l10n.checkInMood,
               value: _mood,
               onChanged: (value) => setState(() => _mood = value),
             ),
@@ -196,7 +201,7 @@ final class _CheckInDialogState extends State<CheckInDialog> {
               key: const Key('check-in-feedback-field'),
               controller: _feedbackController,
               maxLines: 3,
-              decoration: const InputDecoration(labelText: 'Feedback'),
+              decoration: InputDecoration(labelText: l10n.checkInFeedback),
             ),
             if (_error != null) Text(_error!),
           ],
@@ -205,12 +210,12 @@ final class _CheckInDialogState extends State<CheckInDialog> {
       actions: <Widget>[
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(l10n.commonCancel),
         ),
         FilledButton(
           key: const Key('save-check-in-button'),
           onPressed: _save,
-          child: const Text('Save'),
+          child: Text(l10n.commonSave),
         ),
       ],
     );
@@ -219,7 +224,7 @@ final class _CheckInDialogState extends State<CheckInDialog> {
   Future<void> _save() async {
     final sleepMinutes = int.tryParse(_sleepController.text.trim());
     if (sleepMinutes == null || sleepMinutes < 0) {
-      setState(() => _error = 'Sleep minutes must be a non-negative number.');
+      setState(() => _error = context.l10n.checkInSleepInvalid);
       return;
     }
     Navigator.of(context).pop(

@@ -1,23 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:studyflow/auth/auth_screen.dart';
 import 'package:studyflow/auth/auth_repository.dart';
+import 'package:studyflow/auth/auth_screen.dart';
+import '../helpers/l10n_test_app.dart';
 
 void main() {
   testWidgets('initial state shows sign in and create account only',
       (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: AuthScreen(
-          onLogin: (_, __) async {},
-          onRegister: (_, __) async {},
-        ),
+    await pumpWithL10n(
+      tester,
+      AuthScreen(
+        onLogin: (_, __) async {},
+        onRegister: (_, __) async {},
       ),
     );
 
     expect(find.byKey(const Key('auth-screen')), findsOneWidget);
-    expect(find.text('Sign in'), findsWidgets);
-    expect(find.text('Create account'), findsWidgets);
+    expect(find.text('登录'), findsWidgets);
+    expect(find.text('注册'), findsWidgets);
     expect(find.text('Initialize'), findsNothing);
     expect(find.text('Pair'), findsNothing);
     expect(find.text('Recovery key'), findsNothing);
@@ -27,12 +27,11 @@ void main() {
   });
 
   testWidgets('login mode shows email and password fields', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: AuthScreen(
-          onLogin: (_, __) async {},
-          onRegister: (_, __) async {},
-        ),
+    await pumpWithL10n(
+      tester,
+      AuthScreen(
+        onLogin: (_, __) async {},
+        onRegister: (_, __) async {},
       ),
     );
 
@@ -43,16 +42,15 @@ void main() {
 
   testWidgets('register mode shows email, password and confirmation',
       (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: AuthScreen(
-          onLogin: (_, __) async {},
-          onRegister: (_, __) async {},
-        ),
+    await pumpWithL10n(
+      tester,
+      AuthScreen(
+        onLogin: (_, __) async {},
+        onRegister: (_, __) async {},
       ),
     );
 
-    await tester.tap(find.text('Create account'));
+    await tester.tap(find.text('注册'));
     await tester.pump();
 
     expect(find.byKey(const Key('auth-email-field')), findsOneWidget);
@@ -63,15 +61,14 @@ void main() {
   testWidgets('login submits email and password', (tester) async {
     String? submittedEmail;
     String? submittedPassword;
-    await tester.pumpWidget(
-      MaterialApp(
-        home: AuthScreen(
-          onLogin: (email, password) async {
-            submittedEmail = email;
-            submittedPassword = password;
-          },
-          onRegister: (_, __) async {},
-        ),
+    await pumpWithL10n(
+      tester,
+      AuthScreen(
+        onLogin: (email, password) async {
+          submittedEmail = email;
+          submittedPassword = password;
+        },
+        onRegister: (_, __) async {},
       ),
     );
 
@@ -93,19 +90,18 @@ void main() {
   testWidgets('register submits email and password', (tester) async {
     String? submittedEmail;
     String? submittedPassword;
-    await tester.pumpWidget(
-      MaterialApp(
-        home: AuthScreen(
-          onLogin: (_, __) async {},
-          onRegister: (email, password) async {
-            submittedEmail = email;
-            submittedPassword = password;
-          },
-        ),
+    await pumpWithL10n(
+      tester,
+      AuthScreen(
+        onLogin: (_, __) async {},
+        onRegister: (email, password) async {
+          submittedEmail = email;
+          submittedPassword = password;
+        },
       ),
     );
 
-    await tester.tap(find.text('Create account'));
+    await tester.tap(find.text('注册'));
     await tester.pump();
     await tester.enterText(
       find.byKey(const Key('auth-email-field')),
@@ -129,18 +125,17 @@ void main() {
   testWidgets('password mismatch blocks submission and shows inline error',
       (tester) async {
     var submitted = false;
-    await tester.pumpWidget(
-      MaterialApp(
-        home: AuthScreen(
-          onLogin: (_, __) async {},
-          onRegister: (_, __) async {
-            submitted = true;
-          },
-        ),
+    await pumpWithL10n(
+      tester,
+      AuthScreen(
+        onLogin: (_, __) async {},
+        onRegister: (_, __) async {
+          submitted = true;
+        },
       ),
     );
 
-    await tester.tap(find.text('Create account'));
+    await tester.tap(find.text('注册'));
     await tester.pump();
     await tester.enterText(
       find.byKey(const Key('auth-email-field')),
@@ -158,21 +153,20 @@ void main() {
     await tester.pump();
 
     expect(submitted, isFalse);
-    expect(find.text('Passwords do not match'), findsOneWidget);
+    expect(find.text('两次输入的密码不一致'), findsOneWidget);
   });
 
   testWidgets('short password shows inline validation error in register mode',
       (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: AuthScreen(
-          onLogin: (_, __) async {},
-          onRegister: (_, __) async {},
-        ),
+    await pumpWithL10n(
+      tester,
+      AuthScreen(
+        onLogin: (_, __) async {},
+        onRegister: (_, __) async {},
       ),
     );
 
-    await tester.tap(find.text('Create account'));
+    await tester.tap(find.text('注册'));
     await tester.pump();
     await tester.enterText(
       find.byKey(const Key('auth-email-field')),
@@ -186,7 +180,7 @@ void main() {
     await tester.pump();
 
     expect(
-      find.text('Password must be at least 8 characters'),
+      find.text('密码至少需要 8 位'),
       findsOneWidget,
     );
   });
@@ -194,14 +188,13 @@ void main() {
   testWidgets('login mode accepts legacy passwords without composition rules',
       (tester) async {
     String? submittedPassword;
-    await tester.pumpWidget(
-      MaterialApp(
-        home: AuthScreen(
-          onLogin: (_, password) async {
-            submittedPassword = password;
-          },
-          onRegister: (_, __) async {},
-        ),
+    await pumpWithL10n(
+      tester,
+      AuthScreen(
+        onLogin: (_, password) async {
+          submittedPassword = password;
+        },
+        onRegister: (_, __) async {},
       ),
     );
 
@@ -220,14 +213,13 @@ void main() {
   });
 
   testWidgets('api failure shows friendly Chinese error', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: AuthScreen(
-          onLogin: (_, __) async {
-            throw const AuthApiException(401, null, 'Unauthorized.');
-          },
-          onRegister: (_, __) async {},
-        ),
+    await pumpWithL10n(
+      tester,
+      AuthScreen(
+        onLogin: (_, __) async {
+          throw const AuthApiException(401, null, 'Unauthorized.');
+        },
+        onRegister: (_, __) async {},
       ),
     );
 
@@ -247,14 +239,13 @@ void main() {
   });
 
   testWidgets('server detail message takes precedence', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: AuthScreen(
-          onLogin: (_, __) async {
-            throw const AuthApiException(409, '该邮箱已被注册', 'Conflict.');
-          },
-          onRegister: (_, __) async {},
-        ),
+    await pumpWithL10n(
+      tester,
+      AuthScreen(
+        onLogin: (_, __) async {
+          throw const AuthApiException(409, '该邮箱已被注册', 'Conflict.');
+        },
+        onRegister: (_, __) async {},
       ),
     );
 
@@ -274,13 +265,12 @@ void main() {
   });
 
   testWidgets('initial message is displayed when provided', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: AuthScreen(
-          onLogin: (_, __) async {},
-          onRegister: (_, __) async {},
-          initialMessage: '登录已过期，请重新登录',
-        ),
+    await pumpWithL10n(
+      tester,
+      AuthScreen(
+        onLogin: (_, __) async {},
+        onRegister: (_, __) async {},
+        initialMessage: '登录已过期，请重新登录',
       ),
     );
 

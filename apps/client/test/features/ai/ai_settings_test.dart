@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:studyflow/features/ai/ai_repository.dart';
 import 'package:studyflow/features/ai/ai_settings_model.dart';
 import 'package:studyflow/features/ai/ai_settings_screen.dart';
+import '../../helpers/l10n_test_app.dart';
 
 final class MemoryAiSettingsStore implements AiSettingsStore {
   MemoryAiSettingsStore({this.initial = AiSettings.empty});
@@ -65,10 +66,9 @@ void main() {
         enabled: true,
       ),
     );
-    await tester.pumpWidget(
-      MaterialApp(
-        home: AiSettingsScreen(store: store, repository: RecordingAiRepository()),
-      ),
+    await pumpWithL10n(
+      tester,
+      AiSettingsScreen(store: store, repository: RecordingAiRepository()),
     );
     await tester.pumpAndSettle();
 
@@ -101,10 +101,9 @@ void main() {
   testWidgets('saving persists settings and masks nothing in plain log',
       (tester) async {
     final store = MemoryAiSettingsStore();
-    await tester.pumpWidget(
-      MaterialApp(
-        home: AiSettingsScreen(store: store, repository: RecordingAiRepository()),
-      ),
+    await pumpWithL10n(
+      tester,
+      AiSettingsScreen(store: store, repository: RecordingAiRepository()),
     );
     await tester.pumpAndSettle();
 
@@ -132,12 +131,11 @@ void main() {
 
   testWidgets('connection test reports success', (tester) async {
     final repository = RecordingAiRepository();
-    await tester.pumpWidget(
-      MaterialApp(
-        home: AiSettingsScreen(
-          store: MemoryAiSettingsStore(),
-          repository: repository,
-        ),
+    await pumpWithL10n(
+      tester,
+      AiSettingsScreen(
+        store: MemoryAiSettingsStore(),
+        repository: repository,
       ),
     );
     await tester.pumpAndSettle();
@@ -164,12 +162,11 @@ void main() {
   testWidgets('connection test failure shows a readable message',
       (tester) async {
     final repository = RecordingAiRepository(failTest: true);
-    await tester.pumpWidget(
-      MaterialApp(
-        home: AiSettingsScreen(
-          store: MemoryAiSettingsStore(),
-          repository: repository,
-        ),
+    await pumpWithL10n(
+      tester,
+      AiSettingsScreen(
+        store: MemoryAiSettingsStore(),
+        repository: repository,
       ),
     );
     await tester.pumpAndSettle();
@@ -202,10 +199,9 @@ void main() {
         enabled: true,
       ),
     );
-    await tester.pumpWidget(
-      MaterialApp(
-        home: AiSettingsScreen(store: store, repository: RecordingAiRepository()),
-      ),
+    await pumpWithL10n(
+      tester,
+      AiSettingsScreen(store: store, repository: RecordingAiRepository()),
     );
     await tester.pumpAndSettle();
 

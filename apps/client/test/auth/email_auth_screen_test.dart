@@ -63,19 +63,16 @@ void main() {
     });
   });
 
-  group('friendlyAuthError', () {
-    test('maps common status codes to readable Chinese messages', () {
-      expect(friendlyAuthError(401), '邮箱或密码错误');
-      expect(friendlyAuthError(409), '该邮箱已被注册');
-      expect(friendlyAuthError(422), '邮箱或密码格式不正确');
+  group('authErrorKey', () {
+    test('maps common status codes to stable error keys', () {
+      expect(authErrorKey(401), 'authErrorInvalidCredentials');
+      expect(authErrorKey(409), 'authErrorEmailTaken');
+      expect(authErrorKey(422), 'authErrorInvalidInput');
+      expect(authErrorKey(429), 'authErrorTooManyAttempts');
     });
 
-    test('server detail takes precedence over the mapping', () {
-      expect(friendlyAuthError(409, serverDetail: 'custom detail'), 'custom detail');
-    });
-
-    test('unknown status falls back to a generic message', () {
-      expect(friendlyAuthError(500), '操作失败，请稍后重试');
+    test('unknown status falls back to a generic key', () {
+      expect(authErrorKey(500), 'authErrorGeneric');
     });
   });
 

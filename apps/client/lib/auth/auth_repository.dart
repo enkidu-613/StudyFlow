@@ -369,7 +369,7 @@ class AuthApiException implements Exception {
     if (serverDetail != null && serverDetail!.isNotEmpty) {
       return serverDetail!;
     }
-    return friendlyAuthError(statusCode);
+    return authErrorKey(statusCode);
   }
 }
 

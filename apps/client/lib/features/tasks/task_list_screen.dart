@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:studyflow/app/studyflow_workspace.dart';
 import 'package:studyflow/features/tasks/task_editor_screen.dart';
+import 'package:studyflow/l10n/l10n_extension.dart';
 import 'package:studyflow_domain/domain.dart';
 
 final class TaskListScreen extends StatefulWidget {
@@ -82,8 +83,9 @@ final class _TaskListScreenState extends State<TaskListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Scaffold(
-      appBar: AppBar(title: const Text('Tasks')),
+      appBar: AppBar(title: Text(l10n.navTasks)),
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: _loading
@@ -104,7 +106,10 @@ final class _TaskListScreenState extends State<TaskListScreen> {
                       ),
                       title: Text(task.title),
                       subtitle: Text(
-                        '${task.estimatedMinutes} min  ${task.priority.name}',
+                        l10n.taskRowSubtitle(
+                          task.estimatedMinutes,
+                          task.priority.name,
+                        ),
                       ),
                       trailing: Icon(
                         task.status == TaskStatus.completed
@@ -114,16 +119,16 @@ final class _TaskListScreenState extends State<TaskListScreen> {
                       onTap: () => _openEditor(task),
                     ),
                   if (_tasks.isEmpty && _error == null)
-                    const Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Center(child: Text('No tasks')),
+                    Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Center(child: Text(l10n.tasksEmpty)),
                     ),
                 ],
               ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _openEditor(),
-        tooltip: 'New task',
+        tooltip: l10n.taskNew,
         child: const Icon(Icons.add),
       ),
     );

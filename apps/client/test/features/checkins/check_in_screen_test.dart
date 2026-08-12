@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studyflow/app/studyflow_workspace.dart';
 import 'package:studyflow/features/checkins/check_in_screen.dart';
+import '../../helpers/l10n_test_app.dart';
 
 void main() {
   late Directory directory;
@@ -23,8 +24,9 @@ void main() {
   });
 
   Future<void> pumpScreen(WidgetTester tester) async {
-    await tester.pumpWidget(
-      MaterialApp(home: CheckInScreen(workspace: workspace)),
+    await pumpWithL10n(
+      tester,
+      CheckInScreen(workspace: workspace),
     );
     await tester.pumpAndSettle();
   }
@@ -32,7 +34,7 @@ void main() {
   testWidgets('shows an empty state before any check-in', (tester) async {
     await pumpScreen(tester);
 
-    expect(find.text('No check-ins yet'), findsOneWidget);
+    expect(find.text('还没有打卡记录'), findsOneWidget);
     expect(find.byType(FloatingActionButton), findsOneWidget);
   });
 
@@ -61,7 +63,7 @@ void main() {
     }
     await tester.pumpAndSettle();
 
-    expect(find.text('450 min sleep · energy 3'), findsOneWidget);
+    expect(find.text('睡眠 450 分钟 · 精力 3'), findsOneWidget);
     expect(find.text('Slept well'), findsNothing);
 
     final saved = await tester.runAsync(workspace.checkIns.list);
@@ -84,7 +86,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('Sleep minutes must be a non-negative number.'),
+      find.text('睡眠时长必须是非负数字'),
       findsOneWidget,
     );
     expect(await tester.runAsync(workspace.pendingCount), 0);
@@ -95,10 +97,10 @@ void main() {
 
     await tester.tap(find.byType(FloatingActionButton));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Cancel'));
+    await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
 
-    expect(find.text('No check-ins yet'), findsOneWidget);
+    expect(find.text('还没有打卡记录'), findsOneWidget);
     expect(await tester.runAsync(workspace.pendingCount), 0);
   });
 }

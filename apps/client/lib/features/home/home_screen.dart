@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:studyflow/app/studyflow_workspace.dart';
+import 'package:studyflow/l10n/l10n_extension.dart';
 import 'package:studyflow/util/uuid.dart';
 import 'package:studyflow_domain/domain.dart';
 import 'package:studyflow_platform_contract/platform_contract.dart';
@@ -85,8 +86,9 @@ final class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final data = _data;
+    final l10n = context.l10n;
     return Scaffold(
-      appBar: AppBar(title: const Text('Today')),
+      appBar: AppBar(title: Text(l10n.navToday)),
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: ListView(
@@ -113,11 +115,11 @@ final class _HomeScreenState extends State<HomeScreen> {
                         ? Icons.notifications_active_outlined
                         : Icons.notifications_off_outlined,
                   ),
-                  title: const Text('Notifications'),
+                  title: Text(l10n.homeNotifications),
                   subtitle: Text(
                     _notificationsAllowed(data.health)
-                        ? 'granted'
-                        : 'permission required',
+                        ? l10n.homeNotifGranted
+                        : l10n.homeNotifRequired,
                   ),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => context.go('/settings'),
@@ -127,7 +129,7 @@ final class _HomeScreenState extends State<HomeScreen> {
               Card(
                 child: ListTile(
                   leading: const Icon(Icons.fact_check_outlined),
-                  title: const Text('Check in'),
+                  title: Text(l10n.homeCheckIn),
                   trailing: const Icon(Icons.add),
                   onTap: _openCheckIn,
                 ),
@@ -137,9 +139,9 @@ final class _HomeScreenState extends State<HomeScreen> {
                 Card(
                   child: ListTile(
                     leading: const Icon(Icons.bedtime_outlined),
-                    title: const Text('Last check-in'),
+                    title: Text(l10n.homeLastCheckIn),
                     subtitle: Text(
-                      '${data.latestCheckIn!.sleepMinutes} min',
+                      l10n.minutesShort(data.latestCheckIn!.sleepMinutes),
                     ),
                   ),
                 ),
@@ -231,8 +233,9 @@ final class _CheckInDialogState extends State<_CheckInDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return AlertDialog(
-      title: const Text('Check in'),
+      title: Text(l10n.checkInNew),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -240,30 +243,30 @@ final class _CheckInDialogState extends State<_CheckInDialog> {
             TextField(
               controller: _sleepController,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Sleep minutes',
-                suffixText: 'min',
+              decoration: InputDecoration(
+                labelText: l10n.checkInSleepMinutes,
+                suffixText: l10n.minutesSuffix,
               ),
             ),
             _RatingSlider(
-              label: 'Sleep quality',
+              label: l10n.checkInSleepQuality,
               value: _sleepQuality,
               onChanged: (value) => setState(() => _sleepQuality = value),
             ),
             _RatingSlider(
-              label: 'Energy',
+              label: l10n.checkInEnergy,
               value: _energy,
               onChanged: (value) => setState(() => _energy = value),
             ),
             _RatingSlider(
-              label: 'Mood',
+              label: l10n.checkInMood,
               value: _mood,
               onChanged: (value) => setState(() => _mood = value),
             ),
             TextField(
               controller: _feedbackController,
               maxLines: 3,
-              decoration: const InputDecoration(labelText: 'Feedback'),
+              decoration: InputDecoration(labelText: l10n.checkInFeedback),
             ),
           ],
         ),
@@ -271,11 +274,11 @@ final class _CheckInDialogState extends State<_CheckInDialog> {
       actions: <Widget>[
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(l10n.commonCancel),
         ),
         FilledButton(
           onPressed: _save,
-          child: const Text('Save'),
+          child: Text(l10n.commonSave),
         ),
       ],
     );

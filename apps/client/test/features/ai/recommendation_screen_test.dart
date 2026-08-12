@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studyflow/features/ai/ai_repository.dart';
 import 'package:studyflow/features/ai/recommendation_screen.dart';
+import '../../helpers/l10n_test_app.dart';
 
 void main() {
   Future<AiRecommendation> recommendation() async => AiRecommendation(
@@ -28,8 +29,9 @@ void main() {
     WidgetTester tester,
     Future<AiRecommendation> Function() request,
   ) async {
-    await tester.pumpWidget(
-      MaterialApp(home: RecommendationScreen(request: request)),
+    await pumpWithL10n(
+      tester,
+      RecommendationScreen(request: request),
     );
     await tester.pumpAndSettle();
   }
@@ -42,7 +44,7 @@ void main() {
 
     expect(find.text('Focus on the morning study block.'), findsOneWidget);
     expect(find.text('morning_focus'), findsOneWidget);
-    expect(find.text('Request another'), findsOneWidget);
+    expect(find.text('再获取一条'), findsOneWidget);
   });
 
   testWidgets('shows proposed changes as confirmation-only', (tester) async {
@@ -51,11 +53,11 @@ void main() {
     await tester.tap(find.byKey(const Key('request-recommendation-button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Proposed changes (require confirmation)'), findsOneWidget);
+    expect(find.text('建议的变更（需确认后生效）'), findsOneWidget);
     expect(find.text('shift_schedule_block'), findsOneWidget);
-    expect(find.text('15 min · Align with sleep window.'), findsOneWidget);
+    expect(find.text('15 分钟 · Align with sleep window.'), findsOneWidget);
     expect(
-      find.textContaining('Nothing was changed'),
+      find.textContaining('尚未做任何修改'),
       findsOneWidget,
     );
   });
@@ -69,7 +71,7 @@ void main() {
     await tester.tap(find.byKey(const Key('request-recommendation-button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Recommendation unavailable'), findsOneWidget);
+    expect(find.text('暂时无法获取建议'), findsOneWidget);
     expect(find.textContaining('AI 服务不可用'), findsOneWidget);
   });
 

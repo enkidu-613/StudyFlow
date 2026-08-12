@@ -55,19 +55,17 @@ final class AuthErrorDetail {
   final String message;
 }
 
-String friendlyAuthError(int statusCode, {String? serverDetail}) {
-  if (serverDetail != null && serverDetail.isNotEmpty) {
-    return serverDetail;
-  }
-  return switch (statusCode) {
-    401 => '邮箱或密码错误',
-    409 => '该邮箱已被注册',
-    422 => '邮箱或密码格式不正确',
-    429 => '尝试次数过多，请稍后再试',
-    503 => '服务暂时不可用，请稍后重试',
-    _ => '操作失败，请稍后重试',
-  };
-}
+/// Maps an HTTP status code to a stable error key. UI layers translate the
+/// key through the localized strings; this keeps the model layer free of
+/// Flutter dependencies.
+String authErrorKey(int statusCode) => switch (statusCode) {
+      401 => 'authErrorInvalidCredentials',
+      409 => 'authErrorEmailTaken',
+      422 => 'authErrorInvalidInput',
+      429 => 'authErrorTooManyAttempts',
+      503 => 'authErrorUnavailable',
+      _ => 'authErrorGeneric',
+    };
 
 const int passwordMinLength = 8;
 const int passwordMaxLength = 16;

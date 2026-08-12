@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:studyflow/app/studyflow_workspace.dart';
+import 'package:studyflow/l10n/l10n_extension.dart';
 import 'package:studyflow/util/uuid.dart';
 import 'package:studyflow_domain/domain.dart';
 
@@ -89,7 +90,7 @@ final class _FocusScreenState extends State<FocusScreen> {
         .map((task) => task.title)
         .firstOrNull;
     final result = await widget.workspace.platform.startFocusSession(
-      title: taskTitle ?? 'StudyFlow focus',
+      title: taskTitle ?? context.l10n.focusDefaultTitle,
     );
     if (mounted && !result.isSupported) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -149,8 +150,9 @@ final class _FocusScreenState extends State<FocusScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Scaffold(
-      appBar: AppBar(title: const Text('Focus')),
+      appBar: AppBar(title: Text(l10n.navFocus)),
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: ListView(
@@ -163,7 +165,7 @@ final class _FocusScreenState extends State<FocusScreen> {
               ),
             DropdownButtonFormField<String>(
               initialValue: _taskId,
-              decoration: const InputDecoration(labelText: 'Task'),
+              decoration: InputDecoration(labelText: l10n.focusTaskLabel),
               items: <DropdownMenuItem<String>>[
                 for (final task in _tasks)
                   DropdownMenuItem<String>(
@@ -190,33 +192,35 @@ final class _FocusScreenState extends State<FocusScreen> {
                   FilledButton.icon(
                     onPressed: _taskId == null ? null : _start,
                     icon: const Icon(Icons.play_arrow),
-                    label: const Text('Start'),
+                    label: Text(l10n.focusStart),
                   )
                 else if (_running)
                   OutlinedButton.icon(
                     onPressed: _pause,
                     icon: const Icon(Icons.pause),
-                    label: const Text('Pause'),
+                    label: Text(l10n.focusPause),
                   )
                 else
                   FilledButton.icon(
                     onPressed: _resume,
                     icon: const Icon(Icons.play_arrow),
-                    label: const Text('Resume'),
+                    label: Text(l10n.focusResume),
                   ),
                 if (_sessionStartedAt != null) ...<Widget>[
                   const SizedBox(width: 12),
                   FilledButton.icon(
                     onPressed: _finish,
                     icon: const Icon(Icons.stop),
-                    label: const Text('Finish'),
+                    label: Text(l10n.focusFinish),
                   ),
                 ],
               ],
             ),
             const SizedBox(height: 24),
-            const Text('Sessions',
-                style: TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              l10n.focusSessionsTitle,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             for (final session in _sessions)
               ListTile(

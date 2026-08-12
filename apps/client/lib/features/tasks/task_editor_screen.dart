@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:studyflow/app/studyflow_workspace.dart';
+import 'package:studyflow/l10n/l10n_extension.dart';
 import 'package:studyflow/util/uuid.dart';
 import 'package:studyflow_domain/domain.dart';
 
@@ -49,11 +50,11 @@ final class _TaskEditorScreenState extends State<TaskEditorScreen> {
     final title = _titleController.text.trim();
     final estimatedMinutes = int.tryParse(_minutesController.text.trim());
     if (title.isEmpty) {
-      setState(() => _error = 'Title is required.');
+      setState(() => _error = context.l10n.taskTitleRequired);
       return;
     }
     if (estimatedMinutes == null || estimatedMinutes <= 0) {
-      setState(() => _error = 'Minutes must be positive.');
+      setState(() => _error = context.l10n.taskMinutesPositive);
       return;
     }
     final tags = _tagsController.text
@@ -82,9 +83,10 @@ final class _TaskEditorScreenState extends State<TaskEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.task == null ? 'New task' : 'Edit task'),
+        title: Text(widget.task == null ? l10n.taskNew : l10n.taskEdit),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -92,28 +94,28 @@ final class _TaskEditorScreenState extends State<TaskEditorScreen> {
           TextField(
             key: const Key('task-title-field'),
             controller: _titleController,
-            decoration: const InputDecoration(labelText: 'Title'),
+            decoration: InputDecoration(labelText: l10n.taskTitleLabel),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _descriptionController,
             maxLines: 3,
-            decoration: const InputDecoration(labelText: 'Description'),
+            decoration: InputDecoration(labelText: l10n.taskDescriptionLabel),
           ),
           const SizedBox(height: 12),
           TextField(
             key: const Key('task-minutes-field'),
             controller: _minutesController,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Estimated minutes',
-              suffixText: 'min',
+            decoration: InputDecoration(
+              labelText: l10n.taskEstimatedMinutes,
+              suffixText: l10n.minutesSuffix,
             ),
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<TaskPriority>(
             initialValue: _priority,
-            decoration: const InputDecoration(labelText: 'Priority'),
+            decoration: InputDecoration(labelText: l10n.taskPriorityLabel),
             items: <DropdownMenuItem<TaskPriority>>[
               for (final priority in TaskPriority.values)
                 DropdownMenuItem<TaskPriority>(
@@ -130,7 +132,7 @@ final class _TaskEditorScreenState extends State<TaskEditorScreen> {
           const SizedBox(height: 12),
           DropdownButtonFormField<RepeatRule>(
             initialValue: _repeatRule,
-            decoration: const InputDecoration(labelText: 'Repeat'),
+            decoration: InputDecoration(labelText: l10n.taskRepeatLabel),
             items: <DropdownMenuItem<RepeatRule>>[
               for (final rule in RepeatRule.values)
                 DropdownMenuItem<RepeatRule>(
@@ -147,9 +149,9 @@ final class _TaskEditorScreenState extends State<TaskEditorScreen> {
           const SizedBox(height: 12),
           TextField(
             controller: _tagsController,
-            decoration: const InputDecoration(
-              labelText: 'Tags',
-              hintText: 'math, reading',
+            decoration: InputDecoration(
+              labelText: l10n.taskTagsLabel,
+              hintText: l10n.taskTagsHint,
             ),
           ),
           if (_error != null) ...<Widget>[
@@ -162,7 +164,7 @@ final class _TaskEditorScreenState extends State<TaskEditorScreen> {
             key: const Key('save-task-button'),
             onPressed: _save,
             icon: const Icon(Icons.save_outlined),
-            label: const Text('Save'),
+            label: Text(l10n.commonSave),
           ),
         ],
       ),
