@@ -185,6 +185,7 @@ final class _StudyFlowRootState extends State<StudyFlowRoot> {
     try {
       return await widget.authRepository.refresh();
     } on AuthApiException {
+      // Server rejected the credentials: the session is truly invalid.
       await widget.authRepository.logout();
       if (mounted) {
         setState(
@@ -193,14 +194,8 @@ final class _StudyFlowRootState extends State<StudyFlowRoot> {
       }
       return null;
     } on Object {
-      await widget.authRepository.logout();
-      if (mounted) {
-        setState(
-          () => _initialMessageKind =
-              AuthInitialMessage.restoreFailedAndSignIn,
-        );
-      }
-      return null;
+      // Network or storage failure: keep the local session and open offline.
+      return context;
     }
   }
 

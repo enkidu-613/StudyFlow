@@ -9,7 +9,6 @@ enum AuthMode { login, register }
 enum AuthInitialMessage {
   sessionExpired,
   restoreFailed,
-  restoreFailedAndSignIn,
 }
 
 final class AuthScreen extends StatefulWidget {
@@ -280,7 +279,6 @@ final class _AuthScreenState extends State<AuthScreen> {
     return switch (kind) {
       AuthInitialMessage.sessionExpired => l10n.authSessionExpired,
       AuthInitialMessage.restoreFailed => l10n.authNetworkFailed,
-      AuthInitialMessage.restoreFailedAndSignIn => l10n.authNetworkFailed,
     };
   }
 
