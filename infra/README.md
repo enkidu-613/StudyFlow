@@ -16,6 +16,8 @@
 - Caddyfile：将域名请求转发到 API 容器，并自动申请 HTTPS 证书。
 - bootstrap-env.sh：在 VPS 生成生产 .env、随机密钥和数据库连接配置。
 - backup/backup.sh：使用 AES-256-CBC + PBKDF2 加密 pg_dump 备份文件。
+  宿主机有 pg_dump 时直接使用；没有时自动通过 `docker exec` 在 postgres
+  容器内执行（容器自带 pg_dump，无需在 VPS 额外安装客户端工具）。
 - backup/restore-check.sh：校验备份摘要，并可将备份恢复到临时 PostgreSQL。
 - .env.example：环境变量说明模板；生产 .env 由 bootstrap-env.sh 生成，不要手工复制。
 

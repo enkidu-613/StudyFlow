@@ -2,8 +2,9 @@
 # Encrypted PostgreSQL backup for StudyFlow.
 #
 # Requirements:
-#   - psql/pg_dump (PostgreSQL client tools)
 #   - openssl (encryption)
+#   - pg_dump (PostgreSQL client tools) on the host, or Docker with the
+#     studyflow postgres container (container has pg_dump built in)
 #   - STUDYFLOW_DATABASE_URL or OLD_DATABASE_URL (standard postgresql:// URL)
 #   - STUDYFLOW_BACKUP_PASSPHRASE
 #
@@ -34,11 +35,30 @@ fi
 
 mkdir -p "$BACKUP_DIR"
 
+# Prefer a host pg_dump; fall back to running pg_dump inside the Docker
+# postgres container when the host lacks the client tools.
+if command -v pg_dump >/dev/null 2>&1; then
+    dump_command=(pg_dump --dbname="$DATABASE_URL" --no-owner --no-privileges)
+else
+    postgres_container="$(docker ps --format '{{.Names}}' 2>/dev/null \
+        | grep -E '^infra_postgres_1$|postgres' | head -n 1 || true)"
+    if [[ -z "$postgres_container" ]]; then
+        echo "pg_dump not found on host and no postgres container is running." >&2
+        exit 1
+    fi
+    # Inside the container the database host resolves via 127.0.0.1.
+    container_url="${DATABASE_URL/@postgres:/@127.0.0.1:}"
+    dump_command=(
+        docker exec "$postgres_container" pg_dump
+        --dbname="$container_url" --no-owner --no-privileges
+    )
+fi
+
 # Dump -> encrypt (PBKDF2 salt is stored in the OpenSSL header) -> digest.
 ciphertext_file="$(mktemp)"
 trap 'rm -f "$ciphertext_file"' EXIT
 
-if ! pg_dump --dbname="$DATABASE_URL" --no-owner --no-privileges \
+if ! "${dump_command[@]}" \
     | openssl enc -aes-256-cbc -pbkdf2 -iter 100000 \
         -pass env:STUDYFLOW_BACKUP_PASSPHRASE \
         > "$ciphertext_file" 2>/dev/null; then

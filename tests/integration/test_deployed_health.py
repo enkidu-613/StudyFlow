@@ -98,3 +98,10 @@ def test_backup_script_never_prints_credentials() -> None:
     assert 'echo "$PASSPHRASE"' not in script
     assert 'pg_dump --dbname="$DATABASE_URL"' in script
     assert 'pg_dump --dbname="$OLD_DATABASE_URL"' not in script
+
+
+def test_backup_script_falls_back_to_postgres_container() -> None:
+    script = (INFRA_ROOT / "backup" / "backup.sh").read_text(encoding="utf-8")
+    assert 'docker exec "$postgres_container" pg_dump' in script
+    assert "@127.0.0.1:" in script
+    assert "command -v pg_dump" in script
