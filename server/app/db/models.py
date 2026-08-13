@@ -207,3 +207,44 @@ class UserSyncOperation(TimestampedModel, Base):
         server_default="false",
     )
     schema_version: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class UserBackup(TimestampedModel, Base):
+    __tablename__ = "user_backups"
+    __table_args__ = (
+        CheckConstraint(
+            "length(name) > 0 AND name NOT LIKE ' %' AND name NOT LIKE '% '",
+            name="ck_user_backups_name_nonempty",
+        ),
+        CheckConstraint(
+            "status IN ('creating', 'ready', 'failed')",
+            name="ck_user_backups_status",
+        ),
+    )
+
+    backup_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload: Mapped[dict] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"),
+        nullable=False,
+    )
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    operation_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    last_operation_sequence: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+    status: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default="ready",
+        server_default="ready",
+    )
