@@ -143,6 +143,11 @@ final class HttpBackupsRepository implements BackupsRepository {
           'Backup request violated the server contract.',
         );
       }
+      if (response.statusCode == 429) {
+        throw const BackupRateLimitFailure(
+          'Backup requests are rate limited.',
+        );
+      }
       if (!acceptedStatusCodes.contains(response.statusCode)) {
         throw BackupServerFailure(
           'Backup server returned HTTP ${response.statusCode}.',
@@ -198,6 +203,10 @@ final class BackupQuotaFailure extends BackupApiFailure {
 
 final class BackupServerFailure extends BackupApiFailure {
   const BackupServerFailure(super.message, {super.cause});
+}
+
+final class BackupRateLimitFailure extends BackupApiFailure {
+  const BackupRateLimitFailure(super.message, {super.cause});
 }
 
 final class BackupNotFoundFailure extends BackupApiFailure {

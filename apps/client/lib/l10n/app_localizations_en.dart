@@ -441,6 +441,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get backupsCreateTooFrequent =>
+      'Creating backups too frequently. Try again later.';
+
+  @override
   String get backupsLoadFailed => 'Could not load backups. Try again later.';
 
   @override

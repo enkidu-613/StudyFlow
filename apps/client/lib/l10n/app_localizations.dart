@@ -890,6 +890,12 @@ abstract class AppLocalizations {
   /// **'操作失败：{reason}'**
   String backupsOperationFailed(Object reason);
 
+  /// No description provided for @backupsCreateTooFrequent.
+  ///
+  /// In zh, this message translates to:
+  /// **'创建备份过于频繁，请稍后再试'**
+  String get backupsCreateTooFrequent;
+
   /// No description provided for @backupsLoadFailed.
   ///
   /// In zh, this message translates to:

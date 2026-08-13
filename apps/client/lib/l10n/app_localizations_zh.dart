@@ -434,6 +434,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get backupsCreateTooFrequent => '创建备份过于频繁，请稍后再试';
+
+  @override
   String get backupsLoadFailed => '加载备份失败，请稍后重试';
 
   @override

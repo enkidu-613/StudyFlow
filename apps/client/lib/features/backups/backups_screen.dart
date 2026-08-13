@@ -240,7 +240,19 @@ final class _BackupsScreenState extends State<BackupsScreen> {
     if (error is BackupOfflineFailure || error is BackupNetworkFailure) {
       return l10n.backupsLoadFailedOffline;
     }
-    return l10n.backupsOperationFailed('${error.runtimeType}');
+    if (error is BackupRateLimitFailure) {
+      return l10n.backupsCreateTooFrequent;
+    }
+    if (error is BackupAuthenticationFailure) {
+      return l10n.authSessionExpired;
+    }
+    return l10n.backupsOperationFailed(
+      switch (error) {
+        BackupNotFoundFailure() => l10n.backupsDeleteTitle,
+        BackupSchemaFailure() => l10n.authErrorInvalidInput,
+        _ => l10n.authErrorGeneric,
+      },
+    );
   }
 
   String _formatDate(DateTime value) {

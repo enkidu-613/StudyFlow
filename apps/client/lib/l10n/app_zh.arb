@@ -132,6 +132,7 @@
   "backupsLimitGoDelete": "去删除",
   "backupsCreateSuccess": "已创建备份",
   "backupsOperationFailed": "操作失败：{reason}",
+  "backupsCreateTooFrequent": "创建备份过于频繁，请稍后再试",
   "backupsLoadFailed": "加载备份失败，请稍后重试",
   "backupsLoadFailedOffline": "网络连接失败，请检查网络后重试",
   "backupsRetry": "重试",

@@ -132,6 +132,7 @@
   "backupsLimitGoDelete": "Delete some",
   "backupsCreateSuccess": "Backup created",
   "backupsOperationFailed": "Operation failed: {reason}",
+  "backupsCreateTooFrequent": "Creating backups too frequently. Try again later.",
   "backupsLoadFailed": "Could not load backups. Try again later.",
   "backupsLoadFailedOffline": "Network error. Check your connection and retry.",
   "backupsRetry": "Retry",
