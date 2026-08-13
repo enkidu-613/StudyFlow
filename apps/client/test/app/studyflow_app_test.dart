@@ -154,7 +154,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Pending sync'), findsOneWidget);
+    expect(find.text('Up to date'), findsWidgets);
     expect(find.text('Permissions'), findsOneWidget);
   });
 }

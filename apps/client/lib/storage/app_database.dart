@@ -225,6 +225,17 @@ final class AccountScopedTransaction {
     );
   }
 
+  Future<void> deleteRecord(EntityType entityType, String recordId) async {
+    _checkAccount(_database.activeAccountId);
+    final normalizedRecordId = _normalizedUuid(recordId, 'recordId');
+
+    await _database.customStatement(
+      'DELETE FROM ${entityType.tableName} '
+      'WHERE account_id = ? AND record_id = ?',
+      <Object?>[_database.activeAccountId, normalizedRecordId],
+    );
+  }
+
   Future<void> enqueue(Operation operation) async {
     if (operation.accountId != _database.activeAccountId) {
       throw const OperationAccountScopeException(

@@ -152,6 +152,60 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tasksEmpty => 'No tasks';
 
   @override
+  String get taskEmptyFiltered => 'No tasks match the current filter';
+
+  @override
+  String get taskEmptyHint => 'Tap + to create your first task';
+
+  @override
+  String get taskFilterAll => 'All';
+
+  @override
+  String get taskFilterTodo => 'To do';
+
+  @override
+  String get taskFilterInProgress => 'In progress';
+
+  @override
+  String get taskFilterCompleted => 'Completed';
+
+  @override
+  String taskGroupInProgress(Object count) {
+    return 'In progress · $count';
+  }
+
+  @override
+  String taskGroupTodo(Object count) {
+    return 'To do · $count';
+  }
+
+  @override
+  String taskGroupCompleted(Object count) {
+    return 'Completed · $count';
+  }
+
+  @override
+  String get taskMarkInProgress => 'Mark in progress';
+
+  @override
+  String get taskMarkCompleted => 'Mark completed';
+
+  @override
+  String get taskMarkCancelled => 'Mark cancelled';
+
+  @override
+  String get taskDelete => 'Delete task';
+
+  @override
+  String get taskDeleteBody => 'This cannot be undone. Delete this task?';
+
+  @override
+  String get taskDeleted => 'Task deleted';
+
+  @override
+  String get taskEditAction => 'Edit';
+
+  @override
   String get taskNew => 'New task';
 
   @override
@@ -196,10 +250,52 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonCancel => 'Cancel';
 
   @override
+  String get commonDelete => 'Delete';
+
+  @override
   String get scheduleEmpty => 'No schedule blocks';
 
   @override
+  String get scheduleEmptyHint => 'Tap + to add a schedule block';
+
+  @override
+  String get scheduleGroupToday => 'Today';
+
+  @override
+  String get scheduleGroupTomorrow => 'Tomorrow';
+
+  @override
   String get blockNew => 'New block';
+
+  @override
+  String get blockEdit => 'Edit block';
+
+  @override
+  String get blockDelete => 'Delete block';
+
+  @override
+  String get blockDeleteBody => 'This cannot be undone. Delete this block?';
+
+  @override
+  String get blockDeleted => 'Block deleted';
+
+  @override
+  String get blockLockedHint => 'This block is locked and cannot be edited';
+
+  @override
+  String get blockKindTask => 'Task';
+
+  @override
+  String get blockKindRest => 'Rest';
+
+  @override
+  String get blockKindSleep => 'Sleep';
+
+  @override
+  String get blockKindBreakTime => 'Break';
+
+  @override
+  String get blockUnknownTask => 'Unknown task';
 
   @override
   String get blockKindLabel => 'Kind';
@@ -492,10 +588,15 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get syncPendingTitle => 'Pending sync';
+  String get syncUpToDate => 'Up to date';
 
   @override
-  String get syncIdle => 'Synchronized or waiting for changes';
+  String get syncPending => 'Pending sync';
+
+  @override
+  String syncPendingCount(Object count) {
+    return '$count changes pending';
+  }
 
   @override
   String get syncSyncing => 'Synchronizing records…';

@@ -356,6 +356,102 @@ abstract class AppLocalizations {
   /// **'还没有任务'**
   String get tasksEmpty;
 
+  /// No description provided for @taskEmptyFiltered.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前筛选下没有任务'**
+  String get taskEmptyFiltered;
+
+  /// No description provided for @taskEmptyHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'点击右下角按钮新建第一个任务'**
+  String get taskEmptyHint;
+
+  /// No description provided for @taskFilterAll.
+  ///
+  /// In zh, this message translates to:
+  /// **'全部'**
+  String get taskFilterAll;
+
+  /// No description provided for @taskFilterTodo.
+  ///
+  /// In zh, this message translates to:
+  /// **'待办'**
+  String get taskFilterTodo;
+
+  /// No description provided for @taskFilterInProgress.
+  ///
+  /// In zh, this message translates to:
+  /// **'进行中'**
+  String get taskFilterInProgress;
+
+  /// No description provided for @taskFilterCompleted.
+  ///
+  /// In zh, this message translates to:
+  /// **'已完成'**
+  String get taskFilterCompleted;
+
+  /// No description provided for @taskGroupInProgress.
+  ///
+  /// In zh, this message translates to:
+  /// **'进行中 · {count}'**
+  String taskGroupInProgress(Object count);
+
+  /// No description provided for @taskGroupTodo.
+  ///
+  /// In zh, this message translates to:
+  /// **'待办 · {count}'**
+  String taskGroupTodo(Object count);
+
+  /// No description provided for @taskGroupCompleted.
+  ///
+  /// In zh, this message translates to:
+  /// **'已完成 · {count}'**
+  String taskGroupCompleted(Object count);
+
+  /// No description provided for @taskMarkInProgress.
+  ///
+  /// In zh, this message translates to:
+  /// **'标记进行中'**
+  String get taskMarkInProgress;
+
+  /// No description provided for @taskMarkCompleted.
+  ///
+  /// In zh, this message translates to:
+  /// **'标记完成'**
+  String get taskMarkCompleted;
+
+  /// No description provided for @taskMarkCancelled.
+  ///
+  /// In zh, this message translates to:
+  /// **'标记取消'**
+  String get taskMarkCancelled;
+
+  /// No description provided for @taskDelete.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除任务'**
+  String get taskDelete;
+
+  /// No description provided for @taskDeleteBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除后不可恢复，确定删除该任务吗？'**
+  String get taskDeleteBody;
+
+  /// No description provided for @taskDeleted.
+  ///
+  /// In zh, this message translates to:
+  /// **'已删除任务'**
+  String get taskDeleted;
+
+  /// No description provided for @taskEditAction.
+  ///
+  /// In zh, this message translates to:
+  /// **'编辑'**
+  String get taskEditAction;
+
   /// No description provided for @taskNew.
   ///
   /// In zh, this message translates to:
@@ -440,17 +536,101 @@ abstract class AppLocalizations {
   /// **'取消'**
   String get commonCancel;
 
+  /// No description provided for @commonDelete.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除'**
+  String get commonDelete;
+
   /// No description provided for @scheduleEmpty.
   ///
   /// In zh, this message translates to:
   /// **'还没有日程块'**
   String get scheduleEmpty;
 
+  /// No description provided for @scheduleEmptyHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'点击右下角按钮添加日程块'**
+  String get scheduleEmptyHint;
+
+  /// No description provided for @scheduleGroupToday.
+  ///
+  /// In zh, this message translates to:
+  /// **'今天'**
+  String get scheduleGroupToday;
+
+  /// No description provided for @scheduleGroupTomorrow.
+  ///
+  /// In zh, this message translates to:
+  /// **'明天'**
+  String get scheduleGroupTomorrow;
+
   /// No description provided for @blockNew.
   ///
   /// In zh, this message translates to:
   /// **'新建日程块'**
   String get blockNew;
+
+  /// No description provided for @blockEdit.
+  ///
+  /// In zh, this message translates to:
+  /// **'编辑日程块'**
+  String get blockEdit;
+
+  /// No description provided for @blockDelete.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除日程块'**
+  String get blockDelete;
+
+  /// No description provided for @blockDeleteBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除后不可恢复，确定删除该日程块吗？'**
+  String get blockDeleteBody;
+
+  /// No description provided for @blockDeleted.
+  ///
+  /// In zh, this message translates to:
+  /// **'已删除日程块'**
+  String get blockDeleted;
+
+  /// No description provided for @blockLockedHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'该日程块已锁定，无法修改'**
+  String get blockLockedHint;
+
+  /// No description provided for @blockKindTask.
+  ///
+  /// In zh, this message translates to:
+  /// **'任务'**
+  String get blockKindTask;
+
+  /// No description provided for @blockKindRest.
+  ///
+  /// In zh, this message translates to:
+  /// **'休息'**
+  String get blockKindRest;
+
+  /// No description provided for @blockKindSleep.
+  ///
+  /// In zh, this message translates to:
+  /// **'睡眠'**
+  String get blockKindSleep;
+
+  /// No description provided for @blockKindBreakTime.
+  ///
+  /// In zh, this message translates to:
+  /// **'小憩'**
+  String get blockKindBreakTime;
+
+  /// No description provided for @blockUnknownTask.
+  ///
+  /// In zh, this message translates to:
+  /// **'未知任务'**
+  String get blockUnknownTask;
 
   /// No description provided for @blockKindLabel.
   ///
@@ -968,17 +1148,23 @@ abstract class AppLocalizations {
   /// **'已删除 {deleted} 个，{notFound} 个不存在'**
   String backupsBatchDeletePartial(Object deleted, Object notFound);
 
-  /// No description provided for @syncPendingTitle.
+  /// No description provided for @syncUpToDate.
+  ///
+  /// In zh, this message translates to:
+  /// **'同步完成'**
+  String get syncUpToDate;
+
+  /// No description provided for @syncPending.
   ///
   /// In zh, this message translates to:
   /// **'待同步'**
-  String get syncPendingTitle;
+  String get syncPending;
 
-  /// No description provided for @syncIdle.
+  /// No description provided for @syncPendingCount.
   ///
   /// In zh, this message translates to:
-  /// **'已同步或等待变更'**
-  String get syncIdle;
+  /// **'{count} 条更改待同步'**
+  String syncPendingCount(Object count);
 
   /// No description provided for @syncSyncing.
   ///

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:studyflow/app/studyflow_workspace.dart';
+import 'package:studyflow/features/schedule/schedule_block_editor.dart';
+import 'package:studyflow/l10n/app_localizations.dart';
 import 'package:studyflow/l10n/l10n_extension.dart';
-import 'package:studyflow/util/uuid.dart';
+import 'package:studyflow/widgets/confirm_delete_dialog.dart';
 import 'package:studyflow_domain/domain.dart';
 
 final class ScheduleScreen extends StatefulWidget {
@@ -48,18 +50,54 @@ final class _ScheduleScreenState extends State<ScheduleScreen> {
     }
   }
 
-  Future<void> _openEditor() async {
+  Future<void> _openEditor([ScheduleBlock? block]) async {
+    if (block?.isLocked ?? false) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(context.l10n.blockLockedHint)));
+      return;
+    }
     final saved = await showModalBottomSheet<ScheduleBlock>(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _ScheduleBlockEditor(
+      builder: (context) => ScheduleBlockEditor(
         workspace: widget.workspace,
         tasks: _tasks,
+        block: block,
       ),
     );
     if (saved != null) {
       await _refresh();
     }
+  }
+
+  Future<void> _deleteBlock(ScheduleBlock block) async {
+    if (block.isLocked) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(context.l10n.blockLockedHint)));
+      return;
+    }
+    final confirmed = await showDeleteConfirmationDialog(
+      context,
+      title: context.l10n.blockDelete,
+      body: context.l10n.blockDeleteBody,
+      confirmKey: 'block-delete-dialog',
+    );
+    if (!confirmed || !mounted) {
+      return;
+    }
+    await widget.workspace.schedule.delete(
+      block.id,
+      write: await widget.workspace.nextWrite(),
+    );
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(context.l10n.blockDeleted)));
+    await _refresh();
   }
 
   @override
@@ -71,243 +109,266 @@ final class _ScheduleScreenState extends State<ScheduleScreen> {
         onRefresh: _refresh,
         child: _loading
             ? const Center(child: CircularProgressIndicator())
-            : ListView(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                children: <Widget>[
-                  if (_error != null)
-                    ListTile(
-                      leading: const Icon(Icons.error_outline),
-                      title: Text('$_error'),
-                    ),
-                  for (final block in _blocks)
-                    ListTile(
-                      leading: Icon(_iconFor(block.kind)),
-                      title: Text(_titleFor(block)),
-                      subtitle: Text(
-                        '${_format(block.start)} - ${_format(block.end)}',
-                      ),
-                      trailing: block.isLocked
-                          ? const Icon(Icons.lock_outline)
-                          : null,
-                    ),
-                  if (_blocks.isEmpty && _error == null)
-                    Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: Center(child: Text(l10n.scheduleEmpty)),
-                    ),
-                ],
-              ),
+            : _buildList(l10n),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _openEditor,
+        onPressed: () => _openEditor(),
         tooltip: l10n.blockNew,
         child: const Icon(Icons.add),
       ),
     );
   }
 
-  IconData _iconFor(ScheduleBlockKind kind) => switch (kind) {
-        ScheduleBlockKind.task => Icons.school_outlined,
-        ScheduleBlockKind.rest => Icons.self_improvement,
-        ScheduleBlockKind.sleep => Icons.bedtime_outlined,
-        ScheduleBlockKind.breakTime => Icons.coffee_outlined,
-      };
-
-  String _titleFor(ScheduleBlock block) =>
-      block.kind == ScheduleBlockKind.task && block.taskId != null
-          ? _tasks
-                  .where((task) => task.id == block.taskId)
-                  .map((task) => task.title)
-                  .firstOrNull ??
-              block.kind.name
-          : block.kind.name;
-
-  String _format(DateTime value) {
-    final local = value.toLocal();
-    return '${local.month}/${local.day} '
-        '${local.hour.toString().padLeft(2, '0')}:'
-        '${local.minute.toString().padLeft(2, '0')}';
-  }
-}
-
-final class _ScheduleBlockEditor extends StatefulWidget {
-  const _ScheduleBlockEditor({
-    required this.workspace,
-    required this.tasks,
-  });
-
-  final StudyFlowWorkspace workspace;
-  final List<Task> tasks;
-
-  @override
-  State<_ScheduleBlockEditor> createState() => _ScheduleBlockEditorState();
-}
-
-final class _ScheduleBlockEditorState extends State<_ScheduleBlockEditor> {
-  ScheduleBlockKind _kind = ScheduleBlockKind.task;
-  late DateTime _start;
-  late DateTime _end;
-  String? _taskId;
-  bool _locked = false;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    final now = DateTime.now();
-    _start = now;
-    _end = now.add(const Duration(hours: 1));
-  }
-
-  Future<void> _pickStart() async {
-    final picked = await _pickDateTime(_start);
-    if (picked != null) {
-      setState(() => _start = picked);
+  Widget _buildList(AppLocalizations l10n) {
+    if (_error != null) {
+      return ListView(
+        children: <Widget>[
+          ListTile(
+            leading: const Icon(Icons.error_outline),
+            title: Text('$_error'),
+          ),
+        ],
+      );
     }
-  }
-
-  Future<void> _pickEnd() async {
-    final picked = await _pickDateTime(_end);
-    if (picked != null) {
-      setState(() => _end = picked);
+    if (_blocks.isEmpty) {
+      return ListView(
+        children: <Widget>[
+          const SizedBox(height: 96),
+          Icon(
+            Icons.event_outlined,
+            size: 56,
+            color: Theme.of(context).colorScheme.outline,
+          ),
+          const SizedBox(height: 16),
+          Center(child: Text(l10n.scheduleEmpty)),
+          const SizedBox(height: 8),
+          Center(
+            child: Text(
+              l10n.scheduleEmptyHint,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.outline,
+              ),
+            ),
+          ),
+        ],
+      );
     }
-  }
 
-  Future<DateTime?> _pickDateTime(DateTime initial) async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: DateTime.now().subtract(const Duration(days: 30)),
-      lastDate: DateTime.now().add(const Duration(days: 730)),
+    final days = <DateTime, List<ScheduleBlock>>{};
+    for (final block in _blocks) {
+      final day = DateTime(
+        block.start.toLocal().year,
+        block.start.toLocal().month,
+        block.start.toLocal().day,
+      );
+      days.putIfAbsent(day, () => <ScheduleBlock>[]).add(block);
+    }
+    final sortedDays = days.keys.toList()..sort();
+    final today = DateTime.now();
+
+    return ListView(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      children: <Widget>[
+        for (final day in sortedDays) ...<Widget>[
+          _DayHeader(
+            key: Key('schedule-day-${day.year}-${day.month}-${day.day}'),
+            label: _dayLabel(l10n, day, today),
+          ),
+          for (final block in days[day]!)
+            _BlockTile(
+              key: Key('schedule-block-${block.id}'),
+              block: block,
+              taskTitle: _taskTitleFor(block),
+              onTap: () => _openEditor(block),
+              onLongPress: () => _showBlockActions(block),
+              onDelete: () => _deleteBlock(block),
+            ),
+        ],
+      ],
     );
-    if (date == null) {
-      return null;
-    }
-    if (!mounted) {
-      return null;
-    }
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(initial),
-    );
-    if (time == null) {
-      return null;
-    }
-    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
   }
 
-  Future<void> _save() async {
-    if (!_end.isAfter(_start)) {
-      setState(() => _error = context.l10n.blockEndAfterStart);
+  Future<void> _showBlockActions(ScheduleBlock block) async {
+    if (block.isLocked) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(context.l10n.blockLockedHint)));
       return;
     }
-    final block = ScheduleBlock(
-      id: newUuidV4(),
-      start: _start,
-      end: _end,
-      kind: _kind,
-      taskId: _kind == ScheduleBlockKind.task ? _taskId : null,
-      source: ScheduleBlockSource.manual,
-      isLocked: _locked,
+    final l10n = context.l10n;
+    final action = await showModalBottomSheet<_BlockAction>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            ListTile(
+              key: const Key('block-action-edit'),
+              leading: const Icon(Icons.edit_outlined),
+              title: Text(l10n.blockEdit),
+              onTap: () => Navigator.of(context).pop(_BlockAction.edit),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              key: const Key('block-action-delete'),
+              leading: Icon(
+                Icons.delete_outline,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              title: Text(
+                l10n.blockDelete,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+              onTap: () => Navigator.of(context).pop(_BlockAction.delete),
+            ),
+          ],
+        ),
+      ),
     );
-    await widget.workspace.schedule.save(
-      block,
-      write: await widget.workspace.nextWrite(),
-    );
-    if (mounted) {
-      Navigator.of(context).pop(block);
+    if (action == null || !mounted) {
+      return;
+    }
+    switch (action) {
+      case _BlockAction.edit:
+        await _openEditor(block);
+      case _BlockAction.delete:
+        await _deleteBlock(block);
     }
   }
+
+  String _taskTitleFor(ScheduleBlock block) {
+    if (block.kind != ScheduleBlockKind.task || block.taskId == null) {
+      return _kindLabel(context, block.kind);
+    }
+    return _tasks
+            .where((task) => task.id == block.taskId)
+            .map((task) => task.title)
+            .firstOrNull ??
+        context.l10n.blockUnknownTask;
+  }
+
+  String _kindLabel(BuildContext context, ScheduleBlockKind kind) =>
+      switch (kind) {
+        ScheduleBlockKind.task => context.l10n.blockKindTask,
+        ScheduleBlockKind.rest => context.l10n.blockKindRest,
+        ScheduleBlockKind.sleep => context.l10n.blockKindSleep,
+        ScheduleBlockKind.breakTime => context.l10n.blockKindBreakTime,
+      };
+
+  String _dayLabel(
+    AppLocalizations l10n,
+    DateTime day,
+    DateTime today,
+  ) {
+    final isToday = day.year == today.year &&
+        day.month == today.month &&
+        day.day == today.day;
+    if (isToday) {
+      return l10n.scheduleGroupToday;
+    }
+    final tomorrow = today.add(const Duration(days: 1));
+    final isTomorrow = day.year == tomorrow.year &&
+        day.month == tomorrow.month &&
+        day.day == tomorrow.day;
+    if (isTomorrow) {
+      return l10n.scheduleGroupTomorrow;
+    }
+    return '${day.month}/${day.day}';
+  }
+}
+
+enum _BlockAction { edit, delete }
+
+final class _DayHeader extends StatelessWidget {
+  const _DayHeader({required this.label, super.key});
+
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
     return Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          Text(l10n.blockNew, style: const TextStyle(fontSize: 20)),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<ScheduleBlockKind>(
-            initialValue: _kind,
-            decoration: InputDecoration(labelText: l10n.blockKindLabel),
-            items: <DropdownMenuItem<ScheduleBlockKind>>[
-              for (final kind in ScheduleBlockKind.values)
-                DropdownMenuItem<ScheduleBlockKind>(
-                  value: kind,
-                  child: Text(kind.name),
-                ),
-            ],
-            onChanged: (value) {
-              if (value != null) {
-                setState(() => _kind = value);
-              }
-            },
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _pickStart,
-                  icon: const Icon(Icons.play_arrow),
-                  label: Text(_format(_start)),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _pickEnd,
-                  icon: const Icon(Icons.stop),
-                  label: Text(_format(_end)),
-                ),
-              ),
-            ],
-          ),
-          if (_kind == ScheduleBlockKind.task) ...<Widget>[
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: _taskId,
-              decoration: InputDecoration(labelText: l10n.blockTaskLabel),
-              items: <DropdownMenuItem<String>>[
-                for (final task in widget.tasks)
-                  DropdownMenuItem<String>(
-                    value: task.id,
-                    child: Text(task.title),
-                  ),
-              ],
-              onChanged: (value) => setState(() => _taskId = value),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: Theme.of(context).colorScheme.primary,
             ),
-          ],
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(l10n.blockLocked),
-            value: _locked,
-            onChanged: (value) => setState(() => _locked = value),
-          ),
-          if (_error != null) Text(_error!),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: _save,
-            icon: const Icon(Icons.save_outlined),
-            label: Text(l10n.commonSave),
-          ),
-        ],
+      ),
+    );
+  }
+}
+
+final class _BlockTile extends StatelessWidget {
+  const _BlockTile({
+    required this.block,
+    required this.taskTitle,
+    required this.onTap,
+    required this.onLongPress,
+    required this.onDelete,
+    super.key,
+  });
+
+  final ScheduleBlock block;
+  final String taskTitle;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dismissible(
+      key: Key('block-dismiss-${block.id}'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        color: Theme.of(context).colorScheme.error,
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 16),
+        child: Icon(
+          Icons.delete_outline,
+          color: Theme.of(context).colorScheme.onError,
+        ),
+      ),
+      onDismissed: (_) => onDelete(),
+      child: ListTile(
+        leading: _KindIcon(kind: block.kind),
+        title: Text(taskTitle),
+        subtitle: Text(
+          '${_formatTime(block.start)} - ${_formatTime(block.end)}',
+        ),
+        trailing: block.isLocked
+            ? const Icon(Icons.lock_outline)
+            : const Icon(Icons.chevron_right),
+        onTap: onTap,
+        onLongPress: onLongPress,
       ),
     );
   }
 
-  String _format(DateTime value) {
+  String _formatTime(DateTime value) {
     final local = value.toLocal();
-    return '${local.month}/${local.day} '
-        '${local.hour.toString().padLeft(2, '0')}:'
+    return '${local.hour.toString().padLeft(2, '0')}:'
         '${local.minute.toString().padLeft(2, '0')}';
+  }
+}
+
+final class _KindIcon extends StatelessWidget {
+  const _KindIcon({required this.kind});
+
+  final ScheduleBlockKind kind;
+
+  @override
+  Widget build(BuildContext context) {
+    final (icon, color) = switch (kind) {
+      ScheduleBlockKind.task => (Icons.school_outlined, Colors.indigo),
+      ScheduleBlockKind.rest => (Icons.self_improvement, Colors.teal),
+      ScheduleBlockKind.sleep => (Icons.bedtime_outlined, Colors.deepPurple),
+      ScheduleBlockKind.breakTime => (Icons.coffee_outlined, Colors.brown),
+    };
+    return CircleAvatar(
+      backgroundColor: color.withValues(alpha: 0.12),
+      child: Icon(icon, size: 20, color: color),
+    );
   }
 }

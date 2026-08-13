@@ -42,6 +42,24 @@ final class ScheduleRepository {
     });
   }
 
+  Future<void> delete(String blockId, {required Write write}) async {
+    final operation = Operation(
+      accountId: _store.activeAccountId,
+      operationId: write.operationId,
+      recordId: blockId,
+      logicalClock: write.logicalClock,
+      entityType: EntityType.scheduleBlock.wireName,
+      payload: const <String, Object?>{},
+      isTombstone: true,
+      schemaVersion: _schemaVersion,
+    );
+
+    await _store.transaction((transaction) async {
+      await transaction.deleteRecord(EntityType.scheduleBlock, blockId);
+      await transaction.enqueue(operation);
+    });
+  }
+
   Future<ScheduleBlock?> get(String blockId) async {
     final record = await _store.records(EntityType.scheduleBlock).get(
           accountId: _store.activeAccountId,

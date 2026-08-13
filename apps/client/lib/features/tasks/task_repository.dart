@@ -56,6 +56,24 @@ final class TaskRepository {
     });
   }
 
+  Future<void> delete(String taskId, {required Write write}) async {
+    final operation = Operation(
+      accountId: _store.activeAccountId,
+      operationId: write.operationId,
+      recordId: taskId,
+      logicalClock: write.logicalClock,
+      entityType: EntityType.task.wireName,
+      payload: const <String, Object?>{},
+      isTombstone: true,
+      schemaVersion: _schemaVersion,
+    );
+
+    await _store.transaction((transaction) async {
+      await transaction.deleteRecord(EntityType.task, taskId);
+      await transaction.enqueue(operation);
+    });
+  }
+
   Future<Task?> get(String taskId) async {
     final record = await _store.records(EntityType.task).get(
           accountId: _store.activeAccountId,

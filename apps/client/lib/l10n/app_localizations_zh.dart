@@ -149,6 +149,60 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tasksEmpty => '还没有任务';
 
   @override
+  String get taskEmptyFiltered => '当前筛选下没有任务';
+
+  @override
+  String get taskEmptyHint => '点击右下角按钮新建第一个任务';
+
+  @override
+  String get taskFilterAll => '全部';
+
+  @override
+  String get taskFilterTodo => '待办';
+
+  @override
+  String get taskFilterInProgress => '进行中';
+
+  @override
+  String get taskFilterCompleted => '已完成';
+
+  @override
+  String taskGroupInProgress(Object count) {
+    return '进行中 · $count';
+  }
+
+  @override
+  String taskGroupTodo(Object count) {
+    return '待办 · $count';
+  }
+
+  @override
+  String taskGroupCompleted(Object count) {
+    return '已完成 · $count';
+  }
+
+  @override
+  String get taskMarkInProgress => '标记进行中';
+
+  @override
+  String get taskMarkCompleted => '标记完成';
+
+  @override
+  String get taskMarkCancelled => '标记取消';
+
+  @override
+  String get taskDelete => '删除任务';
+
+  @override
+  String get taskDeleteBody => '删除后不可恢复，确定删除该任务吗？';
+
+  @override
+  String get taskDeleted => '已删除任务';
+
+  @override
+  String get taskEditAction => '编辑';
+
+  @override
   String get taskNew => '新建任务';
 
   @override
@@ -193,10 +247,52 @@ class AppLocalizationsZh extends AppLocalizations {
   String get commonCancel => '取消';
 
   @override
+  String get commonDelete => '删除';
+
+  @override
   String get scheduleEmpty => '还没有日程块';
 
   @override
+  String get scheduleEmptyHint => '点击右下角按钮添加日程块';
+
+  @override
+  String get scheduleGroupToday => '今天';
+
+  @override
+  String get scheduleGroupTomorrow => '明天';
+
+  @override
   String get blockNew => '新建日程块';
+
+  @override
+  String get blockEdit => '编辑日程块';
+
+  @override
+  String get blockDelete => '删除日程块';
+
+  @override
+  String get blockDeleteBody => '删除后不可恢复，确定删除该日程块吗？';
+
+  @override
+  String get blockDeleted => '已删除日程块';
+
+  @override
+  String get blockLockedHint => '该日程块已锁定，无法修改';
+
+  @override
+  String get blockKindTask => '任务';
+
+  @override
+  String get blockKindRest => '休息';
+
+  @override
+  String get blockKindSleep => '睡眠';
+
+  @override
+  String get blockKindBreakTime => '小憩';
+
+  @override
+  String get blockUnknownTask => '未知任务';
 
   @override
   String get blockKindLabel => '类型';
@@ -483,10 +579,15 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get syncPendingTitle => '待同步';
+  String get syncUpToDate => '同步完成';
 
   @override
-  String get syncIdle => '已同步或等待变更';
+  String get syncPending => '待同步';
+
+  @override
+  String syncPendingCount(Object count) {
+    return '$count 条更改待同步';
+  }
 
   @override
   String get syncSyncing => '正在同步记录…';

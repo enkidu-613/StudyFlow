@@ -343,10 +343,13 @@ final class _SyncStatusCard extends StatelessWidget {
   }) {
     final l10n = context.l10n;
     final pending = pendingOverride ?? value.pendingCount;
-    final isIdle = value.kind == SyncStatusKind.idle;
     final isOffline = value.kind == SyncStatusKind.offline;
+    final isFailed = value.kind == SyncStatusKind.failed;
+    final upToDate = value.kind == SyncStatusKind.idle && pending == 0;
+    final hasPending = value.kind == SyncStatusKind.idle && pending > 0;
     final subtitle = switch (value.kind) {
-      SyncStatusKind.idle => l10n.syncIdle,
+      SyncStatusKind.idle when hasPending => l10n.syncPendingCount(pending),
+      SyncStatusKind.idle => l10n.syncUpToDate,
       SyncStatusKind.syncing => l10n.syncSyncing,
       SyncStatusKind.offline => l10n.syncOffline,
       SyncStatusKind.failed => l10n.syncFailed(
@@ -356,9 +359,13 @@ final class _SyncStatusCard extends StatelessWidget {
     return Card(
       child: ListTile(
         leading: Icon(
-          isIdle ? Icons.cloud_done_outlined : Icons.cloud_upload_outlined,
+          isFailed
+              ? Icons.cloud_off_outlined
+              : (upToDate
+                  ? Icons.cloud_done_outlined
+                  : Icons.cloud_upload_outlined),
         ),
-        title: Text(l10n.syncPendingTitle),
+        title: Text(upToDate ? l10n.syncUpToDate : l10n.syncPending),
         subtitle: Text(subtitle),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
