@@ -28,6 +28,7 @@ final class PlatformBridge {
     required String title,
     required DateTime at,
     String? payload,
+    String? identifier,
   }) =>
       _invokeCapability(
         'scheduleReminder',
@@ -35,7 +36,14 @@ final class PlatformBridge {
           'title': title,
           'at': at.toUtc().millisecondsSinceEpoch,
           if (payload != null) 'text': payload,
+          if (identifier != null) 'id': identifier,
         },
+      );
+
+  Future<CapabilityResult> cancelReminder(String identifier) =>
+      _invokeCapability(
+        'cancelReminder',
+        <String, Object?>{'id': identifier},
       );
 
   Future<CapabilityResult> startFocusSession({required String title}) =>

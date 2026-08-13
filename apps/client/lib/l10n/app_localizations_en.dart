@@ -283,6 +283,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get blockLockedHint => 'This block is locked and cannot be edited';
 
   @override
+  String blockReminderBody(Object time) {
+    return 'Starts at $time';
+  }
+
+  @override
+  String get blockReminderDefaultTitle => 'Schedule reminder';
+
+  @override
   String get blockKindTask => 'Task';
 
   @override

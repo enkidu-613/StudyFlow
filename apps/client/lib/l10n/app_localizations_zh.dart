@@ -280,6 +280,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get blockLockedHint => '该日程块已锁定，无法修改';
 
   @override
+  String blockReminderBody(Object time) {
+    return '$time 开始';
+  }
+
+  @override
+  String get blockReminderDefaultTitle => '日程提醒';
+
+  @override
   String get blockKindTask => '任务';
 
   @override

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:studyflow/app/studyflow_workspace.dart';
 import 'package:studyflow/features/schedule/schedule_block_editor.dart';
@@ -51,12 +53,6 @@ final class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   Future<void> _openEditor([ScheduleBlock? block]) async {
-    if (block?.isLocked ?? false) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(context.l10n.blockLockedHint)));
-      return;
-    }
     final saved = await showModalBottomSheet<ScheduleBlock>(
       context: context,
       isScrollControlled: true,
@@ -90,6 +86,12 @@ final class _ScheduleScreenState extends State<ScheduleScreen> {
     await widget.workspace.schedule.delete(
       block.id,
       write: await widget.workspace.nextWrite(),
+    );
+    unawaited(
+      widget.workspace.platform.cancelReminder(block.id).then(
+            (_) {},
+            onError: (_) {},
+          ),
     );
     if (!mounted) {
       return;
@@ -189,12 +191,6 @@ final class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   Future<void> _showBlockActions(ScheduleBlock block) async {
-    if (block.isLocked) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(context.l10n.blockLockedHint)));
-      return;
-    }
     final l10n = context.l10n;
     final action = await showModalBottomSheet<_BlockAction>(
       context: context,

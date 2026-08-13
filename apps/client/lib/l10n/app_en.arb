@@ -84,6 +84,8 @@
   "blockDeleteBody": "This cannot be undone. Delete this block?",
   "blockDeleted": "Block deleted",
   "blockLockedHint": "This block is locked and cannot be edited",
+  "blockReminderBody": "Starts at {time}",
+  "blockReminderDefaultTitle": "Schedule reminder",
   "blockKindTask": "Task",
   "blockKindRest": "Rest",
   "blockKindSleep": "Sleep",

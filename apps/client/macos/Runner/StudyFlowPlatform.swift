@@ -13,6 +13,8 @@ final class StudyFlowPlatform {
       switch call.method {
       case "scheduleReminder":
         scheduleReminder(call: call, result: result)
+      case "cancelReminder":
+        cancelReminder(call: call, result: result)
       case "startFocusSession":
         startFocusSession(call: call, result: result)
       case "getUsageSummary":
@@ -48,6 +50,8 @@ final class StudyFlowPlatform {
     }
     let title = arguments["title"] as? String ?? "StudyFlow reminder"
     let text = arguments["text"] as? String ?? "Scheduled block"
+    let identifier =
+      arguments["id"] as? String ?? UUID().uuidString
     authorizeIfNeeded { granted in
       guard granted else {
         result(
@@ -63,11 +67,12 @@ final class StudyFlowPlatform {
       let content = UNMutableNotificationContent()
       content.title = title
       content.body = text
+      content.sound = .default
       let trigger = UNTimeIntervalNotificationTrigger(
         timeInterval: interval,
         repeats: false)
       let request = UNNotificationRequest(
-        identifier: UUID().uuidString,
+        identifier: identifier,
         content: content,
         trigger: trigger)
       UNUserNotificationCenter.current().add(request) { error in
@@ -82,6 +87,24 @@ final class StudyFlowPlatform {
         }
       }
     }
+  }
+
+  private static func cancelReminder(
+    call: FlutterMethodCall,
+    result: @escaping FlutterResult
+  ) {
+    guard let arguments = call.arguments as? [String: Any],
+          let identifier = arguments["id"] as? String else {
+      result(
+        FlutterError(
+          code: "invalid_argument",
+          message: "Reminder identifier is missing.",
+          details: nil))
+      return
+    }
+    UNUserNotificationCenter.current().removePendingNotificationRequests(
+      withIdentifiers: [identifier])
+    result(["kind": "supported", "message": "Reminder cancelled."])
   }
 
   private static func startFocusSession(

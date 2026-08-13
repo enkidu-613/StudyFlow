@@ -84,6 +84,8 @@
   "blockDeleteBody": "删除后不可恢复，确定删除该日程块吗？",
   "blockDeleted": "已删除日程块",
   "blockLockedHint": "该日程块已锁定，无法修改",
+  "blockReminderBody": "{time} 开始",
+  "blockReminderDefaultTitle": "日程提醒",
   "blockKindTask": "任务",
   "blockKindRest": "休息",
   "blockKindSleep": "睡眠",

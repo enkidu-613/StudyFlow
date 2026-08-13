@@ -602,6 +602,18 @@ abstract class AppLocalizations {
   /// **'该日程块已锁定，无法修改'**
   String get blockLockedHint;
 
+  /// No description provided for @blockReminderBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'{time} 开始'**
+  String blockReminderBody(Object time);
+
+  /// No description provided for @blockReminderDefaultTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'日程提醒'**
+  String get blockReminderDefaultTitle;
+
   /// No description provided for @blockKindTask.
   ///
   /// In zh, this message translates to:

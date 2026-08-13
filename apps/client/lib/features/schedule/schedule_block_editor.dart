@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:studyflow/app/studyflow_workspace.dart';
+import 'package:studyflow/l10n/app_localizations.dart';
 import 'package:studyflow/l10n/l10n_extension.dart';
 import 'package:studyflow/util/uuid.dart';
 import 'package:studyflow_domain/domain.dart';
@@ -91,14 +94,42 @@ final class _ScheduleBlockEditorState extends State<ScheduleBlockEditor> {
       source: existing?.source ?? ScheduleBlockSource.manual,
       isLocked: _locked,
     );
+    final l10n = context.l10n;
+    final reminderTitle = _reminderTitle(l10n, block);
+    final reminderBody = l10n.blockReminderBody(_format(block.start));
     await widget.workspace.schedule.save(
       block,
       write: await widget.workspace.nextWrite(),
+    );
+    unawaited(
+      widget.workspace.platform.scheduleReminder(
+        title: reminderTitle,
+        at: block.start,
+        payload: reminderBody,
+        identifier: block.id,
+      ).then(
+        (_) {},
+        onError: (_) {},
+      ),
     );
     if (mounted) {
       Navigator.of(context).pop(block);
     }
   }
+
+  String _reminderTitle(AppLocalizations l10n, ScheduleBlock block) =>
+      block.kind == ScheduleBlockKind.task && block.taskId != null
+          ? widget.tasks
+                  .where((task) => task.id == block.taskId)
+                  .map((task) => task.title)
+                  .firstOrNull ??
+              l10n.blockReminderDefaultTitle
+          : switch (block.kind) {
+              ScheduleBlockKind.task => l10n.blockKindTask,
+              ScheduleBlockKind.rest => l10n.blockKindRest,
+              ScheduleBlockKind.sleep => l10n.blockKindSleep,
+              ScheduleBlockKind.breakTime => l10n.blockKindBreakTime,
+            };
 
   @override
   Widget build(BuildContext context) {

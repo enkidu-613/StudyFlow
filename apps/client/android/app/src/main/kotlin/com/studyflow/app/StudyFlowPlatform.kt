@@ -22,6 +22,7 @@ object StudyFlowPlatform {
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
                 "scheduleReminder" -> scheduleReminder(context, call.arguments, result)
+                "cancelReminder" -> cancelReminder(context, call.arguments, result)
                 "startFocusSession" -> startFocusSession(context, call.arguments, result)
                 "getUsageSummary" -> result.success(
                     unsupported("Usage summaries require separate UsageStats authorization.")
@@ -46,6 +47,7 @@ object StudyFlowPlatform {
         val text = map["text"] as? String ?: "Scheduled block"
         val atMillis = (map["at"] as? Number)?.toLong()
             ?: return result.error("invalid_argument", "Reminder time is missing.", null)
+        val identifier = map["id"] as? String
 
         if (!hasNotificationPermission(context)) {
             return result.error(
@@ -62,7 +64,7 @@ object StudyFlowPlatform {
             )
         }
 
-        val requestCode = (java.lang.System.currentTimeMillis() % Int.MAX_VALUE).toInt()
+        val requestCode = requestCodeFor(identifier)
         val notificationId = requestCode
         val intent = Intent(context, ReminderReceiver::class.java)
             .putExtra("title", title)
@@ -86,6 +88,40 @@ object StudyFlowPlatform {
             alarmManager.setExact(AlarmManager.RTC_WAKEUP, atMillis, pendingIntent)
         }
         result.success(mapOf("kind" to "supported", "message" to "Reminder scheduled."))
+    }
+
+    private fun cancelReminder(
+        context: Context,
+        arguments: Any?,
+        result: MethodChannel.Result,
+    ) {
+        val map = arguments as? Map<*, *>
+            ?: return result.error("invalid_argument", "Reminder identifier is missing.", null)
+        val identifier = map["id"] as? String
+            ?: return result.error("invalid_argument", "Reminder identifier is missing.", null)
+        val requestCode = requestCodeFor(identifier)
+        val intent = Intent(context, ReminderReceiver::class.java)
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                PendingIntent.FLAG_IMMUTABLE
+            } else {
+                0
+            }
+        val pendingIntent = PendingIntent.getBroadcast(context, requestCode, intent, flags)
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        alarmManager.cancel(pendingIntent)
+        result.success(mapOf("kind" to "supported", "message" to "Reminder cancelled."))
+    }
+
+    private fun requestCodeFor(identifier: String?): Int {
+        if (identifier == null) {
+            return (java.lang.System.currentTimeMillis() % Int.MAX_VALUE).toInt()
+        }
+        var hash = 0
+        for (char in identifier) {
+            hash = hash * 31 + char.code
+        }
+        return hash and Int.MAX_VALUE
     }
 
     private fun startFocusSession(

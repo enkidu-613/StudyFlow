@@ -117,8 +117,7 @@ void main() {
     expect(find.byKey(const Key('schedule-block-bbbbbbbb-bbbb-4bbb-8bbb-000000000002')), findsNothing);
   });
 
-  testWidgets('locked block cannot be edited and shows a hint',
-      (tester) async {
+  testWidgets('locked block can be opened and unlocked', (tester) async {
     final now = DateTime.now();
     await seed(
       block(
@@ -135,12 +134,19 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('schedule-block-bbbbbbbb-bbbb-4bbb-8bbb-000000000003')));
+    await tester
+        .tap(find.byKey(const Key('schedule-block-bbbbbbbb-bbbb-4bbb-8bbb-000000000003')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Edit block'), findsNothing);
-    expect(find.text('This block is locked and cannot be edited'),
-        findsOneWidget);
+    expect(find.text('Edit block'), findsOneWidget);
+    await tester.tap(find.text('Locked'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    final stored = await workspace.schedule
+        .get('bbbbbbbb-bbbb-4bbb-8bbb-000000000003');
+    expect(stored?.isLocked, isFalse);
   });
 
   testWidgets('blocks are grouped by day in time order', (tester) async {
