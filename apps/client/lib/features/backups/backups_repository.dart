@@ -14,6 +14,8 @@ abstract interface class BackupsRepository {
   Future<BackupSummary> rename(String backupId, String name);
 
   Future<void> delete(String backupId);
+
+  Future<BackupBatchDeleteResult> deleteMany(List<String> backupIds);
 }
 
 final class HttpBackupsRepository implements BackupsRepository {
@@ -110,6 +112,28 @@ final class HttpBackupsRepository implements BackupsRepository {
       '/v1/backups/$backupId',
       acceptedStatusCodes: const <int>{204},
     );
+  }
+
+  @override
+  Future<BackupBatchDeleteResult> deleteMany(List<String> backupIds) async {
+    final json = _object(
+      await _send(
+        'POST',
+        '/v1/backups/batch-delete',
+        body: jsonEncode(<String, Object?>{
+          'backup_ids': backupIds,
+        }),
+      ),
+      'batch delete response',
+    );
+    try {
+      return BackupBatchDeleteResult.fromApiJson(json.cast<String, Object?>());
+    } on FormatException catch (error) {
+      throw BackupSchemaFailure(
+        'Batch delete response was invalid.',
+        cause: error,
+      );
+    }
   }
 
   Future<Object?> _send(

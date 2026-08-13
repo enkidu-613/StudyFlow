@@ -71,6 +71,34 @@ final class RecordingBackupsRepository implements BackupsRepository {
     }
     _backups.removeWhere((b) => b.backupId == backupId);
   }
+
+  bool failBatchDeleteOffline = false;
+  int batchDeleteCalls = 0;
+  final List<String> batchDeletedIds = <String>[];
+  int batchNotFoundCount = 0;
+
+  @override
+  Future<BackupBatchDeleteResult> deleteMany(List<String> backupIds) async {
+    batchDeleteCalls += 1;
+    if (failBatchDeleteOffline) {
+      throw const BackupOfflineFailure('offline');
+    }
+    batchDeletedIds.addAll(backupIds);
+    var deleted = 0;
+    for (final id in backupIds) {
+      if (_backups.any((b) => b.backupId == id)) {
+        deleted += 1;
+      }
+      _backups.removeWhere((b) => b.backupId == id);
+    }
+    return BackupBatchDeleteResult(
+      deleted: deleted,
+      notFound: List<String>.generate(
+        batchNotFoundCount,
+        (i) => 'missing-$i',
+      ),
+    );
+  }
 }
 
 BackupSummary backup(String id, String name) => BackupSummary(
@@ -276,5 +304,268 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.byKey(const Key('backups-empty-state')), findsOneWidget);
+  });
+
+  testWidgets('edit button is hidden for empty list', (tester) async {
+    await pumpWithL10n(
+      tester,
+      BackupsScreen(repository: RecordingBackupsRepository()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('backups-edit-button')), findsNothing);
+  });
+
+  testWidgets('edit enters selection mode with checkboxes', (tester) async {
+    final repository = RecordingBackupsRepository(
+      initial: <BackupSummary>[backup('a', '备份A'), backup('b', '备份B')],
+    );
+    await pumpWithL10n(
+      tester,
+      BackupsScreen(repository: repository),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('backups-edit-button')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('backup-item-checkbox-a')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('backup-item-menu')), findsNothing);
+    expect(find.byKey(const Key('backup-batch-delete-button')), findsOneWidget);
+    expect(find.byKey(const Key('create-backup-button')), findsNothing);
+    expect(find.text('已选 0 项'), findsOneWidget);
+  });
+
+  testWidgets('long press enters selection mode and selects the item',
+      (tester) async {
+    final repository = RecordingBackupsRepository(
+      initial: <BackupSummary>[backup('a', '备份A')],
+    );
+    await pumpWithL10n(
+      tester,
+      BackupsScreen(repository: repository),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.longPress(find.byKey(const Key('backup-item-a')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('已选 1 项'), findsOneWidget);
+    final checkbox = tester.widget<Checkbox>(
+      find.byKey(const Key('backup-item-checkbox-a')),
+    );
+    expect(checkbox.value, isTrue);
+  });
+
+  testWidgets('tapping items toggles selection count', (tester) async {
+    final repository = RecordingBackupsRepository(
+      initial: <BackupSummary>[backup('a', 'A'), backup('b', 'B')],
+    );
+    await pumpWithL10n(
+      tester,
+      BackupsScreen(repository: repository),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('backups-edit-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('backup-item-a')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('已选 1 项'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('backup-item-b')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('已选 2 项'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('backup-item-a')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('已选 1 项'), findsOneWidget);
+  });
+
+  testWidgets('select all toggles between all and none', (tester) async {
+    final repository = RecordingBackupsRepository(
+      initial: <BackupSummary>[backup('a', 'A'), backup('b', 'B')],
+    );
+    await pumpWithL10n(
+      tester,
+      BackupsScreen(repository: repository),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('backups-edit-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('全选'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('backup-select-all-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('已选 2 项'), findsOneWidget);
+    expect(find.text('全不选'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('backup-select-all-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('已选 0 项'), findsOneWidget);
+    expect(find.text('全选'), findsOneWidget);
+  });
+
+  testWidgets('batch delete button disabled with empty selection',
+      (tester) async {
+    final repository = RecordingBackupsRepository(
+      initial: <BackupSummary>[backup('a', 'A')],
+    );
+    await pumpWithL10n(
+      tester,
+      BackupsScreen(repository: repository),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('backups-edit-button')));
+    await tester.pumpAndSettle();
+
+    final button = tester.widget<FilledButton>(
+      find.byKey(const Key('backup-batch-delete-button')),
+    );
+    expect(button.onPressed, isNull);
+  });
+
+  testWidgets('batch delete success removes backups and exits selection',
+      (tester) async {
+    final repository = RecordingBackupsRepository(
+      initial: <BackupSummary>[backup('a', 'A'), backup('b', 'B')],
+    );
+    await pumpWithL10n(
+      tester,
+      BackupsScreen(repository: repository),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('backups-edit-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('backup-select-all-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('backup-batch-delete-button')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('backup-batch-delete-dialog')),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.byKey(const Key('backup-batch-delete-confirm-button')),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(repository.batchDeletedIds, <String>['a', 'b']);
+    expect(repository.batchDeleteCalls, 1);
+    expect(find.text('已删除 2 个备份'), findsOneWidget);
+    expect(find.byKey(const Key('backups-edit-button')), findsNothing);
+    expect(find.byKey(const Key('create-backup-button')), findsOneWidget);
+    expect(find.byKey(const Key('backups-empty-state')), findsOneWidget);
+  });
+
+  testWidgets('batch delete partial failure shows partial message',
+      (tester) async {
+    final repository = RecordingBackupsRepository(
+      initial: <BackupSummary>[backup('a', 'A'), backup('b', 'B')],
+    )..batchNotFoundCount = 1;
+    await pumpWithL10n(
+      tester,
+      BackupsScreen(repository: repository),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('backups-edit-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('backup-select-all-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('backup-batch-delete-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('backup-batch-delete-confirm-button')),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.textContaining('不存在'), findsOneWidget);
+    expect(find.byKey(const Key('backups-edit-button')), findsNothing);
+  });
+
+  testWidgets('batch delete offline keeps selection mode', (tester) async {
+    final repository = RecordingBackupsRepository(
+      initial: <BackupSummary>[backup('a', 'A')],
+    )..failBatchDeleteOffline = true;
+    await pumpWithL10n(
+      tester,
+      BackupsScreen(repository: repository),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('backups-edit-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('backup-item-a')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('backup-batch-delete-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('backup-batch-delete-confirm-button')),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('网络连接失败，请检查网络后重试'), findsOneWidget);
+    expect(find.text('已选 1 项'), findsOneWidget);
+    expect(find.byKey(const Key('backup-batch-delete-button')), findsOneWidget);
+  });
+
+  testWidgets('cancel exits selection mode without deleting', (tester) async {
+    final repository = RecordingBackupsRepository(
+      initial: <BackupSummary>[backup('a', 'A')],
+    );
+    await pumpWithL10n(
+      tester,
+      BackupsScreen(repository: repository),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('backups-edit-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('backup-selection-cancel-button')));
+    await tester.pumpAndSettle();
+
+    expect(repository.batchDeleteCalls, 0);
+    expect(find.byKey(const Key('create-backup-button')), findsOneWidget);
+    expect(find.byKey(const Key('backups-edit-button')), findsOneWidget);
+  });
+
+  testWidgets('batch delete dialog cancel does not call repository',
+      (tester) async {
+    final repository = RecordingBackupsRepository(
+      initial: <BackupSummary>[backup('a', 'A')],
+    );
+    await pumpWithL10n(
+      tester,
+      BackupsScreen(repository: repository),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('backups-edit-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('backup-item-a')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('backup-batch-delete-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('backup-batch-delete-cancel-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.batchDeleteCalls, 0);
+    expect(find.text('已选 1 项'), findsOneWidget);
   });
 }

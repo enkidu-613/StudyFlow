@@ -62,6 +62,38 @@ final class BackupListResult {
   final List<BackupSummary> backups;
 }
 
+final class BackupBatchDeleteResult {
+  BackupBatchDeleteResult({
+    required this.deleted,
+    required Iterable<String> notFound,
+  }) : notFound = List<String>.unmodifiable(notFound);
+
+  factory BackupBatchDeleteResult.fromApiJson(Map<String, Object?> json) {
+    const expectedKeys = <String>{'deleted', 'not_found'};
+    if (json.keys.toSet().difference(expectedKeys).isNotEmpty ||
+        expectedKeys.difference(json.keys.toSet()).isNotEmpty) {
+      throw const FormatException('Batch delete has unexpected fields.');
+    }
+    final deleted = json['deleted'];
+    final notFound = json['not_found'];
+    if (deleted is! int || notFound is! List) {
+      throw const FormatException('Batch delete has invalid field types.');
+    }
+    return BackupBatchDeleteResult(
+      deleted: deleted,
+      notFound: notFound.map((id) {
+        if (id is! String) {
+          throw const FormatException('not_found must be a string list.');
+        }
+        return id.toLowerCase();
+      }),
+    );
+  }
+
+  final int deleted;
+  final List<String> notFound;
+}
+
 const int maxBackupsPerAccount = 5;
 
 String formatBackupBytes(int bytes) {

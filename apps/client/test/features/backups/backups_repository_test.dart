@@ -189,6 +189,64 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  test('deleteMany posts ids and parses deleted/not_found', () async {
+    late http.Request captured;
+    final client = MockClient((request) async {
+      captured = request;
+      return http.Response(
+        jsonEncode(<String, Object?>{
+          'deleted': 1,
+          'not_found': <String>['33333333-3333-4333-8333-333333333333'],
+        }),
+        200,
+        headers: <String, String>{'content-type': 'application/json; charset=utf-8'},
+      );
+    });
+    final repository = repositoryWith(client);
+
+    final result = await repository.deleteMany(<String>[
+      '22222222-2222-4222-8222-222222222222',
+      '33333333-3333-4333-8333-333333333333',
+    ]);
+
+    expect(captured.method, 'POST');
+    expect(captured.url.path, '/v1/backups/batch-delete');
+    expect(jsonDecode(captured.body), <String, Object?>{
+      'backup_ids': <String>[
+        '22222222-2222-4222-8222-222222222222',
+        '33333333-3333-4333-8333-333333333333',
+      ],
+    });
+    expect(result.deleted, 1);
+    expect(result.notFound, <String>['33333333-3333-4333-8333-333333333333']);
+  });
+
+  test('deleteMany rejects unexpected response fields', () async {
+    final client = MockClient(
+      (request) async => http.Response(
+        jsonEncode(<String, Object?>{'deleted': 1}),
+        200,
+        headers: <String, String>{'content-type': 'application/json; charset=utf-8'},
+      ),
+    );
+    final repository = repositoryWith(client);
+
+    expect(
+      () => repository.deleteMany(<String>['22222222-2222-4222-8222-222222222222']),
+      throwsA(isA<BackupSchemaFailure>()),
+    );
+  });
+
+  test('deleteMany 401 maps to BackupAuthenticationFailure', () async {
+    final client = MockClient((request) async => http.Response('no', 401));
+    final repository = repositoryWith(client);
+
+    expect(
+      () => repository.deleteMany(<String>['22222222-2222-4222-8222-222222222222']),
+      throwsA(isA<BackupAuthenticationFailure>()),
+    );
+  });
 }
 
 extension on BackupSummary {

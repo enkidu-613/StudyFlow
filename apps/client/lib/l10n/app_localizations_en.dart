@@ -455,6 +455,43 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupsRetry => 'Retry';
 
   @override
+  String get backupsEdit => 'Edit';
+
+  @override
+  String backupsSelectionTitle(Object count) {
+    return '$count selected';
+  }
+
+  @override
+  String get backupsSelectAll => 'Select all';
+
+  @override
+  String get backupsSelectNone => 'Select none';
+
+  @override
+  String backupsDeleteSelected(Object count) {
+    return 'Delete ($count)';
+  }
+
+  @override
+  String get backupsBatchDeleteTitle => 'Delete selected backups';
+
+  @override
+  String backupsBatchDeleteBody(Object count) {
+    return 'This permanently deletes $count backups and cannot be undone. Continue?';
+  }
+
+  @override
+  String backupsBatchDeleteSuccess(Object count) {
+    return 'Deleted $count backups';
+  }
+
+  @override
+  String backupsBatchDeletePartial(Object deleted, Object notFound) {
+    return 'Deleted $deleted, $notFound not found';
+  }
+
+  @override
   String get syncPendingTitle => 'Pending sync';
 
   @override

@@ -446,6 +446,43 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupsRetry => '重试';
 
   @override
+  String get backupsEdit => '编辑';
+
+  @override
+  String backupsSelectionTitle(Object count) {
+    return '已选 $count 项';
+  }
+
+  @override
+  String get backupsSelectAll => '全选';
+
+  @override
+  String get backupsSelectNone => '全不选';
+
+  @override
+  String backupsDeleteSelected(Object count) {
+    return '删除 ($count)';
+  }
+
+  @override
+  String get backupsBatchDeleteTitle => '删除所选备份';
+
+  @override
+  String backupsBatchDeleteBody(Object count) {
+    return '将删除 $count 个备份，删除后不可恢复。确定继续吗？';
+  }
+
+  @override
+  String backupsBatchDeleteSuccess(Object count) {
+    return '已删除 $count 个备份';
+  }
+
+  @override
+  String backupsBatchDeletePartial(Object deleted, Object notFound) {
+    return '已删除 $deleted 个，$notFound 个不存在';
+  }
+
+  @override
   String get syncPendingTitle => '待同步';
 
   @override

@@ -914,6 +914,60 @@ abstract class AppLocalizations {
   /// **'重试'**
   String get backupsRetry;
 
+  /// No description provided for @backupsEdit.
+  ///
+  /// In zh, this message translates to:
+  /// **'编辑'**
+  String get backupsEdit;
+
+  /// No description provided for @backupsSelectionTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'已选 {count} 项'**
+  String backupsSelectionTitle(Object count);
+
+  /// No description provided for @backupsSelectAll.
+  ///
+  /// In zh, this message translates to:
+  /// **'全选'**
+  String get backupsSelectAll;
+
+  /// No description provided for @backupsSelectNone.
+  ///
+  /// In zh, this message translates to:
+  /// **'全不选'**
+  String get backupsSelectNone;
+
+  /// No description provided for @backupsDeleteSelected.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除 ({count})'**
+  String backupsDeleteSelected(Object count);
+
+  /// No description provided for @backupsBatchDeleteTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除所选备份'**
+  String get backupsBatchDeleteTitle;
+
+  /// No description provided for @backupsBatchDeleteBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'将删除 {count} 个备份，删除后不可恢复。确定继续吗？'**
+  String backupsBatchDeleteBody(Object count);
+
+  /// No description provided for @backupsBatchDeleteSuccess.
+  ///
+  /// In zh, this message translates to:
+  /// **'已删除 {count} 个备份'**
+  String backupsBatchDeleteSuccess(Object count);
+
+  /// No description provided for @backupsBatchDeletePartial.
+  ///
+  /// In zh, this message translates to:
+  /// **'已删除 {deleted} 个，{notFound} 个不存在'**
+  String backupsBatchDeletePartial(Object deleted, Object notFound);
+
   /// No description provided for @syncPendingTitle.
   ///
   /// In zh, this message translates to:
