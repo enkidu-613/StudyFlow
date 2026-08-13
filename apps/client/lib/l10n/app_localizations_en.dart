@@ -313,6 +313,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get permissionDetailRequired => 'permission required';
 
   @override
+  String get permissionPromptDeclined =>
+      'Notifications are not enabled. You can allow them in System Settings later.';
+
+  @override
+  String get permissionPromptDenied =>
+      'System Settings opened. Allow notifications for StudyFlow there.';
+
+  @override
+  String get permissionPromptFailed =>
+      'Permission request failed. Try again later.';
+
+  @override
+  String get permissionUnavailableTitle => 'Not available on macOS';
+
+  @override
+  String permissionUnavailableMessage(Object permission) {
+    return '$permission is a mobile-only permission and needs no authorization on macOS.';
+  }
+
+  @override
   String get settingsAiEntry => 'AI settings';
 
   @override

@@ -23,6 +23,8 @@ final class StudyFlowPlatform {
         getPermissionStatus(result: result)
       case "requestPermission":
         requestPermission(call: call, result: result)
+      case "showUnavailablePermission":
+        showUnavailablePermission(call: call, result: result)
       case "openPermissionSettings":
         openPermissionSettings(result: result)
       default:
@@ -215,6 +217,9 @@ final class StudyFlowPlatform {
       case .authorized, .provisional:
         result(["granted": true, "status": "authorized"])
       case .denied:
+        // macOS never re-prompts after a denial; open the notification
+        // settings pane so the user can flip the switch there.
+        openNotificationSettingsPane()
         result(FlutterError(
           code: "permission_denied",
           message: "Notifications are denied. Open System Settings to allow them.",
@@ -228,19 +233,57 @@ final class StudyFlowPlatform {
               message: error.localizedDescription,
               details: nil))
           } else {
-            result(["granted": granted])
+            result([
+              "granted": granted,
+              "status": granted ? "authorized" : "declined",
+            ])
           }
         }
       }
     }
   }
 
-  private static func openPermissionSettings(result: @escaping FlutterResult) {
-    let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications")
-    if let url = url {
-      NSWorkspace.shared.open(url)
+  private static func openNotificationSettingsPane() {
+    let urls = [
+      "x-apple.systempreferences:com.apple.Notifications-Settings.extension",
+      "x-apple.systempreferences:com.apple.preference.notifications",
+    ]
+    for urlString in urls {
+      if let url = URL(string: urlString) {
+        NSWorkspace.shared.open(url)
+        return
+      }
     }
+  }
+
+  private static func openPermissionSettings(result: @escaping FlutterResult) {
+    openNotificationSettingsPane()
     result(true)
+  }
+
+  private static func showUnavailablePermission(
+    call: FlutterMethodCall,
+    result: @escaping FlutterResult
+  ) {
+    guard let arguments = call.arguments as? [String: Any],
+          let title = arguments["title"] as? String,
+          let message = arguments["message"] as? String else {
+      result(
+        FlutterError(
+          code: "invalid_argument",
+          message: "Unavailable permission arguments are missing.",
+          details: nil))
+      return
+    }
+    DispatchQueue.main.async {
+      let alert = NSAlert()
+      alert.alertStyle = .informational
+      alert.messageText = title
+      alert.informativeText = message
+      alert.addButton(withTitle: "OK")
+      alert.runModal()
+      result(true)
+    }
   }
 
   private static func authorizeIfNeeded(completion: @escaping (Bool) -> Void) {

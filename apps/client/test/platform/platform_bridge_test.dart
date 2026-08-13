@@ -146,44 +146,50 @@ void main() {
     );
   });
 
-  test('requestPermission returns true when the native prompt grants it',
+  test('requestPermission returns authorized when the native prompt grants it',
       () async {
     final platform = FakePlatform(<String, Object?>{
-      'requestPermission': <String, Object?>{'granted': true},
+      'requestPermission': <String, Object?>{
+        'granted': true,
+        'status': 'authorized',
+      },
     });
     final bridge = PlatformBridge(channel: platform);
 
-    final granted = await bridge
+    final status = await bridge
         .requestPermission(PlatformPermissionId.notifications);
 
-    expect(granted, isTrue);
+    expect(status, 'authorized');
     expect(platform.methods, <String>['requestPermission']);
   });
 
-  test('requestPermission returns false when the native prompt is declined',
+  test('requestPermission returns declined when the native prompt is declined',
       () async {
     final platform = FakePlatform(<String, Object?>{
-      'requestPermission': <String, Object?>{'granted': false},
+      'requestPermission': <String, Object?>{
+        'granted': false,
+        'status': 'declined',
+      },
     });
     final bridge = PlatformBridge(channel: platform);
 
-    final granted = await bridge
+    final status = await bridge
         .requestPermission(PlatformPermissionId.notifications);
 
-    expect(granted, isFalse);
+    expect(status, 'declined');
   });
 
-  test('requestPermission returns false when the channel is missing',
+  test('requestPermission returns null when the channel is missing',
       () async {
     final bridge = PlatformBridge(channel: UnsupportedPlatform());
 
-    final granted = await bridge
+    final status = await bridge
         .requestPermission(PlatformPermissionId.notifications);
 
-    expect(granted, isFalse);
+    expect(status, isNull);
   });
 
-  test('requestPermission returns false on permission_denied platform error',
+  test('requestPermission returns denied on permission_denied platform error',
       () async {
     final platform = FakePlatform(<String, Object?>{
       'requestPermission': PlatformException(
@@ -193,10 +199,26 @@ void main() {
     });
     final bridge = PlatformBridge(channel: platform);
 
-    final granted = await bridge
+    final status = await bridge
         .requestPermission(PlatformPermissionId.notifications);
 
-    expect(granted, isFalse);
+    expect(status, 'denied');
+  });
+
+  test('requestPermission returns unsupported on unsupported platform error',
+      () async {
+    final platform = FakePlatform(<String, Object?>{
+      'requestPermission': PlatformException(
+        code: 'unsupported',
+        message: 'Not requestable.',
+      ),
+    });
+    final bridge = PlatformBridge(channel: platform);
+
+    final status = await bridge
+        .requestPermission(PlatformPermissionId.batteryOptimization);
+
+    expect(status, 'unsupported');
   });
 
   test('openPermissionSettings returns false when the channel is missing',
@@ -206,5 +228,35 @@ void main() {
     final opened = await bridge.openPermissionSettings();
 
     expect(opened, isFalse);
+  });
+
+  test('showUnavailablePermission returns true when the dialog is shown',
+      () async {
+    final platform = FakePlatform(<String, Object?>{
+      'showUnavailablePermission': true,
+    });
+    final bridge = PlatformBridge(channel: platform);
+
+    final shown = await bridge.showUnavailablePermission(
+      PlatformPermissionId.exactAlarm,
+      title: 'Not available on macOS',
+      message: 'Exact alarm is mobile-only.',
+    );
+
+    expect(shown, isTrue);
+    expect(platform.methods, <String>['showUnavailablePermission']);
+  });
+
+  test('showUnavailablePermission returns false when the channel is missing',
+      () async {
+    final bridge = PlatformBridge(channel: UnsupportedPlatform());
+
+    final shown = await bridge.showUnavailablePermission(
+      PlatformPermissionId.exactAlarm,
+      title: 'Not available on macOS',
+      message: 'Exact alarm is mobile-only.',
+    );
+
+    expect(shown, isFalse);
   });
 }

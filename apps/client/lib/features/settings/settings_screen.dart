@@ -206,35 +206,56 @@ final class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _handlePermissionTap(PermissionState state) async {
     final l10n = context.l10n;
     if (!state.available) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            l10n.permissionDetailText(state.detail, allowed: false),
-          ),
+      await widget.workspace.platform.showUnavailablePermission(
+        state.id,
+        title: l10n.permissionUnavailableTitle,
+        message: l10n.permissionUnavailableMessage(
+          l10n.permissionLabel(state.id),
         ),
       );
       return;
     }
     if (state.allowed) {
+      await widget.workspace.platform.showUnavailablePermission(
+        state.id,
+        title: l10n.permissionLabel(state.id),
+        message: l10n.permissionDetailText(state.detail, allowed: true),
+      );
       return;
     }
     final isNotification = state.id == PlatformPermissionId.notifications ||
         state.id == PlatformPermissionId.userNotifications;
     if (isNotification) {
-      final granted = await widget.workspace.platform
+      final status = await widget.workspace.platform
           .requestPermission(state.id);
       await _refresh();
-      if (!granted && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.permissionDetailRequired),
-          ),
-        );
+      if (!mounted) {
+        return;
+      }
+      switch (status) {
+        case 'authorized':
+          break;
+        case 'declined':
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.permissionPromptDeclined)),
+          );
+        case 'denied':
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.permissionPromptDenied)),
+          );
+        default:
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.permissionPromptFailed)),
+          );
       }
       return;
     }
     // App-internal permissions (menu bar, focus) have no system prompt.
-    await widget.workspace.platform.openPermissionSettings();
+    await widget.workspace.platform.showUnavailablePermission(
+      state.id,
+      title: l10n.permissionLabel(state.id),
+      message: l10n.permissionDetailText(state.detail, allowed: false),
+    );
   }
 
   String _selectedLanguageTag(Locale? locale) => switch (locale?.languageCode) {

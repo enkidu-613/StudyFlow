@@ -77,27 +77,58 @@ final class PlatformBridge {
     }
   }
 
+  /// Shows a native system dialog explaining that [id] is not available on
+  /// this platform (for example, exact alarms on macOS).
+  Future<bool> showUnavailablePermission(
+    PlatformPermissionId id, {
+    required String title,
+    required String message,
+  }) async {
+    try {
+      final raw = await _channel.invokeMethod('showUnavailablePermission', <String, Object?>{
+        'id': id.name,
+        'title': title,
+        'message': message,
+      });
+      return raw is bool && raw;
+    } on Object {
+      return false;
+    }
+  }
+
   /// Requests a system authorization prompt for [id] where the platform
-  /// supports one (notifications on macOS). Returns true when the prompt
-  /// granted the permission; false when the prompt was declined, the
-  /// permission is not requestable, or the user previously denied it.
-  Future<bool> requestPermission(PlatformPermissionId id) async {
+  /// supports one (notifications on macOS). Returns one of:
+  /// - `authorized`: the permission is granted.
+  /// - `declined`: the prompt was shown and the user declined it.
+  /// - `denied`: the permission was previously denied; macOS never
+  ///   re-prompts, and the native side has opened System Settings.
+  /// - `unsupported` / `null`: no prompt is available or the request failed.
+  Future<String?> requestPermission(PlatformPermissionId id) async {
     try {
       final raw = await _channel.invokeMethod('requestPermission', <String, Object?>{
         'id': id.name,
       });
       if (raw is Map) {
+        final status = raw['status'];
+        if (status is String) {
+          return status;
+        }
         final granted = raw['granted'];
-        return granted is bool && granted;
+        if (granted is bool) {
+          return granted ? 'authorized' : 'declined';
+        }
       }
-      return false;
+      return null;
     } on PlatformException catch (error) {
-      if (error.code == 'permission_denied' || error.code == 'unsupported') {
-        return false;
+      if (error.code == 'permission_denied') {
+        return 'denied';
       }
-      return false;
+      if (error.code == 'unsupported') {
+        return 'unsupported';
+      }
+      return null;
     } on Object {
-      return false;
+      return null;
     }
   }
 

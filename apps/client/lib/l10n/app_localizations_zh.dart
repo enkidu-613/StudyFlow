@@ -309,6 +309,23 @@ class AppLocalizationsZh extends AppLocalizations {
   String get permissionDetailRequired => '需要授权';
 
   @override
+  String get permissionPromptDeclined => '通知权限未开启，可稍后到系统设置中开启';
+
+  @override
+  String get permissionPromptDenied => '已打开系统设置，请在通知中允许 StudyFlow';
+
+  @override
+  String get permissionPromptFailed => '权限请求失败，请稍后重试';
+
+  @override
+  String get permissionUnavailableTitle => '该权限在 macOS 上不可用';
+
+  @override
+  String permissionUnavailableMessage(Object permission) {
+    return '$permission 是移动平台专属权限，macOS 上不需要授权。';
+  }
+
+  @override
   String get settingsAiEntry => 'AI 设置';
 
   @override

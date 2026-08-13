@@ -668,6 +668,36 @@ abstract class AppLocalizations {
   /// **'需要授权'**
   String get permissionDetailRequired;
 
+  /// No description provided for @permissionPromptDeclined.
+  ///
+  /// In zh, this message translates to:
+  /// **'通知权限未开启，可稍后到系统设置中开启'**
+  String get permissionPromptDeclined;
+
+  /// No description provided for @permissionPromptDenied.
+  ///
+  /// In zh, this message translates to:
+  /// **'已打开系统设置，请在通知中允许 StudyFlow'**
+  String get permissionPromptDenied;
+
+  /// No description provided for @permissionPromptFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'权限请求失败，请稍后重试'**
+  String get permissionPromptFailed;
+
+  /// No description provided for @permissionUnavailableTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'该权限在 macOS 上不可用'**
+  String get permissionUnavailableTitle;
+
+  /// No description provided for @permissionUnavailableMessage.
+  ///
+  /// In zh, this message translates to:
+  /// **'{permission} 是移动平台专属权限，macOS 上不需要授权。'**
+  String permissionUnavailableMessage(Object permission);
+
   /// No description provided for @settingsAiEntry.
   ///
   /// In zh, this message translates to:
