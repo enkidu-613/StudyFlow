@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from server.app.db.context import UserContext
@@ -22,6 +22,12 @@ class BackupRecord:
     last_operation_sequence: int
     status: str
     payload: dict
+
+
+@dataclass(frozen=True, slots=True)
+class BatchDeleteResult:
+    deleted: int
+    not_found: list[UUID]
 
 
 class BackupLimitReachedError(RuntimeError):
@@ -163,6 +169,38 @@ class BackupRepository:
                 if row is None:
                     raise BackupNotFoundError("Backup not found.")
                 await session.delete(row)
+
+    async def delete_many(
+        self,
+        user_id: UUID,
+        backup_ids: list[UUID],
+    ) -> BatchDeleteResult:
+        async with self._session_factory() as session:
+            async with session.begin():
+                found = set(
+                    (
+                        await session.scalars(
+                            select(UserBackup.backup_id).where(
+                                UserBackup.user_id == user_id,
+                                UserBackup.backup_id.in_(backup_ids),
+                            ),
+                        )
+                    ).all(),
+                )
+                if found:
+                    await session.execute(
+                        delete(UserBackup).where(
+                            UserBackup.backup_id.in_(found),
+                        ),
+                    )
+                return BatchDeleteResult(
+                    deleted=len(found),
+                    not_found=[
+                        backup_id
+                        for backup_id in backup_ids
+                        if backup_id not in found
+                    ],
+                )
 
 
 def _to_record(row: UserBackup) -> BackupRecord:

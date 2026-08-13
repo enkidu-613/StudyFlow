@@ -11,6 +11,7 @@ from server.app.backups.repository import (
     BackupRecord,
     BackupRepository,
     BackupSizeLimitError,
+    BatchDeleteResult,
 )
 from server.app.db.context import UserContext
 
@@ -114,6 +115,19 @@ class BackupService:
             await self._repository.delete(context.user_id, backup_id)
         except BackupNotFoundError as exc:
             raise BackupServiceError(404, "备份不存在。") from exc
+
+    async def delete_many(
+        self,
+        context: UserContext,
+        backup_ids: list[UUID],
+    ) -> BatchDeleteResult:
+        unique_ids = list(dict.fromkeys(backup_ids))
+        if len(unique_ids) > self._settings.max_backups_per_user:
+            raise BackupServiceError(
+                422,
+                f"一次最多删除 {self._settings.max_backups_per_user} 个备份。",
+            )
+        return await self._repository.delete_many(context.user_id, unique_ids)
 
     def _enforce_create_rate_limit(self, user_id: UUID) -> None:
         now = datetime.now(UTC)

@@ -42,6 +42,24 @@ class RenameBackupRequest(StrictRequest):
         return _validate_backup_name(value)
 
 
+class BatchDeleteBackupRequest(StrictRequest):
+    backup_ids: list[UUID] = Field(min_length=1)
+
+    @field_validator("backup_ids")
+    @classmethod
+    def validate_unique_ids(cls, value: list[UUID]) -> list[UUID]:
+        if len(set(value)) != len(value):
+            raise ValueError("backup_ids must not contain duplicates")
+        return value
+
+
+class BatchDeleteResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    deleted: int
+    not_found: list[UUID]
+
+
 class BackupSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

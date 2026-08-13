@@ -9,6 +9,8 @@ from server.app.auth.dependencies import get_user_context
 from server.app.backups.schemas import (
     BackupListResponse,
     BackupSummary,
+    BatchDeleteBackupRequest,
+    BatchDeleteResponse,
     CreateBackupRequest,
     RenameBackupRequest,
 )
@@ -81,6 +83,19 @@ async def delete_backup(
     except BackupServiceError as exc:
         raise _http_error(exc) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/batch-delete", response_model=BatchDeleteResponse)
+async def delete_backups_batch(
+    request: BatchDeleteBackupRequest,
+    context: Annotated[UserContext, Depends(get_user_context)],
+    service: Annotated[BackupService, Depends(get_backup_service)],
+) -> BatchDeleteResponse:
+    result = await service.delete_many(context, request.backup_ids)
+    return BatchDeleteResponse(
+        deleted=result.deleted,
+        not_found=result.not_found,
+    )
 
 
 def _http_error(exc: BackupServiceError) -> HTTPException:

@@ -200,3 +200,132 @@ async def test_rename_blank_name_returns_422(harness: BackupRouteHarness) -> Non
     )
 
     assert renamed.status_code == 422
+
+
+async def _create_backups(client: AsyncClient, token: str, count: int) -> list[str]:
+    ids: list[str] = []
+    for i in range(count):
+        response = await client.post(
+            "/v1/backups",
+            headers=_auth(token),
+            json={"name": f"备份 {i}"},
+        )
+        assert response.status_code == 201
+        ids.append(response.json()["backup_id"])
+    return ids
+
+
+@pytest.mark.anyio
+async def test_batch_delete_removes_selected_backups(
+    harness: BackupRouteHarness,
+) -> None:
+    token = await _register(harness.client, "route-g@example.com")
+    ids = await _create_backups(harness.client, token, 3)
+
+    response = await harness.client.post(
+        "/v1/backups/batch-delete",
+        headers=_auth(token),
+        json={"backup_ids": ids[:2]},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["deleted"] == 2
+    assert body["not_found"] == []
+
+    remaining = await harness.client.get(
+        "/v1/backups",
+        headers=_auth(token),
+    )
+    assert len(remaining.json()["backups"]) == 1
+
+
+@pytest.mark.anyio
+async def test_batch_delete_reports_not_found_for_foreign_or_missing(
+    harness: BackupRouteHarness,
+) -> None:
+    token_a = await _register(harness.client, "route-h@example.com")
+    token_b = await _register(harness.client, "route-i@example.com")
+    a_ids = await _create_backups(harness.client, token_a, 1)
+    foreign_id = a_ids[0]
+    missing_id = str(uuid4())
+
+    response = await harness.client.post(
+        "/v1/backups/batch-delete",
+        headers=_auth(token_b),
+        json={"backup_ids": [foreign_id, missing_id]},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["deleted"] == 0
+    assert set(body["not_found"]) == {foreign_id, missing_id}
+
+    # User A's backup must still exist (not deleted by user B).
+    remaining = await harness.client.get(
+        "/v1/backups",
+        headers=_auth(token_a),
+    )
+    assert len(remaining.json()["backups"]) == 1
+
+
+@pytest.mark.anyio
+async def test_batch_delete_empty_ids_returns_422(
+    harness: BackupRouteHarness,
+) -> None:
+    token = await _register(harness.client, "route-j@example.com")
+
+    response = await harness.client.post(
+        "/v1/backups/batch-delete",
+        headers=_auth(token),
+        json={"backup_ids": []},
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_batch_delete_duplicate_ids_returns_422(
+    harness: BackupRouteHarness,
+) -> None:
+    token = await _register(harness.client, "route-k@example.com")
+    ids = await _create_backups(harness.client, token, 1)
+
+    response = await harness.client.post(
+        "/v1/backups/batch-delete",
+        headers=_auth(token),
+        json={"backup_ids": [ids[0], ids[0]]},
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_batch_delete_requires_auth(harness: BackupRouteHarness) -> None:
+    response = await harness.client.post(
+        "/v1/backups/batch-delete",
+        json={"backup_ids": [str(uuid4())]},
+    )
+
+    assert response.status_code == 401
+
+
+@pytest.mark.anyio
+async def test_batch_delete_is_idempotent(harness: BackupRouteHarness) -> None:
+    token = await _register(harness.client, "route-l@example.com")
+    ids = await _create_backups(harness.client, token, 2)
+
+    first = await harness.client.post(
+        "/v1/backups/batch-delete",
+        headers=_auth(token),
+        json={"backup_ids": ids},
+    )
+    second = await harness.client.post(
+        "/v1/backups/batch-delete",
+        headers=_auth(token),
+        json={"backup_ids": ids},
+    )
+
+    assert first.json()["deleted"] == 2
+    assert second.json()["deleted"] == 0
+    assert set(second.json()["not_found"]) == set(ids)
