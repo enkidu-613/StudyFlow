@@ -15,6 +15,8 @@ final class StudyFlowPlatform {
         scheduleReminder(call: call, result: result)
       case "cancelReminder":
         cancelReminder(call: call, result: result)
+      case "playAlarm":
+        playAlarm(call: call, result: result)
       case "startFocusSession":
         startFocusSession(call: call, result: result)
       case "getUsageSummary":
@@ -105,6 +107,37 @@ final class StudyFlowPlatform {
     UNUserNotificationCenter.current().removePendingNotificationRequests(
       withIdentifiers: [identifier])
     result(["kind": "supported", "message": "Reminder cancelled."])
+  }
+
+  private static func playAlarm(
+    call: FlutterMethodCall,
+    result: @escaping FlutterResult
+  ) {
+    guard let arguments = call.arguments as? [String: Any],
+          let title = arguments["title"] as? String,
+          let text = arguments["text"] as? String else {
+      result(
+        FlutterError(
+          code: "invalid_argument",
+          message: "Alarm arguments are missing.",
+          details: nil))
+      return
+    }
+    let sound = NSSound(named: "Glass")
+      ?? NSSound(named: "Ping")
+    sound?.volume = 1.0
+    sound?.loops = true
+    sound?.play()
+    DispatchQueue.main.async {
+      let alert = NSAlert()
+      alert.alertStyle = .warning
+      alert.messageText = title
+      alert.informativeText = text
+      alert.addButton(withTitle: "OK")
+      alert.runModal()
+      sound?.stop()
+      result(["kind": "supported", "message": "Alarm played."])
+    }
   }
 
   private static func startFocusSession(

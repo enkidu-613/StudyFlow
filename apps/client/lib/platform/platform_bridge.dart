@@ -46,6 +46,20 @@ final class PlatformBridge {
         <String, Object?>{'id': identifier},
       );
 
+  /// Rings an audible alarm now (looping native sound until stopped or the
+  /// user dismisses it). Notifications are not required for this.
+  Future<CapabilityResult> playAlarm({
+    required String title,
+    required String text,
+  }) =>
+      _invokeCapability(
+        'playAlarm',
+        <String, Object?>{
+          'title': title,
+          'text': text,
+        },
+      );
+
   Future<CapabilityResult> startFocusSession({required String title}) =>
       _invokeCapability(
         'startFocusSession',

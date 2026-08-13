@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:studyflow/auth/auth_repository.dart';
 import 'package:studyflow/features/checkins/check_in_repository.dart';
 import 'package:studyflow/features/focus/focus_repository.dart';
+import 'package:studyflow/features/schedule/schedule_alarm_service.dart';
 import 'package:studyflow/features/schedule/schedule_repository.dart';
 import 'package:studyflow/features/tasks/task_repository.dart';
 import 'package:studyflow/platform/platform_bridge.dart';
@@ -31,6 +32,7 @@ final class StudyFlowWorkspace {
   final FocusRepository focus;
   final CheckInRepository checkIns;
   final PlatformBridge platform;
+  late final ScheduleAlarmService alarms;
   int _logicalClock;
 
   Future<Write> nextWrite() {
@@ -46,7 +48,10 @@ final class StudyFlowWorkspace {
 
   Future<int> pendingCount() => store.operations.pendingCount();
 
-  Future<void> close() => store.close();
+  Future<void> close() {
+    alarms.dispose();
+    return store.close();
+  }
 
   static Future<StudyFlowWorkspace> openLocalShell() async {
     final store = await AccountScopedStore.open(
@@ -85,6 +90,7 @@ final class StudyFlowWorkspace {
       accountId: accountId,
       store: store,
       platform: platform,
+      alarmsEnabled: false,
     );
   }
 
@@ -92,8 +98,9 @@ final class StudyFlowWorkspace {
     required String accountId,
     required AccountScopedStore store,
     PlatformBridge? platform,
+    bool alarmsEnabled = true,
   }) {
-    return StudyFlowWorkspace._(
+    final workspace = StudyFlowWorkspace._(
       accountId: accountId,
       store: store,
       tasks: TaskRepository(store: store),
@@ -102,5 +109,10 @@ final class StudyFlowWorkspace {
       checkIns: CheckInRepository(store: store),
       platform: platform ?? PlatformBridge(),
     );
+    workspace.alarms = ScheduleAlarmService(
+      workspace: workspace,
+      enabled: alarmsEnabled,
+    );
+    return workspace;
   }
 }

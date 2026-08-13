@@ -101,6 +101,11 @@ final class _ScheduleBlockEditorState extends State<ScheduleBlockEditor> {
       block,
       write: await widget.workspace.nextWrite(),
     );
+    widget.workspace.alarms.upsert(
+      block,
+      title: reminderTitle,
+      text: reminderBody,
+    );
     unawaited(
       widget.workspace.platform.scheduleReminder(
         title: reminderTitle,

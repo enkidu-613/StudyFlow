@@ -87,6 +87,7 @@ final class _ScheduleScreenState extends State<ScheduleScreen> {
       block.id,
       write: await widget.workspace.nextWrite(),
     );
+    widget.workspace.alarms.cancel(block.id);
     unawaited(
       widget.workspace.platform.cancelReminder(block.id).then(
             (_) {},
