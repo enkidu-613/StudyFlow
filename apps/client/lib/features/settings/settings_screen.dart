@@ -13,6 +13,8 @@ final class SettingsScreen extends StatefulWidget {
     this.syncStatus,
     this.onSync,
     this.onLogout,
+    this.locale,
+    this.onLocaleChanged,
     super.key,
   });
 
@@ -20,6 +22,8 @@ final class SettingsScreen extends StatefulWidget {
   final SyncStatusListenable? syncStatus;
   final Future<SyncRunResult?> Function()? onSync;
   final Future<void> Function()? onLogout;
+  final Locale? locale;
+  final Future<void> Function(String? tag)? onLocaleChanged;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -114,16 +118,57 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                         ? Icons.check_circle_outline
                         : Icons.radio_button_unchecked,
                   ),
-                  title: Text(state.id.name),
-                  subtitle: Text(state.detail),
-                  trailing: Text(
-                    state.available
-                        ? l10n.permissionAvailable
-                        : l10n.permissionUnavailable,
+                  title: Text(l10n.permissionLabel(state.id)),
+                  subtitle: Text(
+                    l10n.permissionDetailText(
+                      state.detail,
+                      allowed: state.allowed,
+                    ),
                   ),
+                  trailing: Text(
+                    l10n.permissionStatusText(
+                      available: state.available,
+                      allowed: state.allowed,
+                    ),
+                  ),
+                  onTap: () => widget.workspace.platform.openPermissionSettings(),
                 ),
               ),
             const SizedBox(height: 16),
+            if (widget.onLocaleChanged != null)
+              Card(
+                child: ListTile(
+                  key: const Key('language-setting'),
+                  leading: const Icon(Icons.language_outlined),
+                  title: Text(l10n.settingsLanguage),
+                  trailing: DropdownButton<String>(
+                    value: _selectedLanguageTag(widget.locale),
+                    underline: const SizedBox.shrink(),
+                    items: <DropdownMenuItem<String>>[
+                      DropdownMenuItem<String>(
+                        value: 'system',
+                        child: Text(l10n.settingsLanguageSystem),
+                      ),
+                      const DropdownMenuItem<String>(
+                        value: 'zh',
+                        child: Text('简体中文'),
+                      ),
+                      const DropdownMenuItem<String>(
+                        value: 'en',
+                        child: Text('English'),
+                      ),
+                    ],
+                    onChanged: (tag) {
+                      if (tag != null) {
+                        widget.onLocaleChanged!(
+                          tag == 'system' ? null : tag,
+                        );
+                      }
+                    },
+                  ),
+                ),
+              ),
+            const SizedBox(height: 8),
             Card(
               child: ListTile(
                 key: const Key('open-ai-settings'),
@@ -157,6 +202,12 @@ final class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   bool _busyLogout = false;
+
+  String _selectedLanguageTag(Locale? locale) => switch (locale?.languageCode) {
+        'zh' => 'zh',
+        'en' => 'en',
+        _ => 'system',
+      };
 
   Future<void> _signOut() async {
     final onLogout = widget.onLogout;

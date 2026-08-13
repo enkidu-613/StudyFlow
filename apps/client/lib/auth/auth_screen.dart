@@ -67,6 +67,7 @@ final class _AuthScreenState extends State<AuthScreen> {
     if (_busy) {
       return;
     }
+    setState(() => _message = null);
     if (!(_formKey.currentState?.validate() ?? false)) {
       return;
     }

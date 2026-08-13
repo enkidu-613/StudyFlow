@@ -277,6 +277,42 @@ class AppLocalizationsEn extends AppLocalizations {
   String get permissionUnavailable => 'unavailable';
 
   @override
+  String get permissionAllowed => 'Allowed';
+
+  @override
+  String get permissionDenied => 'Denied';
+
+  @override
+  String get permissionNotifications => 'Notifications';
+
+  @override
+  String get permissionExactAlarm => 'Exact alarm';
+
+  @override
+  String get permissionBackground => 'Background';
+
+  @override
+  String get permissionBatteryOptimization => 'Battery optimization';
+
+  @override
+  String get permissionUsageAccess => 'Usage access';
+
+  @override
+  String get permissionUserNotifications => 'User notifications';
+
+  @override
+  String get permissionMenuBar => 'Menu bar';
+
+  @override
+  String get permissionFocus => 'Focus mode';
+
+  @override
+  String get permissionDetailGranted => 'granted';
+
+  @override
+  String get permissionDetailRequired => 'permission required';
+
+  @override
   String get settingsAiEntry => 'AI settings';
 
   @override
@@ -284,6 +320,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsSignOut => 'Sign out';
+
+  @override
+  String get settingsLanguage => 'Language';
+
+  @override
+  String get settingsLanguageSystem => 'System default';
+
+  @override
+  String get settingsLanguageZh => '简体中文';
+
+  @override
+  String get settingsLanguageEn => 'English';
 
   @override
   String get syncPendingTitle => 'Pending sync';

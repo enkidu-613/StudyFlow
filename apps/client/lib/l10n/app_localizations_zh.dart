@@ -273,6 +273,42 @@ class AppLocalizationsZh extends AppLocalizations {
   String get permissionUnavailable => '不可用';
 
   @override
+  String get permissionAllowed => '已允许';
+
+  @override
+  String get permissionDenied => '未允许';
+
+  @override
+  String get permissionNotifications => '通知';
+
+  @override
+  String get permissionExactAlarm => '精确闹钟';
+
+  @override
+  String get permissionBackground => '后台运行';
+
+  @override
+  String get permissionBatteryOptimization => '电池优化白名单';
+
+  @override
+  String get permissionUsageAccess => '使用情况访问';
+
+  @override
+  String get permissionUserNotifications => '用户通知';
+
+  @override
+  String get permissionMenuBar => '菜单栏';
+
+  @override
+  String get permissionFocus => '专注模式';
+
+  @override
+  String get permissionDetailGranted => '已授权';
+
+  @override
+  String get permissionDetailRequired => '需要授权';
+
+  @override
   String get settingsAiEntry => 'AI 设置';
 
   @override
@@ -280,6 +316,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsSignOut => '退出登录';
+
+  @override
+  String get settingsLanguage => '语言';
+
+  @override
+  String get settingsLanguageSystem => '跟随系统';
+
+  @override
+  String get settingsLanguageZh => '简体中文';
+
+  @override
+  String get settingsLanguageEn => 'English';
 
   @override
   String get syncPendingTitle => '待同步';

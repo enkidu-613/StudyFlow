@@ -596,6 +596,78 @@ abstract class AppLocalizations {
   /// **'不可用'**
   String get permissionUnavailable;
 
+  /// No description provided for @permissionAllowed.
+  ///
+  /// In zh, this message translates to:
+  /// **'已允许'**
+  String get permissionAllowed;
+
+  /// No description provided for @permissionDenied.
+  ///
+  /// In zh, this message translates to:
+  /// **'未允许'**
+  String get permissionDenied;
+
+  /// No description provided for @permissionNotifications.
+  ///
+  /// In zh, this message translates to:
+  /// **'通知'**
+  String get permissionNotifications;
+
+  /// No description provided for @permissionExactAlarm.
+  ///
+  /// In zh, this message translates to:
+  /// **'精确闹钟'**
+  String get permissionExactAlarm;
+
+  /// No description provided for @permissionBackground.
+  ///
+  /// In zh, this message translates to:
+  /// **'后台运行'**
+  String get permissionBackground;
+
+  /// No description provided for @permissionBatteryOptimization.
+  ///
+  /// In zh, this message translates to:
+  /// **'电池优化白名单'**
+  String get permissionBatteryOptimization;
+
+  /// No description provided for @permissionUsageAccess.
+  ///
+  /// In zh, this message translates to:
+  /// **'使用情况访问'**
+  String get permissionUsageAccess;
+
+  /// No description provided for @permissionUserNotifications.
+  ///
+  /// In zh, this message translates to:
+  /// **'用户通知'**
+  String get permissionUserNotifications;
+
+  /// No description provided for @permissionMenuBar.
+  ///
+  /// In zh, this message translates to:
+  /// **'菜单栏'**
+  String get permissionMenuBar;
+
+  /// No description provided for @permissionFocus.
+  ///
+  /// In zh, this message translates to:
+  /// **'专注模式'**
+  String get permissionFocus;
+
+  /// No description provided for @permissionDetailGranted.
+  ///
+  /// In zh, this message translates to:
+  /// **'已授权'**
+  String get permissionDetailGranted;
+
+  /// No description provided for @permissionDetailRequired.
+  ///
+  /// In zh, this message translates to:
+  /// **'需要授权'**
+  String get permissionDetailRequired;
+
   /// No description provided for @settingsAiEntry.
   ///
   /// In zh, this message translates to:
@@ -613,6 +685,30 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'退出登录'**
   String get settingsSignOut;
+
+  /// No description provided for @settingsLanguage.
+  ///
+  /// In zh, this message translates to:
+  /// **'语言'**
+  String get settingsLanguage;
+
+  /// No description provided for @settingsLanguageSystem.
+  ///
+  /// In zh, this message translates to:
+  /// **'跟随系统'**
+  String get settingsLanguageSystem;
+
+  /// No description provided for @settingsLanguageZh.
+  ///
+  /// In zh, this message translates to:
+  /// **'简体中文'**
+  String get settingsLanguageZh;
+
+  /// No description provided for @settingsLanguageEn.
+  ///
+  /// In zh, this message translates to:
+  /// **'English'**
+  String get settingsLanguageEn;
 
   /// No description provided for @syncPendingTitle.
   ///

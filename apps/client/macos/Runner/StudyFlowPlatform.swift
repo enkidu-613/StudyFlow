@@ -21,6 +21,8 @@ final class StudyFlowPlatform {
         result(unsupported("Device restrictions require separate authorization."))
       case "getPermissionStatus":
         getPermissionStatus(result: result)
+      case "openPermissionSettings":
+        openPermissionSettings(result: result)
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -179,6 +181,13 @@ final class StudyFlowPlatform {
       ]
       result(states)
     }
+  }
+
+  private static func openPermissionSettings(result: @escaping FlutterResult) {
+    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Notifications") {
+      NSWorkspace.shared.open(url)
+    }
+    result(true)
   }
 
   private static func authorizeIfNeeded(completion: @escaping (Bool) -> Void) {

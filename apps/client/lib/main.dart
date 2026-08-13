@@ -9,6 +9,7 @@ import 'package:studyflow/auth/auth_screen.dart';
 import 'package:studyflow/auth/client_auth_controller.dart';
 import 'package:studyflow/auth/client_session.dart';
 import 'package:studyflow/config/client_config.dart';
+import 'package:studyflow/config/locale_preference.dart';
 import 'package:studyflow/features/focus/focus_screen.dart';
 import 'package:studyflow/features/home/home_screen.dart';
 import 'package:studyflow/features/schedule/schedule_screen.dart';
@@ -99,6 +100,7 @@ final class StudyFlowRoot extends StatefulWidget {
     required this.authApi,
     required this.authRepository,
     required this.controller,
+    this.localeStore,
     super.key,
   });
 
@@ -106,6 +108,7 @@ final class StudyFlowRoot extends StatefulWidget {
   final HttpAuthApi authApi;
   final AuthRepository authRepository;
   final ClientAuthController controller;
+  final LocalePreferenceStore? localeStore;
 
   @override
   State<StudyFlowRoot> createState() => _StudyFlowRootState();
@@ -114,12 +117,36 @@ final class StudyFlowRoot extends StatefulWidget {
 final class _StudyFlowRootState extends State<StudyFlowRoot> {
   ClientSession? _session;
   AuthInitialMessage? _initialMessageKind;
+  Locale? _locale;
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
+    unawaited(_restoreLocale());
     unawaited(_restoreSession());
+  }
+
+  Future<void> _restoreLocale() async {
+    final store = widget.localeStore ?? SecureLocalePreferenceStore();
+    try {
+      final tag = await store.read();
+      if (tag == 'zh' || tag == 'en') {
+        if (mounted) {
+          setState(() => _locale = Locale(tag!));
+        }
+      }
+    } on Object {
+      // Fall back to the system locale on storage errors.
+    }
+  }
+
+  Future<void> _setLocale(String? tag) async {
+    final store = widget.localeStore ?? SecureLocalePreferenceStore();
+    await store.write(tag);
+    if (mounted) {
+      setState(() => _locale = tag == null ? null : Locale(tag));
+    }
   }
 
   @override
@@ -208,10 +235,11 @@ final class _StudyFlowRootState extends State<StudyFlowRoot> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const MaterialApp(
+      return MaterialApp(
         localizationsDelegates: _localizationsDelegates,
         supportedLocales: _supportedLocales,
-        home: Scaffold(
+        locale: _locale,
+        home: const Scaffold(
           body: Center(child: CircularProgressIndicator()),
         ),
       );
@@ -221,11 +249,14 @@ final class _StudyFlowRootState extends State<StudyFlowRoot> {
       return StudyFlowApp(
         session: session,
         onLogout: _logout,
+        locale: _locale,
+        onLocaleChanged: _setLocale,
       );
     }
     return MaterialApp(
       localizationsDelegates: _localizationsDelegates,
       supportedLocales: _supportedLocales,
+      locale: _locale,
       home: AuthScreen(
         initialMessageKind: _initialMessageKind,
         onLogin: (email, password) => _authenticate(
@@ -240,11 +271,20 @@ final class _StudyFlowRootState extends State<StudyFlowRoot> {
 }
 
 class StudyFlowApp extends StatelessWidget {
-  const StudyFlowApp({this.workspace, this.session, this.onLogout, super.key});
+  const StudyFlowApp({
+    this.workspace,
+    this.session,
+    this.onLogout,
+    this.locale,
+    this.onLocaleChanged,
+    super.key,
+  });
 
   final StudyFlowWorkspace? workspace;
   final ClientSession? session;
   final Future<void> Function()? onLogout;
+  final Locale? locale;
+  final Future<void> Function(String? tag)? onLocaleChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -253,6 +293,7 @@ class StudyFlowApp extends StatelessWidget {
       title: 'StudyFlow',
       localizationsDelegates: _localizationsDelegates,
       supportedLocales: _supportedLocales,
+      locale: locale,
       theme: ThemeData(
         colorSchemeSeed: const Color(0xFF356B8C),
         useMaterial3: true,
@@ -295,6 +336,8 @@ class StudyFlowApp extends StatelessWidget {
                   syncStatus: session?.syncEngine?.status,
                   onSync: session?.syncNow,
                   onLogout: onLogout,
+                  locale: locale,
+                  onLocaleChanged: onLocaleChanged,
                 ),
               ),
             ],

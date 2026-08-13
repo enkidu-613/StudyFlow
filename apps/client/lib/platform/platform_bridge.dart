@@ -68,6 +68,15 @@ final class PlatformBridge {
         rule.toJson(),
       );
 
+  Future<bool> openPermissionSettings() async {
+    try {
+      final raw = await _channel.invokeMethod('openPermissionSettings');
+      return raw is bool ? raw : false;
+    } on Object {
+      return false;
+    }
+  }
+
   Future<PermissionHealth> getPermissionStatus() async {
     try {
       final raw = await _channel.invokeMethod('getPermissionStatus');

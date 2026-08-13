@@ -276,4 +276,21 @@ void main() {
 
     expect(find.text('登录已过期，请重新登录'), findsOneWidget);
   });
+
+  testWidgets('invalid form clears a stale submission message', (tester) async {
+    await pumpWithL10n(
+      tester,
+      AuthScreen(
+        onLogin: (_, __) async {},
+        onRegister: (_, __) async {},
+        initialMessage: '网络连接失败，请检查网络后重试',
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('auth-submit-button')));
+    await tester.pump();
+
+    expect(find.text('网络连接失败，请检查网络后重试'), findsNothing);
+    expect(find.text('请输入邮箱'), findsOneWidget);
+  });
 }
