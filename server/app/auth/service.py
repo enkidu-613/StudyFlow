@@ -45,7 +45,43 @@ class AuthSettings:
             raise ValueError("STUDYFLOW_TOKEN_SIGNING_KEY must be set")
         if len(token_signing_key.encode("utf-8")) < 32:
             raise ValueError("STUDYFLOW_TOKEN_SIGNING_KEY must contain at least 32 bytes")
-        return cls(token_signing_key=token_signing_key)
+        access_token_ttl = _ttl_from_env(
+            "STUDYFLOW_ACCESS_TOKEN_TTL_MINUTES",
+            default=timedelta(minutes=15),
+            unit="minutes",
+        )
+        refresh_token_ttl = _ttl_from_env(
+            "STUDYFLOW_REFRESH_TOKEN_TTL_DAYS",
+            default=timedelta(days=30),
+            unit="days",
+        )
+        return cls(
+            token_signing_key=token_signing_key,
+            access_token_ttl=access_token_ttl,
+            refresh_token_ttl=refresh_token_ttl,
+        )
+
+
+def _ttl_from_env(
+    name: str,
+    *,
+    default: timedelta,
+    unit: str = "minutes",
+) -> timedelta:
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a number") from exc
+    if value <= 0:
+        raise ValueError(f"{name} must be positive")
+    if unit == "minutes":
+        return timedelta(minutes=value)
+    if unit == "days":
+        return timedelta(days=value)
+    raise ValueError(f"unsupported ttl unit: {unit}")
 
 
 @dataclass(frozen=True, slots=True)
