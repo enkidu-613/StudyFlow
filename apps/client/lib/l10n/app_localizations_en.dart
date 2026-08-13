@@ -339,6 +339,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get focusDefaultTitle => 'StudyFlow focus';
 
   @override
+  String get focusTimeRemaining => 'Time remaining';
+
+  @override
+  String get focusPausedRemaining => 'Time remaining (paused)';
+
+  @override
+  String get focusCompleted => 'Focus session complete';
+
+  @override
+  String focusCompletedTitle(Object title) {
+    return '$title focus complete';
+  }
+
+  @override
+  String get focusCompletedBody => 'Time for a break.';
+
+  @override
   String get checkInsEmpty => 'No check-ins yet';
 
   @override

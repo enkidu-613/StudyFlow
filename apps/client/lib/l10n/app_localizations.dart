@@ -710,6 +710,36 @@ abstract class AppLocalizations {
   /// **'StudyFlow 专注'**
   String get focusDefaultTitle;
 
+  /// No description provided for @focusTimeRemaining.
+  ///
+  /// In zh, this message translates to:
+  /// **'剩余时间'**
+  String get focusTimeRemaining;
+
+  /// No description provided for @focusPausedRemaining.
+  ///
+  /// In zh, this message translates to:
+  /// **'剩余时间（已暂停）'**
+  String get focusPausedRemaining;
+
+  /// No description provided for @focusCompleted.
+  ///
+  /// In zh, this message translates to:
+  /// **'专注结束'**
+  String get focusCompleted;
+
+  /// No description provided for @focusCompletedTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'{title} 专注完成'**
+  String focusCompletedTitle(Object title);
+
+  /// No description provided for @focusCompletedBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'任务专注时长已到，休息一下吧。'**
+  String get focusCompletedBody;
+
   /// No description provided for @checkInsEmpty.
   ///
   /// In zh, this message translates to:

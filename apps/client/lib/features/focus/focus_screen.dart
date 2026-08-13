@@ -7,9 +7,12 @@ import 'package:studyflow/util/uuid.dart';
 import 'package:studyflow_domain/domain.dart';
 
 final class FocusScreen extends StatefulWidget {
-  const FocusScreen({required this.workspace, super.key});
+  const FocusScreen({required this.workspace, this.now, super.key});
 
   final StudyFlowWorkspace workspace;
+
+  /// Clock used for the countdown; defaults to [DateTime.now].
+  final DateTime Function()? now;
 
   @override
   State<FocusScreen> createState() => _FocusScreenState();
@@ -23,8 +26,11 @@ final class _FocusScreenState extends State<FocusScreen> {
   DateTime? _sessionStartedAt;
   DateTime? _segmentStartedAt;
   Duration _accumulated = Duration.zero;
+  Duration _target = Duration.zero;
   DateTime _now = DateTime.now();
   Timer? _timer;
+
+  DateTime _currentTime() => (widget.now ?? DateTime.now)();
 
   bool get _running => _segmentStartedAt != null;
 
@@ -32,6 +38,11 @@ final class _FocusScreenState extends State<FocusScreen> {
     final active = _segmentStartedAt;
     return _accumulated +
         (active == null ? Duration.zero : _now.difference(active));
+  }
+
+  Duration get _remaining {
+    final remaining = _target - _elapsed;
+    return remaining.isNegative ? Duration.zero : remaining;
   }
 
   @override
@@ -68,35 +79,90 @@ final class _FocusScreenState extends State<FocusScreen> {
     }
   }
 
+  Task? _selectedTask() => _tasks
+      .where((task) => task.id == _taskId)
+      .firstOrNull;
+
   Future<void> _start() async {
     final taskId = _taskId;
-    if (taskId == null || _sessionStartedAt != null) {
+    final task = _selectedTask();
+    if (taskId == null || task == null || _sessionStartedAt != null) {
       return;
     }
-    final now = DateTime.now();
+    final now = _currentTime();
     setState(() {
       _sessionStartedAt = now;
       _segmentStartedAt = now;
       _accumulated = Duration.zero;
+      _target = Duration(minutes: task.estimatedMinutes);
       _now = now;
     });
     _timer?.cancel();
     _timer = Timer.periodic(
       const Duration(seconds: 1),
-      (_) => setState(() => _now = DateTime.now()),
+      (_) => _tick(),
     );
-    final taskTitle = _tasks
-        .where((task) => task.id == taskId)
-        .map((task) => task.title)
-        .firstOrNull;
     final result = await widget.workspace.platform.startFocusSession(
-      title: taskTitle ?? context.l10n.focusDefaultTitle,
+      title: task.title,
     );
     if (mounted && !result.isSupported) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(result.message)),
       );
     }
+  }
+
+  void _tick() {
+    if (!mounted) {
+      return;
+    }
+    setState(() => _now = _currentTime());
+    if (_running && _target != Duration.zero && _elapsed >= _target) {
+      unawaited(_autoFinish());
+    }
+  }
+
+  Future<void> _autoFinish() async {
+    final taskId = _taskId;
+    if (taskId == null || _sessionStartedAt == null) {
+      return;
+    }
+    final l10n = context.l10n;
+    final task = _selectedTask();
+    final title = task?.title ?? l10n.focusDefaultTitle;
+    final alertTitle = l10n.focusCompletedTitle(title);
+    final alertBody = l10n.focusCompletedBody;
+    final snack = l10n.focusCompleted;
+    final end = _currentTime();
+    final session = FocusSession(
+      id: newUuidV4(),
+      taskId: taskId,
+      startedAt: _sessionStartedAt!,
+      endedAt: end,
+      completionMethod: FocusCompletionMethod.timer,
+    );
+    await widget.workspace.focus.save(
+      session,
+      write: await widget.workspace.nextWrite(),
+    );
+    _timer?.cancel();
+    if (mounted) {
+      setState(() {
+        _sessionStartedAt = null;
+        _segmentStartedAt = null;
+        _accumulated = Duration.zero;
+        _target = Duration.zero;
+      });
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(snack)));
+    }
+    unawaited(
+      widget.workspace.platform
+          .playAlarm(title: alertTitle, text: alertBody)
+          .then((_) {}, onError: (_) {}),
+    );
+    await _refresh();
   }
 
   void _pause() {
@@ -115,7 +181,7 @@ final class _FocusScreenState extends State<FocusScreen> {
       return;
     }
     setState(() {
-      _segmentStartedAt = DateTime.now();
+      _segmentStartedAt = _currentTime();
       _now = _segmentStartedAt!;
     });
   }
@@ -125,7 +191,7 @@ final class _FocusScreenState extends State<FocusScreen> {
     if (startedAt == null || _taskId == null) {
       return;
     }
-    final end = DateTime.now();
+    final end = _currentTime();
     final session = FocusSession(
       id: newUuidV4(),
       taskId: _taskId!,
@@ -143,6 +209,7 @@ final class _FocusScreenState extends State<FocusScreen> {
         _sessionStartedAt = null;
         _segmentStartedAt = null;
         _accumulated = Duration.zero;
+        _target = Duration.zero;
       });
     }
     await _refresh();
@@ -180,10 +247,26 @@ final class _FocusScreenState extends State<FocusScreen> {
             const SizedBox(height: 24),
             Center(
               child: Text(
-                _formatDuration(_elapsed),
+                _target == Duration.zero
+                    ? _formatDuration(_elapsed)
+                    : _formatDuration(_remaining),
                 style: Theme.of(context).textTheme.displayMedium,
               ),
             ),
+            if (_target != Duration.zero)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    _running
+                        ? l10n.focusTimeRemaining
+                        : l10n.focusPausedRemaining,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                  ),
+                ),
+              ),
             const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,

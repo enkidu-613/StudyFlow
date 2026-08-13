@@ -336,6 +336,23 @@ class AppLocalizationsZh extends AppLocalizations {
   String get focusDefaultTitle => 'StudyFlow 专注';
 
   @override
+  String get focusTimeRemaining => '剩余时间';
+
+  @override
+  String get focusPausedRemaining => '剩余时间（已暂停）';
+
+  @override
+  String get focusCompleted => '专注结束';
+
+  @override
+  String focusCompletedTitle(Object title) {
+    return '$title 专注完成';
+  }
+
+  @override
+  String get focusCompletedBody => '任务专注时长已到，休息一下吧。';
+
+  @override
   String get checkInsEmpty => '还没有打卡记录';
 
   @override
