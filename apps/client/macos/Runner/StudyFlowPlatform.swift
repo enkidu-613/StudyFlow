@@ -21,6 +21,8 @@ final class StudyFlowPlatform {
         result(unsupported("Device restrictions require separate authorization."))
       case "getPermissionStatus":
         getPermissionStatus(result: result)
+      case "requestPermission":
+        requestPermission(call: call, result: result)
       case "openPermissionSettings":
         openPermissionSettings(result: result)
       default:
@@ -183,8 +185,59 @@ final class StudyFlowPlatform {
     }
   }
 
+  private static func requestPermission(
+    call: FlutterMethodCall,
+    result: @escaping FlutterResult
+  ) {
+    guard let arguments = call.arguments as? [String: Any],
+          let id = arguments["id"] as? String else {
+      result(
+        FlutterError(
+          code: "invalid_argument",
+          message: "Permission id is missing.",
+          details: nil))
+      return
+    }
+
+    // Only notification permissions have a system authorization prompt on
+    // macOS. Everything else is either app-internal or Android-only.
+    guard id == "notifications" || id == "userNotifications" else {
+      result(FlutterError(
+        code: "unsupported",
+        message: "This permission is not requestable on macOS.",
+        details: nil))
+      return
+    }
+
+    let center = UNUserNotificationCenter.current()
+    center.getNotificationSettings { settings in
+      switch settings.authorizationStatus {
+      case .authorized, .provisional:
+        result(["granted": true, "status": "authorized"])
+      case .denied:
+        result(FlutterError(
+          code: "permission_denied",
+          message: "Notifications are denied. Open System Settings to allow them.",
+          details: nil))
+      default:
+        // .notDetermined (and .ephemeral): present the system prompt.
+        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+          if let error = error {
+            result(FlutterError(
+              code: "internal_error",
+              message: error.localizedDescription,
+              details: nil))
+          } else {
+            result(["granted": granted])
+          }
+        }
+      }
+    }
+  }
+
   private static func openPermissionSettings(result: @escaping FlutterResult) {
-    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Notifications") {
+    let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications")
+    if let url = url {
       NSWorkspace.shared.open(url)
     }
     result(true)

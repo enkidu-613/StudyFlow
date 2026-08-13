@@ -145,4 +145,66 @@ void main() {
       isFalse,
     );
   });
+
+  test('requestPermission returns true when the native prompt grants it',
+      () async {
+    final platform = FakePlatform(<String, Object?>{
+      'requestPermission': <String, Object?>{'granted': true},
+    });
+    final bridge = PlatformBridge(channel: platform);
+
+    final granted = await bridge
+        .requestPermission(PlatformPermissionId.notifications);
+
+    expect(granted, isTrue);
+    expect(platform.methods, <String>['requestPermission']);
+  });
+
+  test('requestPermission returns false when the native prompt is declined',
+      () async {
+    final platform = FakePlatform(<String, Object?>{
+      'requestPermission': <String, Object?>{'granted': false},
+    });
+    final bridge = PlatformBridge(channel: platform);
+
+    final granted = await bridge
+        .requestPermission(PlatformPermissionId.notifications);
+
+    expect(granted, isFalse);
+  });
+
+  test('requestPermission returns false when the channel is missing',
+      () async {
+    final bridge = PlatformBridge(channel: UnsupportedPlatform());
+
+    final granted = await bridge
+        .requestPermission(PlatformPermissionId.notifications);
+
+    expect(granted, isFalse);
+  });
+
+  test('requestPermission returns false on permission_denied platform error',
+      () async {
+    final platform = FakePlatform(<String, Object?>{
+      'requestPermission': PlatformException(
+        code: 'permission_denied',
+        message: 'Denied.',
+      ),
+    });
+    final bridge = PlatformBridge(channel: platform);
+
+    final granted = await bridge
+        .requestPermission(PlatformPermissionId.notifications);
+
+    expect(granted, isFalse);
+  });
+
+  test('openPermissionSettings returns false when the channel is missing',
+      () async {
+    final bridge = PlatformBridge(channel: UnsupportedPlatform());
+
+    final opened = await bridge.openPermissionSettings();
+
+    expect(opened, isFalse);
+  });
 }

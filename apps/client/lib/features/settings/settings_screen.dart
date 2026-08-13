@@ -131,7 +131,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                       allowed: state.allowed,
                     ),
                   ),
-                  onTap: () => widget.workspace.platform.openPermissionSettings(),
+                  onTap: () => _handlePermissionTap(state),
                 ),
               ),
             const SizedBox(height: 16),
@@ -202,6 +202,40 @@ final class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   bool _busyLogout = false;
+
+  Future<void> _handlePermissionTap(PermissionState state) async {
+    final l10n = context.l10n;
+    if (!state.available) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n.permissionDetailText(state.detail, allowed: false),
+          ),
+        ),
+      );
+      return;
+    }
+    if (state.allowed) {
+      return;
+    }
+    final isNotification = state.id == PlatformPermissionId.notifications ||
+        state.id == PlatformPermissionId.userNotifications;
+    if (isNotification) {
+      final granted = await widget.workspace.platform
+          .requestPermission(state.id);
+      await _refresh();
+      if (!granted && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.permissionDetailRequired),
+          ),
+        );
+      }
+      return;
+    }
+    // App-internal permissions (menu bar, focus) have no system prompt.
+    await widget.workspace.platform.openPermissionSettings();
+  }
 
   String _selectedLanguageTag(Locale? locale) => switch (locale?.languageCode) {
         'zh' => 'zh',

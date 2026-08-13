@@ -77,6 +77,30 @@ final class PlatformBridge {
     }
   }
 
+  /// Requests a system authorization prompt for [id] where the platform
+  /// supports one (notifications on macOS). Returns true when the prompt
+  /// granted the permission; false when the prompt was declined, the
+  /// permission is not requestable, or the user previously denied it.
+  Future<bool> requestPermission(PlatformPermissionId id) async {
+    try {
+      final raw = await _channel.invokeMethod('requestPermission', <String, Object?>{
+        'id': id.name,
+      });
+      if (raw is Map) {
+        final granted = raw['granted'];
+        return granted is bool && granted;
+      }
+      return false;
+    } on PlatformException catch (error) {
+      if (error.code == 'permission_denied' || error.code == 'unsupported') {
+        return false;
+      }
+      return false;
+    } on Object {
+      return false;
+    }
+  }
+
   Future<PermissionHealth> getPermissionStatus() async {
     try {
       final raw = await _channel.invokeMethod('getPermissionStatus');
