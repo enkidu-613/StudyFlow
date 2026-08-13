@@ -38,6 +38,7 @@ class MutableClock:
 @dataclass(frozen=True, slots=True)
 class BackupRouteHarness:
     client: AsyncClient
+    application: FastAPI
     service: AuthService
     session_factory: async_sessionmaker[AsyncSession]
     clock: MutableClock
@@ -79,6 +80,7 @@ async def harness() -> AsyncIterator[BackupRouteHarness]:
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         yield BackupRouteHarness(
             client=client,
+            application=application,
             service=auth_service,
             session_factory=session_factory,
             clock=clock,
@@ -329,3 +331,32 @@ async def test_batch_delete_is_idempotent(harness: BackupRouteHarness) -> None:
     assert first.json()["deleted"] == 2
     assert second.json()["deleted"] == 0
     assert set(second.json()["not_found"]) == set(ids)
+
+
+@pytest.mark.anyio
+async def test_batch_delete_over_limit_returns_422(harness: BackupRouteHarness) -> None:
+    from server.app.backups.repository import BackupRepository
+    from server.app.backups.routes import get_backup_service
+    from server.app.backups.service import BackupService, BackupSettings
+
+    small_service = BackupService(
+        BackupRepository(harness.session_factory),
+        BackupSettings(max_backups_per_user=1),
+    )
+    harness.application.dependency_overrides[get_backup_service] = (
+        lambda: small_service
+    )
+    token = await _register(harness.client, "route-m@example.com")
+
+    response = await harness.client.post(
+        "/v1/backups/batch-delete",
+        headers=_auth(token),
+        json={
+            "backup_ids": [
+                str(uuid4()),
+                str(uuid4()),
+            ],
+        },
+    )
+
+    assert response.status_code == 422

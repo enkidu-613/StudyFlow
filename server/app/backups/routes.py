@@ -91,7 +91,10 @@ async def delete_backups_batch(
     context: Annotated[UserContext, Depends(get_user_context)],
     service: Annotated[BackupService, Depends(get_backup_service)],
 ) -> BatchDeleteResponse:
-    result = await service.delete_many(context, request.backup_ids)
+    try:
+        result = await service.delete_many(context, request.backup_ids)
+    except BackupServiceError as exc:
+        raise _http_error(exc) from exc
     return BatchDeleteResponse(
         deleted=result.deleted,
         not_found=result.not_found,

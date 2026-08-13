@@ -449,32 +449,35 @@ final class _BackupsScreenState extends State<BackupsScreen> {
         onRetry: _refresh,
       );
     }
-    return RefreshIndicator(
-      onRefresh: _refresh,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: <Widget>[
-          _BackupCapacityCard(used: list.length, max: maxBackupsPerAccount),
-          const SizedBox(height: 12),
-          if (list.isEmpty)
-            const _BackupsEmptyState()
-          else
-            for (final backup in list)
-              _BackupListItem(
-                backup: backup,
-                selectionMode: _selectionMode,
-                selected: _selectedIds.contains(backup.backupId),
-                onTap: _selectionMode
-                    ? () => _toggleSelected(backup.backupId)
-                    : null,
-                onLongPress: _selectionMode
-                    ? null
-                    : () => _enterSelectionMode(backup.backupId),
-                onRename: () => _rename(backup),
-                onDelete: () => _delete(backup),
-                dateFormatter: _formatDate,
-              ),
-        ],
+    return IgnorePointer(
+      ignoring: _batchDeleting,
+      child: RefreshIndicator(
+        onRefresh: _refresh,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: <Widget>[
+            _BackupCapacityCard(used: list.length, max: maxBackupsPerAccount),
+            const SizedBox(height: 12),
+            if (list.isEmpty)
+              const _BackupsEmptyState()
+            else
+              for (final backup in list)
+                _BackupListItem(
+                  backup: backup,
+                  selectionMode: _selectionMode,
+                  selected: _selectedIds.contains(backup.backupId),
+                  onTap: _selectionMode
+                      ? () => _toggleSelected(backup.backupId)
+                      : null,
+                  onLongPress: _selectionMode
+                      ? null
+                      : () => _enterSelectionMode(backup.backupId),
+                  onRename: () => _rename(backup),
+                  onDelete: () => _delete(backup),
+                  dateFormatter: _formatDate,
+                ),
+          ],
+        ),
       ),
     );
   }

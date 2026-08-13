@@ -190,6 +190,7 @@ class BackupRepository:
                 if found:
                     await session.execute(
                         delete(UserBackup).where(
+                            UserBackup.user_id == user_id,
                             UserBackup.backup_id.in_(found),
                         ),
                     )
