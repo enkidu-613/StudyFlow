@@ -22,7 +22,7 @@ def caddyfile() -> str:
 
 
 def test_compose_does_not_publish_fastapi_directly(compose: dict) -> None:
-    assert compose["services"]["api"]["ports"] == []
+    assert compose["services"]["api"]["ports"] == ["127.0.0.1:8000:8000"]
     assert "8000" in compose["services"]["api"]["expose"]
     assert set(compose["services"]["caddy"]["ports"]) == {"80:80", "443:443"}
 
@@ -61,6 +61,7 @@ def test_caddy_reverse_proxies_api_host_to_api_container(
 ) -> None:
     assert "{$STUDYFLOW_API_HOST}" in caddyfile
     assert "reverse_proxy api:8000" in caddyfile
+    assert "default_sni" not in caddyfile
 
 
 def test_env_example_contains_deployment_variables() -> None:

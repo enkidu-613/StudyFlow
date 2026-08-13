@@ -21,7 +21,10 @@ services:
       context: ..
       dockerfile: infra/api.Dockerfile
     restart: unless-stopped
-    ports: []
+    # Only the host-local cloudflared connector may reach the API directly.
+    # Public traffic still enters through the Cloudflare Tunnel/Caddy.
+    ports:
+      - "127.0.0.1:8000:8000"
     expose:
       - "8000"
     networks:
