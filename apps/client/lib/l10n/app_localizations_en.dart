@@ -354,6 +354,103 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsLanguageEn => 'English';
 
   @override
+  String get settingsBackupsEntry => 'Client backups';
+
+  @override
+  String get settingsBackupsSubtitle => 'Back up client records to the server';
+
+  @override
+  String get backupsCreate => 'Create backup';
+
+  @override
+  String get backupsCapacityTitle => 'Storage used';
+
+  @override
+  String backupsCapacityText(Object max, Object used) {
+    return '$used/$max used';
+  }
+
+  @override
+  String get backupsCapacityFull => 'Limit reached. Delete some backups first.';
+
+  @override
+  String get backupsEmpty => 'No backups yet';
+
+  @override
+  String get backupsEmptyHint => 'Create your first backup below';
+
+  @override
+  String backupsDefaultName(Object date) {
+    return 'Backup $date';
+  }
+
+  @override
+  String backupsItemSubtitle(Object date, Object operations, Object size) {
+    return '$date · $size · $operations records';
+  }
+
+  @override
+  String get backupsRename => 'Rename';
+
+  @override
+  String get backupsRenameTitle => 'Rename backup';
+
+  @override
+  String get backupsRenameLabel => 'Backup name';
+
+  @override
+  String get backupsRenameRequired => 'Name is required';
+
+  @override
+  String backupsRenameTooLong(Object max) {
+    return 'Name must be at most $max characters';
+  }
+
+  @override
+  String get backupsRenameSuccess => 'Renamed';
+
+  @override
+  String get backupsDelete => 'Delete';
+
+  @override
+  String get backupsDeleteTitle => 'Delete backup';
+
+  @override
+  String get backupsDeleteBody => 'This cannot be undone. Delete this backup?';
+
+  @override
+  String get backupsDeleteSuccess => 'Deleted';
+
+  @override
+  String get backupsLimitTitle => 'Backup limit reached';
+
+  @override
+  String backupsLimitBody(Object max) {
+    return 'Each account can keep up to $max backups. Delete some first.';
+  }
+
+  @override
+  String get backupsLimitGoDelete => 'Delete some';
+
+  @override
+  String get backupsCreateSuccess => 'Backup created';
+
+  @override
+  String backupsOperationFailed(Object reason) {
+    return 'Operation failed: $reason';
+  }
+
+  @override
+  String get backupsLoadFailed => 'Could not load backups. Try again later.';
+
+  @override
+  String get backupsLoadFailedOffline =>
+      'Network error. Check your connection and retry.';
+
+  @override
+  String get backupsRetry => 'Retry';
+
+  @override
   String get syncPendingTitle => 'Pending sync';
 
   @override

@@ -3,6 +3,8 @@ import 'package:studyflow/app/studyflow_workspace.dart';
 import 'package:studyflow/features/ai/ai_repository.dart';
 import 'package:studyflow/features/ai/ai_settings_model.dart';
 import 'package:studyflow/features/ai/ai_settings_screen.dart';
+import 'package:studyflow/features/backups/backups_repository.dart';
+import 'package:studyflow/features/backups/backups_screen.dart';
 import 'package:studyflow/l10n/l10n_extension.dart';
 import 'package:studyflow/sync/sync_status.dart';
 import 'package:studyflow_platform_contract/platform_contract.dart';
@@ -15,6 +17,7 @@ final class SettingsScreen extends StatefulWidget {
     this.onLogout,
     this.locale,
     this.onLocaleChanged,
+    this.backupsRepositoryFactory,
     super.key,
   });
 
@@ -24,6 +27,7 @@ final class SettingsScreen extends StatefulWidget {
   final Future<void> Function()? onLogout;
   final Locale? locale;
   final Future<void> Function(String? tag)? onLocaleChanged;
+  final BackupsRepository? Function()? backupsRepositoryFactory;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -166,6 +170,31 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                       }
                     },
                   ),
+                ),
+              ),
+            const SizedBox(height: 8),
+            if (widget.backupsRepositoryFactory != null)
+              Card(
+                child: ListTile(
+                  key: const Key('open-backups'),
+                  leading: const Icon(Icons.cloud_outlined),
+                  title: Text(l10n.settingsBackupsEntry),
+                  subtitle: Text(l10n.settingsBackupsSubtitle),
+                  trailing: const Icon(Icons.arrow_forward),
+                  onTap: () {
+                    final repository = widget.backupsRepositoryFactory!();
+                    if (repository == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(l10n.authSessionExpired)),
+                      );
+                      return;
+                    }
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => BackupsScreen(repository: repository),
+                      ),
+                    );
+                  },
                 ),
               ),
             const SizedBox(height: 8),

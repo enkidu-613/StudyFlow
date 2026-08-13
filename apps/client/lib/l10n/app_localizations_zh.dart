@@ -347,6 +347,102 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsLanguageEn => 'English';
 
   @override
+  String get settingsBackupsEntry => '客户端备份';
+
+  @override
+  String get settingsBackupsSubtitle => '将客户端记录备份到服务器';
+
+  @override
+  String get backupsCreate => '新建备份';
+
+  @override
+  String get backupsCapacityTitle => '备份容量';
+
+  @override
+  String backupsCapacityText(Object max, Object used) {
+    return '已用 $used/$max';
+  }
+
+  @override
+  String get backupsCapacityFull => '已达上限，请先删除部分备份';
+
+  @override
+  String get backupsEmpty => '还没有备份';
+
+  @override
+  String get backupsEmptyHint => '点击下方按钮创建第一个备份';
+
+  @override
+  String backupsDefaultName(Object date) {
+    return '备份 $date';
+  }
+
+  @override
+  String backupsItemSubtitle(Object date, Object operations, Object size) {
+    return '$date · $size · $operations 条记录';
+  }
+
+  @override
+  String get backupsRename => '重命名';
+
+  @override
+  String get backupsRenameTitle => '重命名备份';
+
+  @override
+  String get backupsRenameLabel => '备份名称';
+
+  @override
+  String get backupsRenameRequired => '请输入备份名称';
+
+  @override
+  String backupsRenameTooLong(Object max) {
+    return '名称最多 $max 个字符';
+  }
+
+  @override
+  String get backupsRenameSuccess => '已重命名';
+
+  @override
+  String get backupsDelete => '删除';
+
+  @override
+  String get backupsDeleteTitle => '删除备份';
+
+  @override
+  String get backupsDeleteBody => '删除后不可恢复，确定删除该备份吗？';
+
+  @override
+  String get backupsDeleteSuccess => '已删除';
+
+  @override
+  String get backupsLimitTitle => '已达备份上限';
+
+  @override
+  String backupsLimitBody(Object max) {
+    return '每个账户最多可保留 $max 个备份，请先删除部分备份。';
+  }
+
+  @override
+  String get backupsLimitGoDelete => '去删除';
+
+  @override
+  String get backupsCreateSuccess => '已创建备份';
+
+  @override
+  String backupsOperationFailed(Object reason) {
+    return '操作失败：$reason';
+  }
+
+  @override
+  String get backupsLoadFailed => '加载备份失败，请稍后重试';
+
+  @override
+  String get backupsLoadFailedOffline => '网络连接失败，请检查网络后重试';
+
+  @override
+  String get backupsRetry => '重试';
+
+  @override
   String get syncPendingTitle => '待同步';
 
   @override

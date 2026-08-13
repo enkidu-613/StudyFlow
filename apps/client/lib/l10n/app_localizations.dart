@@ -740,6 +740,174 @@ abstract class AppLocalizations {
   /// **'English'**
   String get settingsLanguageEn;
 
+  /// No description provided for @settingsBackupsEntry.
+  ///
+  /// In zh, this message translates to:
+  /// **'客户端备份'**
+  String get settingsBackupsEntry;
+
+  /// No description provided for @settingsBackupsSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'将客户端记录备份到服务器'**
+  String get settingsBackupsSubtitle;
+
+  /// No description provided for @backupsCreate.
+  ///
+  /// In zh, this message translates to:
+  /// **'新建备份'**
+  String get backupsCreate;
+
+  /// No description provided for @backupsCapacityTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'备份容量'**
+  String get backupsCapacityTitle;
+
+  /// No description provided for @backupsCapacityText.
+  ///
+  /// In zh, this message translates to:
+  /// **'已用 {used}/{max}'**
+  String backupsCapacityText(Object max, Object used);
+
+  /// No description provided for @backupsCapacityFull.
+  ///
+  /// In zh, this message translates to:
+  /// **'已达上限，请先删除部分备份'**
+  String get backupsCapacityFull;
+
+  /// No description provided for @backupsEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'还没有备份'**
+  String get backupsEmpty;
+
+  /// No description provided for @backupsEmptyHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'点击下方按钮创建第一个备份'**
+  String get backupsEmptyHint;
+
+  /// No description provided for @backupsDefaultName.
+  ///
+  /// In zh, this message translates to:
+  /// **'备份 {date}'**
+  String backupsDefaultName(Object date);
+
+  /// No description provided for @backupsItemSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'{date} · {size} · {operations} 条记录'**
+  String backupsItemSubtitle(Object date, Object operations, Object size);
+
+  /// No description provided for @backupsRename.
+  ///
+  /// In zh, this message translates to:
+  /// **'重命名'**
+  String get backupsRename;
+
+  /// No description provided for @backupsRenameTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'重命名备份'**
+  String get backupsRenameTitle;
+
+  /// No description provided for @backupsRenameLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'备份名称'**
+  String get backupsRenameLabel;
+
+  /// No description provided for @backupsRenameRequired.
+  ///
+  /// In zh, this message translates to:
+  /// **'请输入备份名称'**
+  String get backupsRenameRequired;
+
+  /// No description provided for @backupsRenameTooLong.
+  ///
+  /// In zh, this message translates to:
+  /// **'名称最多 {max} 个字符'**
+  String backupsRenameTooLong(Object max);
+
+  /// No description provided for @backupsRenameSuccess.
+  ///
+  /// In zh, this message translates to:
+  /// **'已重命名'**
+  String get backupsRenameSuccess;
+
+  /// No description provided for @backupsDelete.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除'**
+  String get backupsDelete;
+
+  /// No description provided for @backupsDeleteTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除备份'**
+  String get backupsDeleteTitle;
+
+  /// No description provided for @backupsDeleteBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除后不可恢复，确定删除该备份吗？'**
+  String get backupsDeleteBody;
+
+  /// No description provided for @backupsDeleteSuccess.
+  ///
+  /// In zh, this message translates to:
+  /// **'已删除'**
+  String get backupsDeleteSuccess;
+
+  /// No description provided for @backupsLimitTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'已达备份上限'**
+  String get backupsLimitTitle;
+
+  /// No description provided for @backupsLimitBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'每个账户最多可保留 {max} 个备份，请先删除部分备份。'**
+  String backupsLimitBody(Object max);
+
+  /// No description provided for @backupsLimitGoDelete.
+  ///
+  /// In zh, this message translates to:
+  /// **'去删除'**
+  String get backupsLimitGoDelete;
+
+  /// No description provided for @backupsCreateSuccess.
+  ///
+  /// In zh, this message translates to:
+  /// **'已创建备份'**
+  String get backupsCreateSuccess;
+
+  /// No description provided for @backupsOperationFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'操作失败：{reason}'**
+  String backupsOperationFailed(Object reason);
+
+  /// No description provided for @backupsLoadFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'加载备份失败，请稍后重试'**
+  String get backupsLoadFailed;
+
+  /// No description provided for @backupsLoadFailedOffline.
+  ///
+  /// In zh, this message translates to:
+  /// **'网络连接失败，请检查网络后重试'**
+  String get backupsLoadFailedOffline;
+
+  /// No description provided for @backupsRetry.
+  ///
+  /// In zh, this message translates to:
+  /// **'重试'**
+  String get backupsRetry;
+
   /// No description provided for @syncPendingTitle.
   ///
   /// In zh, this message translates to:

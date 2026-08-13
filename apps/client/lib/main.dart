@@ -10,6 +10,7 @@ import 'package:studyflow/auth/client_auth_controller.dart';
 import 'package:studyflow/auth/client_session.dart';
 import 'package:studyflow/config/client_config.dart';
 import 'package:studyflow/config/locale_preference.dart';
+import 'package:studyflow/features/backups/backups_repository.dart';
 import 'package:studyflow/features/focus/focus_screen.dart';
 import 'package:studyflow/features/home/home_screen.dart';
 import 'package:studyflow/features/schedule/schedule_screen.dart';
@@ -251,6 +252,7 @@ final class _StudyFlowRootState extends State<StudyFlowRoot> {
         onLogout: _logout,
         locale: _locale,
         onLocaleChanged: _setLocale,
+        apiBaseUri: widget.apiBaseUri,
       );
     }
     return MaterialApp(
@@ -277,6 +279,7 @@ class StudyFlowApp extends StatelessWidget {
     this.onLogout,
     this.locale,
     this.onLocaleChanged,
+    this.apiBaseUri,
     super.key,
   });
 
@@ -285,6 +288,7 @@ class StudyFlowApp extends StatelessWidget {
   final Future<void> Function()? onLogout;
   final Locale? locale;
   final Future<void> Function(String? tag)? onLocaleChanged;
+  final Uri? apiBaseUri;
 
   @override
   Widget build(BuildContext context) {
@@ -338,6 +342,18 @@ class StudyFlowApp extends StatelessWidget {
                   onLogout: onLogout,
                   locale: locale,
                   onLocaleChanged: onLocaleChanged,
+                  backupsRepositoryFactory: () {
+                    final authContext =
+                        session?.authRepository?.activeContext;
+                    final baseUri = apiBaseUri;
+                    if (authContext == null || baseUri == null) {
+                      return null;
+                    }
+                    return HttpBackupsRepository(
+                      baseUri: baseUri,
+                      authContext: authContext,
+                    );
+                  },
                 ),
               ),
             ],
