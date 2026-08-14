@@ -129,14 +129,22 @@ final class StudyFlowPlatform {
     sound?.loops = true
     sound?.play()
     DispatchQueue.main.async {
+      NSApp.activate(ignoringOtherApps: true)
       let alert = NSAlert()
       alert.alertStyle = .warning
       alert.messageText = title
       alert.informativeText = text
       alert.addButton(withTitle: "OK")
-      alert.runModal()
-      sound?.stop()
-      result(["kind": "supported", "message": "Alarm played."])
+      if let window = NSApp.mainWindow ?? NSApp.windows.first {
+        alert.beginSheetModal(for: window) { _ in
+          sound?.stop()
+          result(["kind": "supported", "message": "Alarm played."])
+        }
+      } else {
+        alert.runModal()
+        sound?.stop()
+        result(["kind": "supported", "message": "Alarm played."])
+      }
     }
   }
 

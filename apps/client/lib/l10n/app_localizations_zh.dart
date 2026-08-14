@@ -312,6 +312,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get blockLocked => '锁定';
 
   @override
+  String get blockRepeatLabel => '重复';
+
+  @override
+  String get blockRepeatNone => '不重复';
+
+  @override
+  String get blockRepeatDaily => '每天';
+
+  @override
+  String get blockRepeatWeekdays => '工作日（周一至周五）';
+
+  @override
+  String get blockRepeatWeekends => '周末（周六、周日）';
+
+  @override
+  String get blockRepeatWeekly => '每周';
+
+  @override
   String get blockEndAfterStart => '结束时间必须晚于开始时间';
 
   @override

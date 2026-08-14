@@ -662,6 +662,42 @@ abstract class AppLocalizations {
   /// **'锁定'**
   String get blockLocked;
 
+  /// No description provided for @blockRepeatLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'重复'**
+  String get blockRepeatLabel;
+
+  /// No description provided for @blockRepeatNone.
+  ///
+  /// In zh, this message translates to:
+  /// **'不重复'**
+  String get blockRepeatNone;
+
+  /// No description provided for @blockRepeatDaily.
+  ///
+  /// In zh, this message translates to:
+  /// **'每天'**
+  String get blockRepeatDaily;
+
+  /// No description provided for @blockRepeatWeekdays.
+  ///
+  /// In zh, this message translates to:
+  /// **'工作日（周一至周五）'**
+  String get blockRepeatWeekdays;
+
+  /// No description provided for @blockRepeatWeekends.
+  ///
+  /// In zh, this message translates to:
+  /// **'周末（周六、周日）'**
+  String get blockRepeatWeekends;
+
+  /// No description provided for @blockRepeatWeekly.
+  ///
+  /// In zh, this message translates to:
+  /// **'每周'**
+  String get blockRepeatWeekly;
+
   /// No description provided for @blockEndAfterStart.
   ///
   /// In zh, this message translates to:

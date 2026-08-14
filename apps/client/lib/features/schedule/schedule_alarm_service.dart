@@ -5,9 +5,10 @@ import 'package:studyflow_domain/domain.dart';
 
 /// Rings an audible alarm on the device when a scheduled block starts.
 ///
-/// Relies on the platform alarm support ([StudyFlowWorkspace.platform]); the
-/// scheduled UNUserNotification stays in place as a background fallback for
-/// when the app is not running.
+/// Repeating blocks arm an alarm for each future occurrence. Relies on the
+/// platform alarm support ([StudyFlowWorkspace.platform]); the scheduled
+/// UNUserNotification stays in place as a background fallback for when the
+/// app is not running.
 final class ScheduleAlarmService {
   ScheduleAlarmService({
     required StudyFlowWorkspace workspace,
@@ -23,48 +24,65 @@ final class ScheduleAlarmService {
   final bool _enabled;
   final Map<String, Timer> _timers = <String, Timer>{};
 
+  static const int _maxOccurrences = 14;
+
   /// Re-arms alarms for all future blocks, cancelling stale ones.
   Future<void> resync() async {
     final blocks = await _workspace.schedule.list();
-    final now = DateTime.now();
     for (final block in blocks) {
-      if (block.start.isAfter(now)) {
-        final title = switch (block.kind) {
-          ScheduleBlockKind.task => 'Task',
-          ScheduleBlockKind.rest => 'Rest',
-          ScheduleBlockKind.sleep => 'Sleep',
-          ScheduleBlockKind.breakTime => 'Break',
-        };
-        _arm(
-          block,
-          title: title,
-          text: block.start.toIso8601String(),
-        );
-      }
+      final title = _defaultTitle(block);
+      _armOccurrences(
+        block,
+        title: title,
+        text: _defaultText(block),
+      );
     }
   }
 
-  /// Arms or replaces the alarm for [block].
-  void upsert(ScheduleBlock block, {required String title, required String text}) {
-    if (!_enabled) {
-      return;
-    }
-    _timers.remove(block.id)?.cancel();
-    if (!block.start.isAfter(DateTime.now())) {
-      return;
-    }
-    _arm(block, title: title, text: text);
-  }
-
-  void _arm(
+  /// Arms or replaces the alarms for [block].
+  void upsert(
     ScheduleBlock block, {
     required String title,
     required String text,
   }) {
-    _timers[block.id] = Timer(
-      block.start.difference(DateTime.now()),
+    if (!_enabled) {
+      return;
+    }
+    _cancelForBlock(block.id);
+    _armOccurrences(block, title: title, text: text);
+  }
+
+  void _armOccurrences(
+    ScheduleBlock block, {
+    required String title,
+    required String text,
+  }) {
+    final now = DateTime.now();
+    var index = 0;
+    for (final occurrence in block.occurrencesAfter(now, limit: _maxOccurrences)) {
+      _armAt(
+        block,
+        occurrence: occurrence,
+        index: index,
+        title: title,
+        text: text,
+      );
+      index += 1;
+    }
+  }
+
+  void _armAt(
+    ScheduleBlock block, {
+    required DateTime occurrence,
+    required int index,
+    required String title,
+    required String text,
+  }) {
+    final delay = occurrence.difference(DateTime.now());
+    _timers['${block.id}#$index'] = Timer(
+      delay,
       () {
-        _timers.remove(block.id);
+        _timers.remove('${block.id}#$index');
         unawaited(
           _workspace.platform
               .playAlarm(title: title, text: text)
@@ -74,10 +92,28 @@ final class ScheduleAlarmService {
     );
   }
 
-  /// Cancels the alarm for [blockId], if any.
+  /// Cancels all alarms for [blockId], if any.
   void cancel(String blockId) {
-    _timers.remove(blockId)?.cancel();
+    _cancelForBlock(blockId);
   }
+
+  void _cancelForBlock(String blockId) {
+    final prefix = '$blockId#';
+    for (final key in _timers.keys.toList(growable: false)) {
+      if (key.startsWith(prefix)) {
+        _timers.remove(key)?.cancel();
+      }
+    }
+  }
+
+  String _defaultTitle(ScheduleBlock block) => switch (block.kind) {
+        ScheduleBlockKind.task => 'Task',
+        ScheduleBlockKind.rest => 'Rest',
+        ScheduleBlockKind.sleep => 'Sleep',
+        ScheduleBlockKind.breakTime => 'Break',
+      };
+
+  String _defaultText(ScheduleBlock block) => block.start.toIso8601String();
 
   void dispose() {
     for (final timer in _timers.values) {

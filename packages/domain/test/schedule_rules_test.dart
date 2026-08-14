@@ -131,6 +131,62 @@ void main() {
       throwsStateError,
     );
   });
+
+  test('a non-repeating block yields only its own start', () {
+    final block = repeating(at('09:00'), ScheduleRepeatRule.none);
+    expect(block.occurrencesAfter(at('08:00')), <DateTime>[at('09:00')]);
+    expect(block.occurrencesAfter(at('09:01')), isEmpty);
+  });
+
+  test('a daily block yields one occurrence per day', () {
+    final block = repeating(at('09:00'), ScheduleRepeatRule.daily);
+    final occurrences =
+        block.occurrencesAfter(at('08:00'), limit: 3).toList();
+    expect(occurrences, <DateTime>[
+      at('09:00'),
+      DateTime.parse('2026-08-12T09:00:00+08:00'),
+      DateTime.parse('2026-08-13T09:00:00+08:00'),
+    ]);
+  });
+
+  test('a weekdays block skips saturday and sunday', () {
+    // 2026-08-11 is a Tuesday.
+    final block = repeating(at('09:00'), ScheduleRepeatRule.weekdays);
+    final occurrences =
+        block.occurrencesAfter(at('08:00'), limit: 3).toList();
+    expect(occurrences, <DateTime>[
+      at('09:00'),
+      DateTime.parse('2026-08-12T09:00:00+08:00'),
+      DateTime.parse('2026-08-13T09:00:00+08:00'),
+    ]);
+  });
+
+  test('a weekends block lands on saturday and sunday', () {
+    final block = repeating(
+      DateTime.parse('2026-08-15T09:00:00+08:00'), // Saturday
+      ScheduleRepeatRule.weekends,
+    );
+    final occurrences = block
+        .occurrencesAfter(
+          DateTime.parse('2026-08-15T08:00:00+08:00'),
+          limit: 2,
+        )
+        .toList();
+    expect(occurrences, <DateTime>[
+      DateTime.parse('2026-08-15T09:00:00+08:00'),
+      DateTime.parse('2026-08-16T09:00:00+08:00'),
+    ]);
+  });
+
+  test('a weekly block repeats seven days later', () {
+    final block = repeating(at('09:00'), ScheduleRepeatRule.weekly);
+    final occurrences =
+        block.occurrencesAfter(at('08:00'), limit: 2).toList();
+    expect(occurrences, <DateTime>[
+      at('09:00'),
+      DateTime.parse('2026-08-18T09:00:00+08:00'),
+    ]);
+  });
 }
 
 ScheduleBlock block(
@@ -150,3 +206,15 @@ ScheduleBlock block(
     );
 
 DateTime at(String time) => DateTime.parse('2026-08-11T$time:00+08:00');
+
+ScheduleBlock repeating(DateTime start, ScheduleRepeatRule rule) =>
+    ScheduleBlock(
+      id: 'repeat-block',
+      start: start,
+      end: start.add(const Duration(minutes: 30)),
+      kind: ScheduleBlockKind.rest,
+      taskId: null,
+      source: ScheduleBlockSource.manual,
+      isLocked: false,
+      repeatRule: rule,
+    );

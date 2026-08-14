@@ -334,9 +334,23 @@ final class _BlockTile extends StatelessWidget {
         subtitle: Text(
           '${_formatTime(block.start)} - ${_formatTime(block.end)}',
         ),
-        trailing: block.isLocked
-            ? const Icon(Icons.lock_outline)
-            : const Icon(Icons.chevron_right),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            if (block.repeatRule != ScheduleRepeatRule.none) ...[
+              Icon(
+                Icons.repeat,
+                size: 18,
+                color: Theme.of(context).colorScheme.outline,
+              ),
+              const SizedBox(width: 4),
+            ],
+            if (block.isLocked)
+              const Icon(Icons.lock_outline)
+            else
+              const Icon(Icons.chevron_right),
+          ],
+        ),
         onTap: onTap,
         onLongPress: onLongPress,
       ),

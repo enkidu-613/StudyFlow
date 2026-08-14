@@ -29,6 +29,7 @@ final class _ScheduleBlockEditorState extends State<ScheduleBlockEditor> {
   late DateTime _end;
   String? _taskId;
   late bool _locked;
+  late ScheduleRepeatRule _repeatRule;
   String? _error;
 
   @override
@@ -40,6 +41,7 @@ final class _ScheduleBlockEditorState extends State<ScheduleBlockEditor> {
     _end = block?.end.toLocal() ?? DateTime.now().add(const Duration(hours: 1));
     _taskId = block?.taskId;
     _locked = block?.isLocked ?? false;
+    _repeatRule = block?.repeatRule ?? ScheduleRepeatRule.none;
   }
 
   Future<void> _pickStart() async {
@@ -93,6 +95,7 @@ final class _ScheduleBlockEditorState extends State<ScheduleBlockEditor> {
       taskId: _kind == ScheduleBlockKind.task ? _taskId : null,
       source: existing?.source ?? ScheduleBlockSource.manual,
       isLocked: _locked,
+      repeatRule: _repeatRule,
     );
     final l10n = context.l10n;
     final reminderTitle = _reminderTitle(l10n, block);
@@ -206,6 +209,23 @@ final class _ScheduleBlockEditorState extends State<ScheduleBlockEditor> {
               onChanged: (value) => setState(() => _taskId = value),
             ),
           ],
+          const SizedBox(height: 12),
+          DropdownButtonFormField<ScheduleRepeatRule>(
+            initialValue: _repeatRule,
+            decoration: InputDecoration(labelText: l10n.blockRepeatLabel),
+            items: <DropdownMenuItem<ScheduleRepeatRule>>[
+              for (final rule in ScheduleRepeatRule.values)
+                DropdownMenuItem<ScheduleRepeatRule>(
+                  value: rule,
+                  child: Text(_repeatLabel(l10n, rule)),
+                ),
+            ],
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _repeatRule = value);
+              }
+            },
+          ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: Text(l10n.blockLocked),
@@ -230,6 +250,15 @@ final class _ScheduleBlockEditorState extends State<ScheduleBlockEditor> {
         ScheduleBlockKind.rest => context.l10n.blockKindRest,
         ScheduleBlockKind.sleep => context.l10n.blockKindSleep,
         ScheduleBlockKind.breakTime => context.l10n.blockKindBreakTime,
+      };
+
+  String _repeatLabel(AppLocalizations l10n, ScheduleRepeatRule rule) =>
+      switch (rule) {
+        ScheduleRepeatRule.none => l10n.blockRepeatNone,
+        ScheduleRepeatRule.daily => l10n.blockRepeatDaily,
+        ScheduleRepeatRule.weekdays => l10n.blockRepeatWeekdays,
+        ScheduleRepeatRule.weekends => l10n.blockRepeatWeekends,
+        ScheduleRepeatRule.weekly => l10n.blockRepeatWeekly,
       };
 
   String _format(DateTime value) {

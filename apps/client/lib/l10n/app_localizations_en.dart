@@ -315,6 +315,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get blockLocked => 'Locked';
 
   @override
+  String get blockRepeatLabel => 'Repeat';
+
+  @override
+  String get blockRepeatNone => 'Does not repeat';
+
+  @override
+  String get blockRepeatDaily => 'Every day';
+
+  @override
+  String get blockRepeatWeekdays => 'Weekdays (Mon-Fri)';
+
+  @override
+  String get blockRepeatWeekends => 'Weekends (Sat-Sun)';
+
+  @override
+  String get blockRepeatWeekly => 'Every week';
+
+  @override
   String get blockEndAfterStart => 'End must be after start';
 
   @override
