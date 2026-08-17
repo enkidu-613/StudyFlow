@@ -22,7 +22,7 @@ services:
       dockerfile: infra/api.Dockerfile
     restart: unless-stopped
     # Only the host-local cloudflared connector may reach the API directly.
-    # Public traffic still enters through the Cloudflare Tunnel/Caddy.
+    # Public traffic enters through the Cloudflare Tunnel, never this port.
     ports:
       - "127.0.0.1:8000:8000"
     expose:
@@ -46,26 +46,9 @@ services:
       retries: 3
       start_period: 10s
 
-  caddy:
-    image: caddy:2.9-alpine
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    networks:
-      - studyflow
-    environment:
-      STUDYFLOW_API_HOST: ${STUDYFLOW_API_HOST}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-
 networks:
   studyflow:
     driver: bridge
 
 volumes:
   studyflow_postgres:
-  caddy_data:
-  caddy_config:

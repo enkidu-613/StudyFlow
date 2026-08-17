@@ -1,0 +1,19 @@
+[Unit]
+Description=StudyFlow API
+After=studyflow-postgres.service
+Requires=studyflow-postgres.service
+
+[Container]
+Image=studyflow-api.build
+ContainerName=studyflow-api
+EnvironmentFile=/home/studyflow/app/StudyFlow/infra/.env
+Network=studyflow.network
+PublishPort=127.0.0.1:8000:8000
+HealthCmd=python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=3)"
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+
+[Service]
+Restart=always
+TimeoutStartSec=900

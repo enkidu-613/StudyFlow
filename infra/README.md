@@ -1,402 +1,204 @@
-# StudyFlow 部署文档
+# StudyFlow 部署与本机联调（Podman）
 
-本目录包含 StudyFlow API 的自托管部署文件，目标环境是 Debian 12 VPS。
+本项目不使用 Docker daemon：macOS 用 `podman machine` + Compose 联调；未来的
+Fedora 44 家庭服务器用普通用户运行的 Podman Quadlet 常驻服务。PostgreSQL 和 API
+不会暴露到公网。
 
-部署结构如下：
+```text
+Flutter 客户端 → HTTPS → Cloudflare Tunnel → 127.0.0.1:8000 API → Podman 私有网络 → PostgreSQL 16
+```
 
-- Caddy 负责 HTTPS 证书、TLS 终止和反向代理。
-- FastAPI API 运行在 Docker 容器中，只在 Docker 内部网络暴露 8000 端口。
-- PostgreSQL 16 运行在同一台 VPS 的 Docker 内网，不暴露公网端口。
-- Cloudflare 负责域名解析和可选的代理加速。
+Cloudflare 负责外部 HTTPS。Tunnel 的上游始终是 `http://127.0.0.1:8000`，所以
+不需要 Caddy、不需要开放 80/443，也不需要路由器端口映射。
 
-## 文件说明
+## 文件与变量
 
-- docker-compose.yml：启动 PostgreSQL、API 和 Caddy。只有 Caddy 对外发布 80、443 端口。
-- api.Dockerfile：构建 Python 3.12、Poetry 和 FastAPI API 镜像；容器启动前执行数据库迁移。
-- Caddyfile：将域名请求转发到 API 容器，并自动申请 HTTPS 证书。
-- bootstrap-env.sh：在 VPS 生成生产 .env、随机密钥和数据库连接配置。
-- backup/backup.sh：使用 AES-256-CBC + PBKDF2 加密 pg_dump 备份文件。
-  宿主机有 pg_dump 时直接使用；没有时自动通过 `docker exec` 在 postgres
-  容器内执行（容器自带 pg_dump，无需在 VPS 额外安装客户端工具）。
-- backup/restore-check.sh：校验备份摘要，并可将备份恢复到临时 PostgreSQL。
-- .env.example：环境变量说明模板；生产 .env 由 bootstrap-env.sh 生成，不要手工复制。
+| 文件/变量 | 谁使用 | 敏感 | 用途/来源 |
+|---|---|---:|---|
+| `compose.yml` | macOS 本机 | 否 | 本机启动 API 与 PostgreSQL |
+| `quadlet/` | Fedora 44 | 否 | rootless 常驻服务单元 |
+| `.env` | API、PostgreSQL、备份 | 是 | `bootstrap-env.sh` 自动生成，权限 600 |
+| `STUDYFLOW_POSTGRES_*` / `POSTGRES_*` | API / PostgreSQL | 密码项是 | 同一组数据库名称、用户、密码；后者供官方镜像初始化 |
+| `STUDYFLOW_DATABASE_URL` | API、备份 | 是 | API 到 PostgreSQL 的连接 URL |
+| `STUDYFLOW_TOKEN_SIGNING_KEY` | API | 是 | JWT 签名密钥 |
+| `STUDYFLOW_API_HOST` | 文档、Tunnel | 否 | 公开域名，如 `api.example.com` |
+| `STUDYFLOW_BACKUP_PASSPHRASE` | 备份/恢复 | 是 | 在密码管理器生成并保存的备份加密口令 |
 
-## 一、准备 Debian 12 VPS
+`.env` 不进 Git。不要运行 `podman compose config`，它会把已展开的秘密打印到
+终端；用 `podman compose ps` 和 `podman compose logs` 查看状态。
 
-> 执行位置：`VPS`（SSH 会话） · 执行身份：`studyflow 普通用户` + `sudo`
+## 一、本机 macOS 联调
 
-使用 studyflow 账户通过 SSH 登录 VPS，不要使用 root 运行应用：
+> 位置：Mac 终端 · 身份：当前 macOS 用户
 
-~~~bash
-ssh studyflow-vps
-cat /etc/os-release
-whoami
-sudo -v
-~~~
+```bash
+brew install podman podman-compose
+podman machine init --now
+podman info --format 'rootless={{.Host.Security.Rootless}} cgroup={{.Host.Cgroups.Version}}'
 
-> 本仓库文档统一使用 `docker-compose`（Debian 12 官方源的旧版命令）。
-> 如果你的系统只安装了新版 `docker compose`（V2 插件），把文中所有
-> `docker-compose` 换成 `docker compose`；先用 `docker compose version`
-> 或 `docker-compose version` 检测实际可用命令。
+cd /Users/enkidu/Documents/ChatGPT/StudyFlow/infra
+STUDYFLOW_BACKUP_PASSPHRASE="$(openssl rand -hex 24)" ./bootstrap-env.sh localhost
+chmod 600 .env
+podman compose --env-file .env -f compose.yml up -d --build
+podman compose --env-file .env -f compose.yml ps
+curl -fsS http://127.0.0.1:8000/health/live
+curl -fsS http://127.0.0.1:8000/health/ready
+```
 
-安装 Docker、Compose、随机值生成工具、防火墙和文件同步工具：
+若 `.env` 已存在，说明已有本机配置；不要重建它，否则本地数据库/会话会失效。
+预期 `ready` 返回 `"database":"ok"`。故障证据：
 
-~~~bash
-sudo apt-get update
-sudo apt-get install -y docker.io docker-compose openssl rsync ufw
-sudo systemctl enable --now docker
-sudo usermod -aG docker studyflow
-exit
-~~~
+```bash
+podman compose --env-file .env -f compose.yml logs --tail=100 postgres
+podman compose --env-file .env -f compose.yml logs --tail=100 api
+```
 
-重新登录，使 docker 用户组权限生效：
+停止联调、但保留数据库卷和镜像：
 
-~~~bash
-ssh studyflow-vps
-docker --version
-docker-compose version
-~~~
+```bash
+podman compose --env-file .env -f compose.yml down
+```
 
-### 1.1 Docker Hub 网络受限时
+客户端只配置公开 API 地址，不传数据库、JWT 或 AI Key：
 
-如果构建时报 `registry-1.docker.io` 连接超时，先确认阿里云 ACR 控制台的
-"镜像工具 → 镜像加速器"地址，并在 VPS 上配置 Docker。该地址属于你的阿里云
-账号，不要写入 Git 仓库：
+```bash
+cd /Users/enkidu/Documents/ChatGPT/StudyFlow/apps/client
+bash ../../tool/flutter run --dart-define=STUDYFLOW_API_BASE_URL=http://127.0.0.1:8000
+```
 
-~~~bash
-sudo mkdir -p /etc/docker
-sudo tee /etc/docker/daemon.json >/dev/null <<'EOF'
-{"registry-mirrors":["你的阿里云ACR镜像加速器地址"]}
-EOF
-sudo systemctl restart docker
-~~~
+Android USB 调试再执行 `adb reverse tcp:8000 tcp:8000`。AI Base URL、模型和
+API Key 由用户在客户端“设置 → AI 设置”填写，仅保存在该设备安全存储中。
 
-## 二、将 Cloudflare 域名指向 VPS
+## 二、Fedora 44 家庭服务器准备
 
-> 执行位置：`本机 Mac`（dig） + `Cloudflare 控制台`（浏览器） · 执行身份：`普通用户`
+> 位置：Fedora 44 控制台/SSH · 身份：系统管理使用 `sudo`，应用使用 `studyflow`
 
-假设你的域名是 example.com，API 使用 api.example.com。不要把端口号写进
-域名，也不要在 DNS 记录中填写 https://。
+```bash
+sudo dnf upgrade -y
+sudo dnf install -y podman openssl rsync git
+sudo useradd --create-home --shell /bin/bash studyflow
+sudo loginctl enable-linger studyflow
+sudo install -d -m 700 -o studyflow -g studyflow /home/studyflow/.ssh
+```
 
-### 2.1 确认域名已经由 Cloudflare 托管
+不要用 root 跑容器，也不需要 Docker 用户组；路由器不配置 80、443、8000 或
+5432 的端口转发。
 
-1. 登录 Cloudflare 控制台。
-2. 在首页选择你的域名。
-3. 如果状态显示为 Active，说明 Cloudflare 已经接管 DNS，可以继续。
-4. 如果状态不是 Active，打开 Overview，复制 Cloudflare 分配的两个
-   Nameserver，然后到域名注册商后台替换原来的 Nameserver。
+## 三、上传代码与生成服务器 `.env`
 
-### 2.2 创建 API 的 A 记录
+> 上传位置：Mac；服务器目录：`/home/studyflow/app/StudyFlow`
 
-在 Cloudflare 控制台依次进入：选择域名 → DNS → Records → Add record。
-
-填写：
-
-~~~text
-Type（类型）：A
-Name（名称）：api
-IPv4 address（IPv4 地址）：你的 VPS 公网 IPv4
-TTL：Auto
-Proxy status：先选择 DNS only（灰云）
-~~~
-
-VPS 公网 IPv4 在阿里云控制台"云服务器 ECS → 实例 → 概览"中查看。不要为
-api 添加指向错误地址的 AAAA 记录；如果 VPS 没有可用 IPv6，应删除旧的 api
-AAAA 记录，否则部分客户端可能优先走 IPv6 而连接失败。
-
-### 2.3 检查域名解析
-
-在 Mac 上执行：
-
-~~~bash
-dig +short api.example.com
-~~~
-
-灰云状态下，结果应包含你的 VPS 公网 IP。
-
-### 2.4 先让 Caddy 申请 HTTPS 证书
-
-确认 VPS 的 80、443 端口已经开放，并启动 Caddy（第四步创建 .env 后再执行）：
-
-~~~bash
-cd /home/studyflow/app/infra
-docker-compose --env-file .env up -d --build
-docker-compose --env-file .env logs --tail=100 caddy
-~~~
-
-日志中应能看到 Caddy 为 api.example.com 申请或加载证书。然后在 Mac 上验证：
-
-~~~bash
-curl -fsS https://api.example.com/health/live
-~~~
-
-如果证书申请失败，优先检查域名解析、VPS 防火墙和服务商安全组是否放行 80、443。
-
-### 2.5 打开 Cloudflare 代理并设置 Full (strict)
-
-证书验证成功后，把 api 的 A 记录 Proxy status 从 DNS only（灰云）切换为
-Proxied（橙云）。然后进入 SSL/TLS → Overview → Encryption mode，选择
-Full (strict)。
-
-## 三、上传代码
-
-> 执行位置：`本机 Mac` · 执行身份：`普通用户`
-
-从完成开发的目录上传到 VPS：
-
-~~~bash
-ssh studyflow-vps 'mkdir -p /home/studyflow/app'
-
-rsync -az \
-  --exclude='.git' \
-  --exclude='.dart_tool' \
-  --exclude='build' \
-  --exclude='.tool-cache' \
+```bash
+ssh studyflow@你的服务器局域网地址 'mkdir -p /home/studyflow/app/StudyFlow'
+rsync -az --delete \
+  --exclude='.git' --exclude='.dart_tool' --exclude='build' --exclude='.tool-cache' \
+  --exclude='infra/.env' \
   /Users/enkidu/Documents/ChatGPT/StudyFlow/ \
-  studyflow-vps:/home/studyflow/app/
-~~~
+  studyflow@你的服务器局域网地址:/home/studyflow/app/StudyFlow/
+```
 
-## 四、生成服务器配置
+`--delete` 只删除服务器项目目录中已经不在本机仓库的文件；若其中有手工文件，先
+移走。登录服务器后：
 
-> 执行位置：`VPS` · 执行身份：`studyflow 普通用户`
+```bash
+cd /home/studyflow/app/StudyFlow/infra
+STUDYFLOW_BACKUP_PASSPHRASE='从密码管理器新建的高强度口令' \
+  ./bootstrap-env.sh api.example.com
+chmod 600 .env
+```
 
-在 VPS 上执行（api.example.com 换成你的实际域名）：
+只有两项需要你提供：`api.example.com`（公开 API 域名）和已经在密码管理器保存的
+备份口令。数据库密码、完整数据库 URL、JWT 签名密钥全部由脚本生成，不能手填、
+不能发送或提交到 Git。
 
-~~~bash
-cd /home/studyflow/app/infra
-./bootstrap-env.sh api.example.com
-~~~
+## 四、启动 Fedora 44 的 rootless Quadlet 服务
 
-脚本会：
-- 检查 .env 不存在，否则拒绝覆盖。
-- 自动生成数据库密码和 JWT 签名密钥，构造完整的连接 URL。
-- 以权限 600 写入 .env，不打印数据库密码或 JWT 密钥。
-- 若未预先设置 STUDYFLOW_BACKUP_PASSPHRASE，生成一个并只显示一次，
-  请立即保存到 VPS 之外的密码管理器。
+> 位置：服务器 · 身份：`studyflow`
 
-生成的 .env 变量（全部由 bootstrap-env.sh 生成，只有 API_HOST 由你传入）：
+```bash
+mkdir -p ~/.config/containers/systemd
+cp /home/studyflow/app/StudyFlow/infra/quadlet/* ~/.config/containers/systemd/
+systemctl --user daemon-reload
+systemctl --user start studyflow-postgres.service
+systemctl --user start studyflow-api.service
 
-| 变量名 | 作用 | 谁生成/提供 | 在哪里获取或生成 | 应填写什么 | 作用范围 | 敏感？ | 怎么验证 |
-|---|---|---|---|---|---|---|---|
-| `STUDYFLOW_POSTGRES_DB` | PostgreSQL 数据库名 | bootstrap-env.sh | 脚本自动写入 .env | `studyflow` | Docker 内 postgres 容器 | 否 | `docker-compose ps` 显示 postgres healthy |
-| `STUDYFLOW_POSTGRES_USER` | 数据库应用用户 | bootstrap-env.sh | 脚本自动写入 .env | `studyflow_app` | Docker 内 postgres 容器 | 否 | 同上 |
-| `STUDYFLOW_POSTGRES_PASSWORD` | 数据库密码 | bootstrap-env.sh（openssl rand -hex 24） | 脚本自动写入 .env，不打印 | 已生成的十六进制值 | Docker 内 postgres 容器 | 是 | 不要 echo、不进入 Git |
-| `STUDYFLOW_DATABASE_URL` | API 连接 PostgreSQL 的完整 URL | bootstrap-env.sh | 脚本自动写入 .env | `postgresql://studyflow_app:<密码>@postgres:5432/studyflow` | API 容器 | 是 | `/health/ready` 返回 `database: ok` |
-| `STUDYFLOW_TOKEN_SIGNING_KEY` | JWT 签名密钥（至少 32 字节） | bootstrap-env.sh（openssl rand -hex 32） | 脚本自动写入 .env，不打印 | 已生成的十六进制值 | 仅 API 容器 | 是 | 注册登录后受保护接口返回 200 |
-| `STUDYFLOW_API_HOST` | 公开 API 域名 | 你 | 部署文档第二节；Cloudflare A 记录指向 VPS | `api.example.com` | Caddy 容器 | 否（公开地址） | `curl https://api.example.com/health/live` |
-| `STUDYFLOW_BACKUP_PASSPHRASE` | 备份加密口令 | 你（密码管理器）或脚本生成 | 脚本生成时只显示一次，立即保存到 VPS 之外 | 高强度随机口令 | 备份脚本（VPS 之外备份时用） | 是 | `restore-check.sh` 输出校验通过 |
-| `STUDYFLOW_BACKUP_DIR` | 备份输出目录 | bootstrap-env.sh | 脚本自动写入 .env | `/var/backups/studyflow` | 备份脚本 | 否 | 备份后目录出现 `.gpg` 文件 |
+systemctl --user status studyflow-postgres.service --no-pager
+systemctl --user status studyflow-api.service --no-pager
+podman ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+curl -fsS http://127.0.0.1:8000/health/live
+curl -fsS http://127.0.0.1:8000/health/ready
+```
 
-密码都是十六进制（hex）字符，不含 URL 特殊字符，因此数据库 URL 无需额外编码；
-若将来手动填写含 `@`、`:`、`/` 的密码，必须按 RFC 3986 做百分号编码后再拼进 URL。
+API 必须只显示 `127.0.0.1:8000`；PostgreSQL 不应有主机端口。更新代码后的流程：
+同步代码、复制 Quadlet 文件、再执行：
 
-## 五、检查配置并启动服务
+```bash
+systemctl --user daemon-reload
+systemctl --user restart studyflow-api.service
+```
 
-> 执行位置：`VPS` · 执行身份：`studyflow 普通用户`（docker 组）
+日志：
 
-先检查 Compose 配置是否完整：
+```bash
+journalctl --user -u studyflow-api.service -n 100 --no-pager
+journalctl --user -u studyflow-postgres.service -n 100 --no-pager
+```
 
-~~~bash
-cd /home/studyflow/app/infra
-docker-compose --env-file .env config
-~~~
+## 五、接入 Cloudflare Tunnel
 
-没有出现变量缺失或 YAML 错误后，再构建并启动：
+> 位置：Cloudflare Zero Trust 控制台 + Fedora 44
 
-~~~bash
-docker-compose --env-file .env up -d --build
-docker-compose --env-file .env ps
-~~~
+创建 Tunnel 和公开 hostname：
 
-API 容器会等待 PostgreSQL 健康后再启动，然后按顺序执行 Alembic 迁移和
-Uvicorn。查看日志：
+| 配置项 | 值 |
+|---|---|
+| Public hostname | `api.example.com` |
+| Service type | `HTTP` |
+| URL | `http://127.0.0.1:8000` |
 
-~~~bash
-docker-compose --env-file .env logs --tail=100 api
-docker-compose --env-file .env logs --tail=100 postgres
-docker-compose --env-file .env logs --tail=100 caddy
-~~~
+根据控制台为该 Tunnel 给出的步骤安装 `cloudflared`。Tunnel token 是
+cloudflared 系统服务的配置，不写进本项目 `.env`。完成后从外部验证：
 
-## 六、防火墙
-
-> 执行位置：`VPS` · 执行身份：`sudo`
-
-只开放 SSH、HTTP 和 HTTPS。SSH 最好只允许你的公网 IP：
-
-~~~bash
-sudo ufw default deny incoming
-sudo ufw default allow outgoing
-sudo ufw allow from 你的公网IP to any port 22 proto tcp
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw --force enable
-sudo ufw status verbose
-~~~
-
-确认可以通过 SSH 密钥重新登录后，再启用防火墙规则。不要开放 API 的 8000
-端口或 PostgreSQL 的 5432 端口。
-
-## 七、验证 API
-
-> 执行位置：`本机 Mac`（curl） · 执行身份：`普通用户`
-
-从 Mac 或其他外部设备执行：
-
-~~~bash
+```bash
 curl -fsS https://api.example.com/health/live
 curl -fsS https://api.example.com/health/ready
-~~~
+```
 
-live 接口应返回 status 为 ok。ready 接口会检查本地 PostgreSQL 连接。
+## 六、防火墙、备份、排障与回滚
 
-如果失败，按以下顺序排查：
+家庭网络不添加 Web 入站规则：不开放 80、443、8000、5432；SSH 仅在确有远程管理
+需求时开放并限制来源。Fedora firewalld 检查命令：
 
-1. Cloudflare A 记录是否指向正确的 VPS IP。
-2. Cloudflare SSL/TLS 是否为 Full (strict)。
-3. VPS 是否开放 80、443。
-4. Caddy 日志是否成功申请证书。
-5. API 日志中的数据库连接或迁移错误。
-6. postgres 容器是否健康（docker-compose ps）。
+```bash
+sudo firewall-cmd --get-active-zones
+sudo firewall-cmd --list-all
+```
 
-## 八、创建第一个邮箱账户
+备份（宿主机没有 `pg_dump` 时会自动用 Podman 容器内工具）：
 
-> 执行位置：`本机 Mac`（curl）或客户端 · 执行身份：`普通用户`
-
-注册接口是公开的，直接使用 curl 创建首个账户（或直接使用客户端注册）：
-
-~~~bash
-curl -fsS -X POST https://api.example.com/v1/auth/register \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"you@example.com","password":"你的密码"}'
-~~~
-
-密码要求：8–16 位，必须包含大写字母、小写字母、数字和 ASCII 特殊符号
-（如 `!@#$%^&*`）；不能全为纯数字、不能包含空格、不能与注册邮箱相同。
-响应包含 access_token 和 refresh_token。不要在文档、日志或仓库中保存密码。
-
-### 登录限流与密码黑名单
-
-- **登录限流**：同一 IP + 邮箱在 10 分钟内失败 5 次后返回 429（含
-  `Retry-After` 头），防止暴力破解与撞库；登录成功会重置该身份的失败计数。
-- **常见密码黑名单**：注册时拒绝内置的常见/泄露密码列表（如
-  `Password1!`、`Qwerty123!`）。
-- **泄露密码检查（HIBP）**：注册时对密码 SHA-1 前 5 位调用
-  `api.pwnedpasswords.com`（k-anonymity，完整密码不上传）；网络异常时跳过
-  该检查，不阻塞注册。
-
-## 九、启动客户端
-
-> 执行位置：`本机 Mac` · 执行身份：`普通用户`
-
-客户端只需要公开 API 地址，不需要数据库密码、JWT 密钥或 AI Key：
-
-~~~bash
-cd /Users/enkidu/Documents/ChatGPT/StudyFlow/apps/client
-bash ../../tool/flutter run \
-  --dart-define=STUDYFLOW_API_BASE_URL=https://api.example.com
-~~~
-
-首次使用时选择 Create account 注册邮箱和密码。登录后可在"设置 → AI 设置"
-中为当前设备填写 AI Base URL、模型和 API Key；API Key 只保存在设备安全
-存储中，不上传 VPS。
-
-## 十、备份与恢复检查
-
-> 执行位置：`VPS` · 执行身份：`sudo`（需要读取 .env 中的口令）
-
-执行加密备份：
-
-~~~bash
-export STUDYFLOW_BACKUP_PASSPHRASE='你的备份密码'
-export STUDYFLOW_DATABASE_URL='postgresql://studyflow_app:数据库密码@127.0.0.1:5432/studyflow'
-sudo -E /home/studyflow/app/infra/backup/backup.sh
-~~~
-
-生产环境更简单的方式是在 .env 已存在的前提下导出变量后执行：
-
-~~~bash
-set -a; source /home/studyflow/app/infra/.env; set +a
-sudo -E /home/studyflow/app/infra/backup/backup.sh
+```bash
+cd /home/studyflow/app/StudyFlow/infra
+set -a; . ./.env; set +a
+mkdir -p "$HOME/studyflow-backups"
+export STUDYFLOW_BACKUP_DIR="$HOME/studyflow-backups"
+./backup/backup.sh
 unset STUDYFLOW_DATABASE_URL STUDYFLOW_BACKUP_PASSPHRASE
-~~~
+```
 
-备份文件应复制到 VPS 以外的独立位置。恢复检查：
+把 `.gpg` 文件复制到另一台机器或对象存储。恢复检查：
 
-~~~bash
-/home/studyflow/app/infra/backup/restore-check.sh \
-  /var/backups/studyflow/studyflow-备份文件.gpg
-~~~
+```bash
+/home/studyflow/app/StudyFlow/infra/backup/restore-check.sh \
+  "$HOME/studyflow-backups/你的备份文件.gpg"
+```
 
-不要把备份密码写入 Git、Docker 镜像或客户端。
+排障顺序：先 `curl http://127.0.0.1:8000/health/ready`，再看 API/PostgreSQL
+日志，最后检查 Tunnel hostname 是否指向 `http://127.0.0.1:8000`。停止回滚：
 
-## 网络结构
+```bash
+systemctl --user stop studyflow-api.service studyflow-postgres.service
+```
 
-~~~text
-Android / macOS 客户端
-        │ HTTPS
-        ▼
-Cloudflare DNS（代理开启，SSL/TLS 为 Full strict）
-        │ HTTPS
-        ▼
-Caddy（VPS，只有 80/443 对外开放）
-        │
-        ▼
-api:8000（Docker 私有网络）
-        │
-        ▼
-postgres:5432（Docker 私有网络，不暴露公网）
-~~~
-
-## 当前生产注意事项
-
-- 生产目标是 Debian 12；不要使用已停止维护的 Fedora 34。
-- 不要直接暴露 API 的 8000 端口或 PostgreSQL 的 5432 端口。
-- 不要在日志中输出访问令牌、数据库密码、JWT 密钥或备份密码。
-- AI API Key 只在客户端设置页配置，服务端不保存、不读取。
-- 若需从旧 Supabase 保留数据，先按
-  `docs/superpowers/specs/2026-08-12-local-postgres-migration-boundary.md`
-  执行独立加密归档，旧 Supabase URL 不写入新生产 .env。
-
-## 常见失败与排障
-
-排障先收集证据，再改配置；按 DNS → TCP 端口 → TLS/Cloudflare → Caddy →
-API → 数据库 → 认证的边界逐层定位。
-
-| 症状 | 最可能原因 | 下一条证据命令 |
-|---|---|---|
-| `dig +short api.example.com` 无结果 | DNS 未生效或 Nameserver 未切换 | 检查 Cloudflare Overview 状态与注册商 Nameserver |
-| 浏览器/curl 显示 525 | Cloudflare 到源站 TLS 握手失败 | `curl -v https://api.example.com/health/live`，检查 Caddy 日志与 SSL/TLS 模式 |
-| Caddy 无法申请证书 | 80/443 未放行或域名解析未生效 | `sudo ufw status verbose`；`docker-compose logs caddy` |
-| `/health/live` 超时 | 防火墙或安全组拦截 | `sudo ufw status verbose`；阿里云安全组检查 80/443 |
-| `/health/ready` 返回 503 | API 连不上 postgres | `docker-compose logs api`；`docker-compose ps` 看 postgres 是否 healthy |
-| 注册登录 500 | 数据库迁移未执行或 JWT 密钥缺失 | `docker-compose logs api`（应出现 alembic 输出）；确认 `.env` 有 TOKEN_SIGNING_KEY |
-| 客户端登录提示"无法恢复上次会话" | 本机网络代理或 TLS 中断 | 用 `curl -fsS https://api.example.com/health/live` 对比；不要把网络代理问题当作认证问题 |
-
-Cloudflare 525 表示 Cloudflare 边缘无法与源站完成 TLS 握手：先确认 Caddy
-监听 443、证书有效（Full strict 需要有效证书）、代理模式设置正确；不要
-把"关闭代理"或"关闭防火墙"当作默认修复。
-
-## 回滚
-
-- **配置回滚**：`docker-compose --env-file .env down` 停止服务；修改
-  `.env` 后重新 `docker-compose --env-file .env up -d`。`.env` 被覆盖前
-  先 `cp .env .env.bak-$(date +%s)`。
-- **代码回滚**：VPS 上 `cd /home/studyflow/app && git checkout <上一个提交>`，
-  重新 `docker-compose --env-file .env up -d --build`。
-- **数据库回滚**：从 `STUDYFLOW_BACKUP_DIR` 中最近的 `.gpg` 备份解密恢复
-  到临时 PostgreSQL，验证后再决定是否覆盖生产数据。迁移降级不自动执行。
-- **密钥泄露处理**：若 `.env` 泄露，重新执行 `./bootstrap-env.sh`（先删除
-  旧 `.env`）生成新密钥，并撤销受影响账户的 refresh token（重启服务后旧
-  会话自动失效）。
-
-## 部署收尾清单
-
-- [ ] `git diff --check`、服务端测试（`pytest`）和客户端测试（`flutter test`）通过。
-- [ ] VPS 上 `.env` 权限为 600，未进入 Git，未出现在日志。
-- [ ] 三个容器（postgres/api/caddy）healthy，`/health/live` 与 `/health/ready` 正常。
-- [ ] 新用户可注册、登录、退出和重新登录。
-- [ ] 两台设备使用同一邮箱登录后任务/日程能同步；冲突策略已说明（字段级合并/冲突副本）。
-- [ ] 客户端 AI 设置可以保存、测试和清除；API Key 在系统安全存储中，未上传。
-- [ ] 域名、HTTPS、反向代理、云防火墙和 VPS 防火墙均有验证证据。
-- [ ] 已说明数据库备份、恢复命令和最近一次恢复演练结果。
-- [ ] macOS/Android 实机验收结果已按 `tests/device/*-matrix.md` 记录 Observed 列。
+代码回退后同步代码、复制 Quadlet 文件并执行 `systemctl --user daemon-reload` 与
+`systemctl --user restart studyflow-postgres.service studyflow-api.service`。数据库迁移不
+自动降级；先完成加密备份与恢复演练。

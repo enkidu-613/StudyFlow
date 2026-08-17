@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>通知毛玻璃效果 Demo</title>
+<style>
+:root {
+  color-scheme: dark;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-height: 100svh;
+  overflow-x: hidden;
+  background: #20251f;
+  color: #fff;
+}
+
+button { font: inherit; }
+
+.demo {
+  position: relative;
+  isolation: isolate;
+  min-height: 100svh;
+  padding: clamp(28px, 7vh, 76px) 18px 36px;
+  overflow: hidden;
+}
+
+.wallpaper,
+.wallpaper::after {
+  position: absolute;
+  inset: 0;
+}
+
+.wallpaper {
+  z-index: -2;
+  background: #4c554c;
+}
+
+.wallpaper svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.wallpaper::after {
+  z-index: 1;
+  background: linear-gradient(180deg, rgba(0, 0, 0, .38), rgba(0, 0, 0, .18) 38%, rgba(0, 0, 0, .55));
+  content: "";
+}
+
+.demo-content {
+  width: min(100%, 470px);
+  margin: 0 auto;
+}
+
+.demo-title {
+  margin: 0 0 16px 4px;
+  color: rgba(255, 255, 255, .78);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, .6);
+}
+
+.notifications {
+  display: grid;
+  gap: 13px;
+}
+
+.notification {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 90px;
+  padding: 15px 16px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .27);
+  border-radius: 27px;
+  background: linear-gradient(135deg, rgba(130, 135, 132, .52), rgba(58, 63, 60, .58) 52%, rgba(39, 44, 41, .67));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .18),
+    inset 0 -1px 0 rgba(0, 0, 0, .34),
+    0 8px 20px rgba(0, 0, 0, .22);
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(25px) saturate(72%) brightness(.96);
+  backdrop-filter: blur(25px) saturate(72%) brightness(.96);
+  transform: translateZ(0);
+  transition: border-color .2s ease, background .2s ease, transform .2s ease;
+  animation: appear .5s cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.notification:nth-child(2) { animation-delay: .06s; }
+.notification:nth-child(3) { animation-delay: .12s; }
+.notification:nth-child(4) { animation-delay: .18s; }
+.notification:nth-child(5) { animation-delay: .24s; }
+
+.notification::before {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(140% 100% at 5% -15%, rgba(255, 255, 255, .28), transparent 38%),
+    linear-gradient(118deg, rgba(255, 255, 255, .11), transparent 34%, transparent 76%, rgba(255, 255, 255, .045));
+  content: "";
+  pointer-events: none;
+}
+
+.notification:active { transform: scale(.985); }
+
+.notification.expanded {
+  border-color: rgba(255, 255, 255, .48);
+  background: linear-gradient(135deg, rgba(150, 154, 152, .65), rgba(61, 67, 64, .73));
+}
+
+.icon {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 50px;
+  width: 50px;
+  height: 50px;
+  border-radius: 14px;
+  box-shadow: inset 0 1px 3px rgba(255, 255, 255, .4), 0 4px 10px rgba(0, 0, 0, .28);
+}
+
+.system-icon {
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle, #c3c4c3 0 17%, #858789 18% 29%, #dedfdd 30% 36%, #737577 37% 54%, #b9bbba 55% 63%, #717372 64%);
+  color: rgba(255, 255, 255, .9);
+  font-size: 29px;
+  line-height: 1;
+}
+
+.person-icon {
+  overflow: visible;
+  background: linear-gradient(145deg, #e6f1ff, #a1b9df 48%, #eaf3ff);
+}
+
+.person-icon::before {
+  position: absolute;
+  top: 9px;
+  left: 18px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #fff;
+  content: "";
+}
+
+.person-icon::after {
+  position: absolute;
+  bottom: 6px;
+  left: 8px;
+  width: 34px;
+  height: 23px;
+  border-radius: 50% 50% 25% 25%;
+  background: #fff;
+  content: "";
+}
+
+.person-icon .message-dot {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  width: 22px;
+  height: 22px;
+  border: 2px solid rgba(255, 255, 255, .7);
+  border-radius: 7px 7px 7px 2px;
+  background: #11d86c;
+}
+
+.game-icon {
+  display: flex;
+  align-items: end;
+  justify-content: space-around;
+  padding: 4px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 33% 34%, #ffe2ef 0 7%, transparent 8%),
+    radial-gradient(circle at 69% 27%, #def4ff 0 6%, transparent 7%),
+    linear-gradient(145deg, #86d7e6, #4e75ad 48%, #f5b2cf);
+}
+
+.game-icon::before,
+.game-icon::after {
+  width: 38%;
+  height: 69%;
+  border-radius: 50% 50% 38% 38%;
+  background: linear-gradient(160deg, #f7edf3 0 31%, #9c76a7 32% 57%, #394b89 58%);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .3);
+  content: "";
+}
+
+.wechat-icon {
+  display: grid;
+  place-items: center;
+  padding-right: 6px;
+  background: #12c76b;
+  color: #fff;
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: -8px;
+}
+
+.unread {
+  position: absolute;
+  z-index: 2;
+  top: 7px;
+  left: 54px;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 2px solid rgba(95, 101, 98, .85);
+  border-radius: 50%;
+  background: #f4f4f4;
+  color: #555;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.video-icon {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: radial-gradient(circle at 42% 25%, #8e8e8e, transparent 21%), #080808;
+  color: #f4f4f4;
+  font-size: 31px;
+  font-weight: 900;
+}
+
+.video-icon::before {
+  content: "♫";
+  text-shadow: -2px -2px 0 #23e8ec, 2px 2px 0 #ff2c6a;
+}
+
+.copy {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  flex: 1;
+}
+
+.heading {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.title {
+  min-width: 0;
+  overflow: hidden;
+  flex: 1;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -.3px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.time {
+  flex: 0 0 auto;
+  color: rgba(255, 255, 255, .78);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.body {
+  max-height: 4.05em;
+  margin-top: 4px;
+  overflow: hidden;
+  color: rgba(255, 255, 255, .96);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -.35px;
+  line-height: 1.35;
+  transition: max-height .25s ease;
+}
+
+.expanded .body { max-height: 20em; }
+
+.expand-hint {
+  margin-top: 24px;
+  color: rgba(255, 255, 255, .65);
+  font-size: 12px;
+  text-align: center;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, .65);
+}
+
+@keyframes appear {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 430px) {
+  .demo { padding-right: 14px; padding-left: 14px; }
+  .notification { gap: 10px; padding: 13px 14px; border-radius: 24px; }
+  .icon { flex-basis: 46px; width: 46px; height: 46px; }
+  .person-icon::before { left: 16px; }
+  .person-icon::after { left: 7px; width: 32px; }
+  .title { font-size: 15px; }
+  .time { font-size: 12px; }
+  .body { font-size: 14px; }
+}
+</style>
+</head>
+<body>
+<main class="demo">
+  <div class="wallpaper" aria-hidden="true">
+    <svg viewBox="0 0 810 1800" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id="forest" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#1c211f" />
+          <stop offset=".45" stop-color="#747d74" />
+          <stop offset="1" stop-color="#1c251d" />
+        </linearGradient>
+        <filter id="soft"><feGaussianBlur stdDeviation="8" /></filter>
+        <filter id="noise">
+          <feTurbulence type="fractalNoise" baseFrequency=".65" numOctaves="3" stitchTiles="stitch" />
+          <feColorMatrix type="saturate" values="0" />
+          <feComponentTransfer><feFuncA type="table" tableValues="0 .13" /></feComponentTransfer>
+        </filter>
+      </defs>
+      <rect width="810" height="1800" fill="url(#forest)" />
+      <g filter="url(#soft)" opacity=".86">
+        <ellipse cx="90" cy="180" rx="240" ry="250" fill="#101512" />
+        <ellipse cx="390" cy="180" rx="250" ry="275" fill="#0c100e" />
+        <ellipse cx="720" cy="210" rx="270" ry="300" fill="#171d18" />
+        <ellipse cx="80" cy="720" rx="230" ry="350" fill="#777e77" />
+        <ellipse cx="340" cy="620" rx="260" ry="350" fill="#39433a" />
+        <ellipse cx="680" cy="650" rx="290" ry="390" fill="#59645a" />
+        <ellipse cx="120" cy="1200" rx="270" ry="430" fill="#1c241d" />
+        <ellipse cx="500" cy="1120" rx="320" ry="430" fill="#5b6758" />
+        <ellipse cx="780" cy="1260" rx="240" ry="450" fill="#151c16" />
+        <ellipse cx="180" cy="1580" rx="350" ry="400" fill="#101611" />
+        <ellipse cx="570" cy="1550" rx="380" ry="430" fill="#263126" />
+      </g>
+      <g fill="none" stroke-linecap="round" opacity=".82">
+        <path d="M-30 1800 C120 1390 105 1050 165 710 C210 460 185 220 220 -40" stroke="#101611" stroke-width="47" />
+        <path d="M165 715 C70 555 8 510 -70 465 M168 640 C270 510 325 405 390 320 M160 845 C64 765 0 730 -75 700" stroke="#172019" stroke-width="23" />
+        <path d="M625 1830 C630 1500 590 1290 650 1020 C690 830 750 610 710 330" stroke="#111812" stroke-width="54" />
+        <path d="M650 1090 C550 980 480 880 420 760 M650 960 C755 860 800 775 870 675 M680 720 C600 625 550 560 500 445" stroke="#202a20" stroke-width="25" />
+        <path d="M365 1450 C390 1160 350 930 400 680 C430 500 405 280 425 70" stroke="#303b30" stroke-width="28" />
+        <path d="M400 740 C310 650 260 580 220 490 M410 610 C490 520 530 440 575 345 M385 925 C295 840 235 790 170 755" stroke="#303b30" stroke-width="18" />
+      </g>
+      <g fill="#d6dad3" opacity=".13">
+        <circle cx="75" cy="430" r="65" /><circle cx="260" cy="300" r="78" /><circle cx="520" cy="370" r="98" />
+        <circle cx="750" cy="470" r="92" /><circle cx="90" cy="900" r="95" /><circle cx="470" cy="800" r="115" />
+        <circle cx="720" cy="960" r="108" /><circle cx="220" cy="1270" r="125" /><circle cx="540" cy="1300" r="130" />
+      </g>
+      <rect width="810" height="1800" filter="url(#noise)" opacity=".35" />
+    </svg>
+  </div>
+
+  <div class="demo-content">
+    <p class="demo-title">Liquid Glass Notification Demo</p>
+    <section class="notifications" aria-label="通知效果演示">
+      <article class="notification">
+        <div class="icon system-icon" aria-hidden="true">⚙</div>
+        <div class="copy">
+          <div class="heading"><div class="title">SOS紧急联络</div><div class="time">22 分钟前</div></div>
+          <div class="body">因侧边按钮被快速按下五次，iPhone 于 19:43 发起了 SOS 紧急联络。你可以在“设置”中管理“按五次进行呼叫”。</div>
+        </div>
+      </article>
+
+      <article class="notification">
+        <div class="icon person-icon" aria-hidden="true"><span class="message-dot"></span></div>
+        <div class="copy">
+          <div class="heading"><div class="title">106550200110280</div><div class="time">现在</div></div>
+          <div class="body">您于 2026 年 08 月 14 日 20 时 00 分向深圳市公安局 110 报警服务台报警。所报情况我单位已如实登记，如有需要，处警单位会主动与您联系。</div>
+        </div>
+      </article>
+
+      <article class="notification">
+        <div class="icon game-icon" aria-hidden="true"></div>
+        <div class="copy">
+          <div class="heading"><div class="title">🍀 连接世界的活动：桃井爱莉 章节开启！</div><div class="time">3 分钟前</div></div>
+          <div class="body">连接世界活动进行中，参与赢限定称号、水晶等道具奖励！</div>
+        </div>
+      </article>
+
+      <article class="notification">
+        <div class="icon wechat-icon" aria-hidden="true">••</div>
+        <span class="unread">2</span>
+        <div class="copy">
+          <div class="heading"><div class="title">T T</div><div class="time">4 分钟前</div></div>
+          <div class="body">警察到了吗</div>
+        </div>
+      </article>
+
+      <article class="notification">
+        <div class="icon video-icon" aria-hidden="true"></div>
+        <div class="copy">
+          <div class="heading"><div class="title">即时通知</div><div class="time">6 分钟前</div></div>
+          <div class="body">总给女人当狗<br>私信了你：[分享视频]</div>
+        </div>
+      </article>
+    </section>
+    <p class="expand-hint">点击通知卡片展开内容</p>
+  </div>
+</main>
+
+<script>
+document.querySelectorAll('.notification').forEach((notification) => {
+  notification.addEventListener('click', () => {
+    notification.classList.toggle('expanded');
+  });
+});
+</script>
+</body>
+</html>

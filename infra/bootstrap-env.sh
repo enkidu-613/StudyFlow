@@ -54,6 +54,9 @@ cat > "$env_file" <<EOF
 STUDYFLOW_POSTGRES_DB=${db_name}
 STUDYFLOW_POSTGRES_USER=${db_user}
 STUDYFLOW_POSTGRES_PASSWORD=${db_password}
+POSTGRES_DB=${db_name}
+POSTGRES_USER=${db_user}
+POSTGRES_PASSWORD=${db_password}
 STUDYFLOW_DATABASE_URL=${database_url}
 STUDYFLOW_TOKEN_SIGNING_KEY=${token_signing_key}
 STUDYFLOW_API_HOST=${api_host}

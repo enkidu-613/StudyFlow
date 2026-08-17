@@ -1,0 +1,4 @@
+[Build]
+ImageTag=localhost/studyflow-api:latest
+SetWorkingDirectory=/home/studyflow/app/StudyFlow
+File=infra/api.Dockerfile

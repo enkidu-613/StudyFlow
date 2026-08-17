@@ -3,7 +3,7 @@
 #
 # Requirements:
 #   - openssl (encryption)
-#   - pg_dump (PostgreSQL client tools) on the host, or Docker with the
+#   - pg_dump (PostgreSQL client tools) on the host, or Podman with the
 #     studyflow postgres container (container has pg_dump built in)
 #   - STUDYFLOW_DATABASE_URL or OLD_DATABASE_URL (standard postgresql:// URL)
 #   - STUDYFLOW_BACKUP_PASSPHRASE
@@ -35,21 +35,21 @@ fi
 
 mkdir -p "$BACKUP_DIR"
 
-# Prefer a host pg_dump; fall back to running pg_dump inside the Docker
+# Prefer a host pg_dump; fall back to running pg_dump inside the Podman
 # postgres container when the host lacks the client tools.
 if command -v pg_dump >/dev/null 2>&1; then
     dump_command=(pg_dump --dbname="$DATABASE_URL" --no-owner --no-privileges)
 else
-    postgres_container="$(docker ps --format '{{.Names}}' 2>/dev/null \
+    postgres_container="$(podman ps --format '{{.Names}}' 2>/dev/null \
         | grep -E '^infra_postgres_1$|postgres' | head -n 1 || true)"
     if [[ -z "$postgres_container" ]]; then
-        echo "pg_dump not found on host and no postgres container is running." >&2
+        echo "pg_dump not found on host and no Podman postgres container is running." >&2
         exit 1
     fi
     # Inside the container the database host resolves via 127.0.0.1.
     container_url="${DATABASE_URL/@postgres:/@127.0.0.1:}"
     dump_command=(
-        docker exec "$postgres_container" pg_dump
+        podman exec "$postgres_container" pg_dump
         --dbname="$container_url" --no-owner --no-privileges
     )
 fi

@@ -1,103 +1,81 @@
 # StudyFlow
 
-StudyFlow is a cross-platform study assistant with a FastAPI backend and
-Flutter client. Android (iQOO Z9 Turbo, OriginOS 6) and macOS are the first
-targets; Windows, Linux, and iOS remain possible through the platform
-contracts.
+[English](README.en.md) | **中文**
 
-## Toolchain
+StudyFlow 是一个跨平台学习助手：围绕固定的睡眠窗口规划一天，通过专注
+计时帮助完成任务，并且**离线也能用**——恢复网络后自动同步。
 
-Install the pinned runtimes with mise:
+## 特性
+
+- **离线优先**：任务、日程、专注记录都存本地（Drift/SQLite），网络恢复后
+  自动同步，无需担心断网。
+- **日程策略**：以目标起床时间为锚点，提出小幅、可确认的睡眠窗口调整建议，
+  锁定块与休息时间保持不变。
+- **专注计时**：目标时长取自任务的预估分钟，倒计时结束自动完成并响铃提醒。
+- **隐私优先的 AI 设置**：每台设备在设置页自行配置 AI 地址、模型与密钥，
+  密钥只存在设备上，服务端不接触。
+- **安全的邮箱认证**：Argon2id 密码哈希 + 短期访问令牌 + 轮换刷新令牌。
+
+## 平台
+
+| 平台 | 状态 |
+|---|---|
+| Android（iQOO Z9 Turbo / OriginOS 6） | ✅ 首批目标 |
+| macOS | ✅ 首批目标 |
+| Windows / Linux / iOS | 可通过平台契约后续支持 |
+
+## 技术栈
+
+- 客户端：Flutter（Dart、Riverpod、GoRouter、Drift/SQLite）
+- 后端：FastAPI（Pydantic v2、SQLAlchemy Async、PyJWT、Argon2id）
+- 数据库：PostgreSQL 16（JSONB）
+- 部署：Docker Compose + Caddy + Cloudflare
+
+## 快速开始
 
 ```bash
+# 安装锁定版本的运行时
 mise install
-```
 
-Use mise to select the runtimes while Poetry remains the Python dependency
-manager:
-
-```bash
+# 后端依赖
 mise exec -- poetry install
-mise exec -- poetry run pytest server/tests/test_health.py -q
+
+# 客户端依赖
 bash tool/flutter pub get
-bash tool/flutter test
 ```
 
-If the system Flutter directory is protected by the local macOS environment,
-set `STUDYFLOW_FLUTTER_ROOT` to a writable SDK copy. The wrapper keeps Flutter
-analytics disabled and redirects `PUB_CACHE` to the ignored `.tool-cache/`
-directory:
+## 测试
 
 ```bash
-export STUDYFLOW_FLUTTER_ROOT="$PWD/.tool-cache/flutter-sdk"
-bash tool/flutter --version
-```
-
-## Bootstrap
-
-- API: `cd server && mise exec -- poetry install && mise exec -- poetry run pytest tests/test_health.py -q`
-- Client: `cd apps/client && bash ../../tool/flutter pub get`
-
-## What is implemented
-
-- **Offline-first client**: tasks, schedule blocks, focus sessions, and
-  check-ins persist in a local Drift/SQLite store and queue operations for
-  later sync.
-- **Email & password auth**: `POST /v1/auth/register`, `login`, `refresh`,
-  and `logout`; Argon2id password hashes, rotating refresh tokens stored as
-  digests, short-lived access JWTs scoped by `user_id`.
-- **User-scoped JSON sync**: `POST /v1/sync/push` and `GET /v1/sync/pull`
-  store JSONB payloads keyed by the JWT `user_id`; idempotent operation IDs,
-  cursor-based pull, and per-user isolation.
-- **Deterministic schedule policy**: `POST /v1/schedule/proposals/validate`
-  proposes small, confirmation-gated sleep-window adjustments anchored to the
-  target wake time; locked blocks and rest intervals are preserved.
-- **Client-side AI settings**: each device configures its own AI Base URL,
-  model, and API key in Settings; keys stay in the device secure storage and
-  never reach the VPS. The server has no AI routes.
-- **Local PostgreSQL deployment**: `infra/` runs PostgreSQL 16, FastAPI, and
-  Caddy in Docker on a Debian 12 VPS; only Caddy publishes 80/443.
-
-## Tests
-
-```bash
-# Server (auth + sync + scheduler + database config + deployment config)
+# 服务端（认证、同步、日程策略等）
 cd server && mise exec -- poetry run pytest
 
-# Client
+# 客户端
 cd apps/client && bash ../../tool/flutter test
 
-# Real API client (API base URL is configuration, not a secret)
+# 连接真实 API 运行（API 地址是公开配置，不是秘密）
 cd apps/client && bash ../../tool/flutter run \
   --dart-define=STUDYFLOW_API_BASE_URL=https://api.example.com
 ```
 
-Device acceptance matrices: `tests/device/android-originos6-matrix.md`
-(iQOO Z9 Turbo) and `tests/device/macos-matrix.md`.
+## 目录结构
 
-## 技术地图
+```
+apps/client/    Flutter 客户端（功能按 features/ 拆分）
+server/         FastAPI 后端（认证、同步、日程策略）
+infra/          Docker Compose、Caddy、Cloudflare 部署与加密备份
+packages/       共享领域包（domain 模型等）
+tests/device/   设备验收矩阵（Android / macOS）
+```
 
-| 层 | 本项目实际采用 | 负责什么 | 不负责什么 |
-|---|---|---|---|
-| 客户端 | Flutter（Dart、Riverpod、GoRouter、Drift/SQLite） | 页面、设备能力、本地安全存储（token/AI Key） | 不保存服务端密钥、不做数据库管理 |
-| API | FastAPI（Pydantic v2、SQLAlchemy Async、PyJWT、Argon2id） | 邮箱认证、JSON 同步、日程策略 | 不保存 AI Key、不执行定时 AI 任务 |
-| 数据库 | PostgreSQL 16（VPS Docker 内网，JSONB） | 用户、会话、任务、日程和同步数据 | 不存明文密码（仅 Argon2id 哈希） |
-| 反向代理 | Caddy（Docker 内网，仅发布 80/443） | HTTPS、域名转发、自动证书 | 不负责业务认证 |
-| DNS/CDN | Cloudflare（A 记录 + 可选代理） | 域名解析、边缘加速 | 不负责数据库端口转发 |
+## 文档
 
-## 部署
+- 部署与运维：`infra/README.md`
+- 工程规范（面向开发代理与协作工具）：`.agent/AGENTS.md`
+- 验收矩阵：`tests/device/android-originos6-matrix.md`、`tests/device/macos-matrix.md`
 
-完整的 Debian 12、Docker、Caddy、Cloudflare、防火墙和加密备份步骤请阅读
-`infra/README.md`。生产环境不要使用已经停止维护的 Fedora 34 镜像。
+## 许可
 
-在 VPS 的 `infra/` 目录执行 `./bootstrap-env.sh api.example.com` 自动生成
-`.env`（数据库密码、JWT 密钥、备份口令）。客户端只需要通过
-`--dart-define` 接收公开的 `STUDYFLOW_API_BASE_URL`，不需要数据库密码、
-JWT 密钥或 AI Key。
-
-## License boundaries
-
-Design and plan documents record which mature open-source projects
-(Super Productivity, ActivityWatch, Vikunja, Nextcloud Calendar) were studied
-for product models. Their code is not vendored; CalDAV interop is deferred to
-a follow-up plan.
+设计与计划文档记录了我们参考学习的成熟开源项目（Super Productivity、
+ActivityWatch、Vikunja、Nextcloud Calendar）；这些项目的代码没有被引入，
+CalDAV 互操作推迟到后续计划。

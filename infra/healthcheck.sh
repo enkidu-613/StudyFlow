@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Health check for the StudyFlow API container. Exits non-zero when the API
-# is not reachable so Docker can restart it.
+# is not reachable so the container runtime can restart it.
 set -euo pipefail
 
 url="${1:-http://127.0.0.1:8000/health/live}"

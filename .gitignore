@@ -26,3 +26,8 @@ artifacts/
 server/.venv/
 apps/client/.flutter-plugins
 apps/client/.flutter-plugins-dependencies
+
+# Tool-local state
+.reasonix/
+.wrangler/
+.agents/
