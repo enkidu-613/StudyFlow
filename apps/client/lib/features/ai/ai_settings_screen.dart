@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'ai_repository.dart';
 import 'ai_settings_model.dart';
+import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extension.dart';
 
 final class AiSettingsScreen extends StatefulWidget {
@@ -23,7 +24,9 @@ final class _AiSettingsScreenState extends State<AiSettingsScreen> {
   final _baseUrlController = TextEditingController();
   final _modelController = TextEditingController();
   final _apiKeyController = TextEditingController();
+  String _savedApiKey = '';
   bool _enabled = false;
+  AiProtocol _protocol = AiProtocol.openaiChatCompletions;
   bool _loading = true;
   bool _saving = false;
   String? _testResult;
@@ -51,10 +54,19 @@ final class _AiSettingsScreenState extends State<AiSettingsScreen> {
     setState(() {
       _baseUrlController.text = settings.baseUrl;
       _modelController.text = settings.model;
-      _apiKeyController.text = settings.apiKey;
+      // Never place the persisted credential back into the editable field.
+      // The secure store remains the source of truth when the field is empty.
+      _savedApiKey = settings.apiKey;
+      _apiKeyController.clear();
       _enabled = settings.enabled;
+      _protocol = settings.protocol;
       _loading = false;
     });
+  }
+
+  String get _effectiveApiKey {
+    final entered = _apiKeyController.text.trim();
+    return entered.isEmpty ? _savedApiKey : entered;
   }
 
   Future<void> _save() async {
@@ -66,14 +78,18 @@ final class _AiSettingsScreenState extends State<AiSettingsScreen> {
       _testResult = null;
     });
     try {
+      final apiKey = _effectiveApiKey;
       await widget.store.write(
         AiSettings(
           baseUrl: _baseUrlController.text.trim(),
           model: _modelController.text.trim(),
-          apiKey: _apiKeyController.text.trim(),
+          apiKey: apiKey,
           enabled: _enabled,
+          protocol: _protocol,
         ),
       );
+      _savedApiKey = apiKey;
+      _apiKeyController.clear();
       if (mounted) {
         setState(() {
           _testResult = context.l10n.aiSaved;
@@ -100,8 +116,9 @@ final class _AiSettingsScreenState extends State<AiSettingsScreen> {
         AiSettings(
           baseUrl: _baseUrlController.text.trim(),
           model: _modelController.text.trim(),
-          apiKey: _apiKeyController.text.trim(),
+          apiKey: _effectiveApiKey,
           enabled: _enabled,
+          protocol: _protocol,
         ),
       );
       if (mounted) {
@@ -163,7 +180,9 @@ final class _AiSettingsScreenState extends State<AiSettingsScreen> {
         _baseUrlController.clear();
         _modelController.clear();
         _apiKeyController.clear();
+        _savedApiKey = '';
         _enabled = false;
+        _protocol = AiProtocol.openaiChatCompletions;
         _testResult = context.l10n.aiCleared;
         _testFailed = false;
       });
@@ -191,9 +210,40 @@ final class _AiSettingsScreenState extends State<AiSettingsScreen> {
                     title: Text(l10n.aiEnabledTitle),
                     subtitle: Text(l10n.aiEnabledSubtitle),
                     value: _enabled,
-                    onChanged: (value) =>
-                        setState(() => _enabled = value),
+                    onChanged: (value) => setState(() => _enabled = value),
                   ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<AiProtocol>(
+                    key: const Key('ai-protocol-field'),
+                    initialValue: _protocol,
+                    decoration: InputDecoration(
+                      labelText: l10n.aiProtocolLabel,
+                      helperText: _protocolEndpointHint(l10n, _protocol),
+                      prefixIcon: const Icon(Icons.swap_horiz_outlined),
+                    ),
+                    items: <DropdownMenuItem<AiProtocol>>[
+                      DropdownMenuItem<AiProtocol>(
+                        value: AiProtocol.openaiChatCompletions,
+                        child: Text(l10n.aiProtocolChat),
+                      ),
+                      DropdownMenuItem<AiProtocol>(
+                        value: AiProtocol.openaiResponses,
+                        child: Text(l10n.aiProtocolResponses),
+                      ),
+                      DropdownMenuItem<AiProtocol>(
+                        value: AiProtocol.anthropicMessages,
+                        child: Text(l10n.aiProtocolAnthropic),
+                      ),
+                    ],
+                    onChanged: _saving
+                        ? null
+                        : (value) => setState(() {
+                              if (value != null) {
+                                _protocol = value;
+                              }
+                            }),
+                  ),
+                  const SizedBox(height: 16),
                   TextFormField(
                     key: const Key('ai-base-url-field'),
                     controller: _baseUrlController,
@@ -217,25 +267,26 @@ final class _AiSettingsScreenState extends State<AiSettingsScreen> {
                       hintText: 'gpt-4o-mini',
                       prefixIcon: const Icon(Icons.smart_toy_outlined),
                     ),
-                    validator: (value) =>
-                        value == null || value.trim().isEmpty
-                            ? l10n.aiModelRequired
-                            : null,
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? l10n.aiModelRequired
+                        : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     key: const Key('ai-api-key-field'),
                     controller: _apiKeyController,
                     enabled: !_saving,
-                    obscureText: true,
                     decoration: InputDecoration(
                       labelText: l10n.aiApiKeyLabel,
+                      hintText: _savedApiKey.isEmpty
+                          ? l10n.aiApiKeyHint
+                          : l10n.aiApiKeySavedHint,
                       prefixIcon: const Icon(Icons.key_outlined),
                     ),
-                    validator: (value) =>
-                        value == null || value.trim().isEmpty
-                            ? l10n.aiApiKeyRequired
-                            : null,
+                    validator: (value) => _savedApiKey.isEmpty &&
+                            (value == null || value.trim().isEmpty)
+                        ? l10n.aiApiKeyRequired
+                        : null,
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -300,4 +351,11 @@ final class _AiSettingsScreenState extends State<AiSettingsScreen> {
       _ => message,
     };
   }
+
+  String _protocolEndpointHint(AppLocalizations l10n, AiProtocol protocol) =>
+      switch (protocol) {
+        AiProtocol.openaiChatCompletions => l10n.aiEndpointHintChat,
+        AiProtocol.openaiResponses => l10n.aiEndpointHintResponses,
+        AiProtocol.anthropicMessages => l10n.aiEndpointHintAnthropic,
+      };
 }

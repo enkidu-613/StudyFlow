@@ -1,17 +1,40 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+/// The wire protocol used to talk to the user-configured AI provider.
+///
+/// Persisted as [AiProtocol.storageValue]. Unknown or missing stored values
+/// fall back to [AiProtocol.openaiChatCompletions] so existing installations
+/// keep working without any configuration change.
+enum AiProtocol {
+  openaiChatCompletions('openaiChatCompletions'),
+  openaiResponses('openaiResponses'),
+  anthropicMessages('anthropicMessages');
+
+  const AiProtocol(this.storageValue);
+
+  final String storageValue;
+
+  static AiProtocol fromStorage(String? value) => switch (value) {
+        'openaiResponses' => AiProtocol.openaiResponses,
+        'anthropicMessages' => AiProtocol.anthropicMessages,
+        _ => AiProtocol.openaiChatCompletions,
+      };
+}
+
 final class AiSettings {
   const AiSettings({
     required this.baseUrl,
     required this.model,
     required this.apiKey,
     required this.enabled,
+    this.protocol = AiProtocol.openaiChatCompletions,
   });
 
   final String baseUrl;
   final String model;
   final String apiKey;
   final bool enabled;
+  final AiProtocol protocol;
 
   static const AiSettings empty = AiSettings(
     baseUrl: '',
@@ -25,21 +48,22 @@ final class AiSettings {
     String? model,
     String? apiKey,
     bool? enabled,
+    AiProtocol? protocol,
   }) =>
       AiSettings(
         baseUrl: baseUrl ?? this.baseUrl,
         model: model ?? this.model,
         apiKey: apiKey ?? this.apiKey,
         enabled: enabled ?? this.enabled,
+        protocol: protocol ?? this.protocol,
       );
 
   bool get isConfigured =>
       baseUrl.isNotEmpty && model.isNotEmpty && apiKey.isNotEmpty;
 
   @override
-  String toString() =>
-      'AiSettings(baseUrl: $baseUrl, model: $model, '
-      'apiKey: <redacted>, enabled: $enabled)';
+  String toString() => 'AiSettings(baseUrl: $baseUrl, model: $model, '
+      'apiKey: <redacted>, enabled: $enabled, protocol: $protocol)';
 }
 
 abstract interface class AiSettingsStore {
@@ -69,6 +93,7 @@ final class SecureAiSettingsStore implements AiSettingsStore {
   static const _modelKey = 'studyflow.ai.model.v1';
   static const _apiKeyKey = 'studyflow.ai.api-key.v1';
   static const _enabledKey = 'studyflow.ai.enabled.v1';
+  static const _protocolKey = 'studyflow.ai.protocol.v1';
 
   final FlutterSecureStorage _storage;
 
@@ -78,11 +103,13 @@ final class SecureAiSettingsStore implements AiSettingsStore {
     final model = await _storage.read(key: _modelKey);
     final apiKey = await _storage.read(key: _apiKeyKey);
     final enabledValue = await _storage.read(key: _enabledKey);
+    final protocolValue = await _storage.read(key: _protocolKey);
     return AiSettings(
       baseUrl: baseUrl ?? '',
       model: model ?? '',
       apiKey: apiKey ?? '',
       enabled: enabledValue == 'true',
+      protocol: AiProtocol.fromStorage(protocolValue),
     );
   }
 
@@ -92,6 +119,10 @@ final class SecureAiSettingsStore implements AiSettingsStore {
     await _storage.write(key: _modelKey, value: settings.model);
     await _storage.write(key: _apiKeyKey, value: settings.apiKey);
     await _storage.write(key: _enabledKey, value: '${settings.enabled}');
+    await _storage.write(
+      key: _protocolKey,
+      value: settings.protocol.storageValue,
+    );
   }
 
   @override
@@ -100,6 +131,7 @@ final class SecureAiSettingsStore implements AiSettingsStore {
     await _storage.delete(key: _modelKey);
     await _storage.delete(key: _apiKeyKey);
     await _storage.delete(key: _enabledKey);
+    await _storage.delete(key: _protocolKey);
   }
 }
 

@@ -1,7 +1,27 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!--
+         StudyFlow is a personal schedule/focus alarm application. It declares
+         both SCHEDULE_EXACT_ALARM and USE_EXACT_ALARM:
+
+         - SCHEDULE_EXACT_ALARM gives OEM ROMs (vivo OriginOS, MIUI, ColorOS)
+           a "Alarms & reminders" toggle in the permission manager; without
+           this declaration that toggle does not exist at all on those ROMs
+           and canScheduleExactAlarms() can never become true.
+         - USE_EXACT_ALARM keeps the auto-granted path for Google Play
+           distributions where the app is categorized as an alarm app.
+
+         Android 12/13 pre-grant SCHEDULE_EXACT_ALARM by default; Android 14+
+         default to denied, so the app still guides the user to the toggle.
+    -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <application
         android:label="studyflow"
         android:name="${applicationName}"
@@ -32,6 +52,25 @@
         <receiver
             android:name="com.studyflow.app.ReminderReceiver"
             android:exported="false" />
+        <receiver
+            android:name="com.studyflow.app.ReminderBootReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
+        <service
+            android:name="com.studyflow.app.AlarmRingingService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="persistent StudyFlow alarm audio" />
+        </service>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
