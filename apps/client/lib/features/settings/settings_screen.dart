@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:studyflow/app/local_account_migration.dart';
 import 'package:studyflow/app/studyflow_workspace.dart';
 import 'package:studyflow/features/ai/ai_repository.dart';
 import 'package:studyflow/features/ai/ai_settings_model.dart';
@@ -33,16 +34,36 @@ final class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-final class _SettingsScreenState extends State<SettingsScreen> {
+final class _SettingsScreenState extends State<SettingsScreen>
+    with WidgetsBindingObserver {
   PermissionHealth? _health;
   CapabilityResult? _usageResult;
   int _pending = 0;
   Object? _error;
+  List<LocalAccountMigrationCandidate> _migrationCandidates =
+      const <LocalAccountMigrationCandidate>[];
+  bool _importingLocalData = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Exact-alarm and battery settings are opened outside the app. Refresh
+    // after returning instead of reporting the old denied state immediately.
+    if (state == AppLifecycleState.resumed) {
+      _refresh();
+    }
   }
 
   Future<void> _refresh() async {
@@ -115,29 +136,31 @@ final class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 8),
             for (final state in _health?.states ?? const <PermissionState>[])
-              Card(
-                child: ListTile(
-                  leading: Icon(
-                    state.allowed
-                        ? Icons.check_circle_outline
-                        : Icons.radio_button_unchecked,
-                  ),
-                  title: Text(l10n.permissionLabel(state.id)),
-                  subtitle: Text(
-                    l10n.permissionDetailText(
-                      state.detail,
-                      allowed: state.allowed,
+              if (!(Theme.of(context).platform == TargetPlatform.android &&
+                  state.id == PlatformPermissionId.menuBar))
+                Card(
+                  child: ListTile(
+                    leading: Icon(
+                      state.allowed
+                          ? Icons.check_circle_outline
+                          : Icons.radio_button_unchecked,
                     ),
-                  ),
-                  trailing: Text(
-                    l10n.permissionStatusText(
-                      available: state.available,
-                      allowed: state.allowed,
+                    title: Text(l10n.permissionLabel(state.id)),
+                    subtitle: Text(
+                      l10n.permissionDetailText(
+                        state.detail,
+                        allowed: state.allowed,
+                      ),
                     ),
+                    trailing: Text(
+                      l10n.permissionStatusText(
+                        available: state.available,
+                        allowed: state.allowed,
+                      ),
+                    ),
+                    onTap: () => _handlePermissionTap(state),
                   ),
-                  onTap: () => _handlePermissionTap(state),
                 ),
-              ),
             const SizedBox(height: 16),
             if (widget.onLocaleChanged != null)
               Card(
@@ -200,6 +223,29 @@ final class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 8),
             Card(
               child: ListTile(
+                key: const Key('import-local-account-data'),
+                leading: const Icon(Icons.move_down_outlined),
+                title:
+                    Text(_migrationCandidates.isEmpty ? '检查旧本地数据' : '导入旧本地数据'),
+                subtitle: Text(_migrationCandidates.isEmpty
+                    ? '检查是否有未登录时创建的任务、日程和药物记录。'
+                    : '发现 ${_migrationCandidates.length} 个旧账户空间；'
+                        '其中最多包含 ${_migrationCandidates.first.recordCount} 条记录。'),
+                trailing: _importingLocalData
+                    ? const SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.arrow_forward),
+                onTap: _importingLocalData
+                    ? null
+                    : (_migrationCandidates.isEmpty
+                        ? _checkForLocalData
+                        : _importLocalData),
+              ),
+            ),
+            Card(
+              child: ListTile(
                 key: const Key('open-ai-settings'),
                 leading: const Icon(Icons.auto_awesome_outlined),
                 title: Text(l10n.settingsAiEntry),
@@ -245,46 +291,46 @@ final class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
     if (state.allowed) {
-      await widget.workspace.platform.showUnavailablePermission(
-        state.id,
-        title: l10n.permissionLabel(state.id),
-        message: l10n.permissionDetailText(state.detail, allowed: true),
-      );
-      return;
-    }
-    final isNotification = state.id == PlatformPermissionId.notifications ||
-        state.id == PlatformPermissionId.userNotifications;
-    if (isNotification) {
-      final status = await widget.workspace.platform
-          .requestPermission(state.id);
-      await _refresh();
       if (!mounted) {
         return;
       }
-      switch (status) {
-        case 'authorized':
-          break;
-        case 'declined':
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.permissionPromptDeclined)),
-          );
-        case 'denied':
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.permissionPromptDenied)),
-          );
-        default:
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.permissionPromptFailed)),
-          );
-      }
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              '${l10n.permissionLabel(state.id)}：'
+              '${l10n.permissionDetailText(state.detail, allowed: true)}',
+            ),
+          ),
+        );
       return;
     }
-    // App-internal permissions (menu bar, focus) have no system prompt.
-    await widget.workspace.platform.showUnavailablePermission(
-      state.id,
-      title: l10n.permissionLabel(state.id),
-      message: l10n.permissionDetailText(state.detail, allowed: false),
-    );
+    final status = await widget.workspace.platform.requestPermission(state.id);
+    await _refresh();
+    if (!mounted) {
+      return;
+    }
+    switch (status) {
+      case 'authorized':
+        break;
+      case 'opened_settings':
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.permissionPromptSettingsOpened)),
+        );
+      case 'declined':
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.permissionPromptDeclined)),
+        );
+      case 'denied':
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.permissionPromptDenied)),
+        );
+      default:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.permissionPromptFailed)),
+        );
+    }
   }
 
   String _selectedLanguageTag(Locale? locale) => switch (locale?.languageCode) {
@@ -305,6 +351,70 @@ final class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) {
         setState(() => _busyLogout = false);
       }
+    }
+  }
+
+  Future<void> _importLocalData() async {
+    final candidates = _migrationCandidates;
+    if (candidates.isEmpty || _importingLocalData) return;
+    final candidate = candidates.first;
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('导入旧本地数据？'),
+        content: Text(
+          '将导入旧账户中的 ${candidate.recordCount} 条本地记录（含 ${candidate.scheduleCount} 条日程）。'
+          '原数据不会删除；当前账户已有同一记录会跳过。导入后会创建新的同步记录。',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('开始导入'),
+          ),
+        ],
+      ),
+    );
+    if (approved != true || !mounted) return;
+    setState(() => _importingLocalData = true);
+    try {
+      final result = await LocalAccountMigrationService(
+        target: widget.workspace,
+      ).importCandidate(candidate);
+      await _syncNow();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已导入 ${result.importedCount} 条记录。')),
+      );
+      await _refresh();
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = error);
+    } finally {
+      if (mounted) setState(() => _importingLocalData = false);
+    }
+  }
+
+  Future<void> _checkForLocalData() async {
+    if (_importingLocalData) return;
+    setState(() => _importingLocalData = true);
+    try {
+      final candidates = await LocalAccountMigrationService(
+        target: widget.workspace,
+      ).discover();
+      if (!mounted) return;
+      setState(() => _migrationCandidates = candidates);
+      if (candidates.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('未发现可导入的旧本地数据。')),
+        );
+      }
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = error);
+    } finally {
+      if (mounted) setState(() => _importingLocalData = false);
     }
   }
 }

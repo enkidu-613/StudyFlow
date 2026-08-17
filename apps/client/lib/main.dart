@@ -11,17 +11,25 @@ import 'package:studyflow/auth/client_session.dart';
 import 'package:studyflow/config/client_config.dart';
 import 'package:studyflow/config/locale_preference.dart';
 import 'package:studyflow/features/backups/backups_repository.dart';
+import 'package:studyflow/features/ai/ai_repository.dart';
+import 'package:studyflow/features/ai/ai_workspace_change_service.dart';
+import 'package:studyflow/features/ai/ai_coach_memory.dart';
+import 'package:studyflow/features/ai/ai_settings_model.dart';
+import 'package:studyflow/features/ai/recommendation_screen.dart';
+import 'package:studyflow/features/ai/today_ai_planning.dart';
 import 'package:studyflow/features/focus/focus_screen.dart';
 import 'package:studyflow/features/home/home_screen.dart';
+import 'package:studyflow/features/medications/medication_screen.dart';
 import 'package:studyflow/features/schedule/schedule_screen.dart';
+import 'package:studyflow/features/schedule/schedule_history_screen.dart';
 import 'package:studyflow/features/settings/settings_screen.dart';
 import 'package:studyflow/features/shell/studyflow_shell.dart';
 import 'package:studyflow/features/tasks/task_list_screen.dart';
 import 'package:studyflow/l10n/app_localizations.dart';
 import 'package:studyflow/l10n/l10n_extension.dart';
 
-const List<LocalizationsDelegate<dynamic>> _localizationsDelegates = <
-    LocalizationsDelegate<dynamic>>[
+const List<LocalizationsDelegate<dynamic>> _localizationsDelegates =
+    <LocalizationsDelegate<dynamic>>[
   AppLocalizations.delegate,
   GlobalMaterialLocalizations.delegate,
   GlobalWidgetsLocalizations.delegate,
@@ -204,6 +212,7 @@ final class _StudyFlowRootState extends State<StudyFlowRoot> {
       authContext: context,
       apiBaseUri: widget.apiBaseUri,
       authRepository: widget.authRepository,
+      onSessionExpired: _handleSessionExpired,
     );
     final previous = _session;
     _session = next;
@@ -225,6 +234,17 @@ final class _StudyFlowRootState extends State<StudyFlowRoot> {
     await widget.authRepository.logout();
     if (mounted) {
       setState(() => _initialMessageKind = null);
+    }
+  }
+
+  Future<void> _handleSessionExpired() async {
+    final previous = _session;
+    _session = null;
+    await previous?.close();
+    if (mounted) {
+      setState(
+        () => _initialMessageKind = AuthInitialMessage.sessionExpired,
+      );
     }
   }
 
@@ -325,8 +345,64 @@ class StudyFlowApp extends StatelessWidget {
                     ScheduleScreen(workspace: workspace),
               ),
               GoRoute(
+                path: '/schedule/history',
+                builder: (context, state) =>
+                    ScheduleHistoryScreen(workspace: workspace),
+              ),
+              GoRoute(
+                path: '/medications',
+                builder: (context, state) =>
+                    MedicationScreen(workspace: workspace),
+              ),
+              GoRoute(
                 path: '/focus',
                 builder: (context, state) => FocusScreen(workspace: workspace),
+              ),
+              GoRoute(
+                path: '/ai/recommendations',
+                builder: (context, state) => RecommendationScreen(
+                  accountId: workspace.accountId,
+                  memoryStore: SecureAiCoachMemoryStore(),
+                  requestReply: ({
+                    required userMessage,
+                    required history,
+                    required conversationSummary,
+                  }) async {
+                    final planner = TodayAiPlanning(
+                      repository: HttpAiRepository(),
+                      settingsStore: SecureAiSettingsStore(),
+                    );
+                    return planner.requestCoachReply(
+                      userMessage: userMessage,
+                      history: history,
+                      conversationSummary: conversationSummary,
+                      tasks: await workspace.tasks.list(),
+                      scheduleBlocks: await workspace.schedule.list(),
+                      focusSessions: await workspace.focus.list(),
+                      checkIns: await workspace.checkIns.list(),
+                      scheduleFeedback: await workspace.scheduleFeedback.list(
+                        limit: 30,
+                      ),
+                      medicationPlans: await workspace.medications.listPlans(),
+                    );
+                  },
+                  summarizeMemory: ({
+                    required existingSummary,
+                    required messages,
+                  }) {
+                    final planner = TodayAiPlanning(
+                      repository: HttpAiRepository(),
+                      settingsStore: SecureAiSettingsStore(),
+                    );
+                    return planner.summarizeCoachMemory(
+                      existingSummary: existingSummary,
+                      messages: messages,
+                    );
+                  },
+                  applyDrafts: (drafts) => AiWorkspaceChangeService(
+                    workspace: workspace,
+                  ).apply(drafts),
+                ),
               ),
               GoRoute(
                 path: '/settings',
@@ -338,8 +414,7 @@ class StudyFlowApp extends StatelessWidget {
                   locale: locale,
                   onLocaleChanged: onLocaleChanged,
                   backupsRepositoryFactory: () {
-                    final authContext =
-                        session?.authRepository?.activeContext;
+                    final authContext = session?.authRepository?.activeContext;
                     final baseUri = apiBaseUri;
                     if (authContext == null || baseUri == null) {
                       return null;

@@ -47,8 +47,7 @@ void main() {
 
   testWidgets('tapping a block opens the editor prefilled and editing works',
       (tester) async {
-    final now = DateTime.now();
-    final blockStart = DateTime(now.year, now.month, now.day, 9);
+    final blockStart = DateTime.now().add(const Duration(hours: 1));
     await seed(
       block(
         id: 'bbbbbbbb-bbbb-4bbb-8bbb-000000000001',
@@ -64,7 +63,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('schedule-block-bbbbbbbb-bbbb-4bbb-8bbb-000000000001')));
+    await tester.tap(find.byKey(
+        const Key('schedule-block-bbbbbbbb-bbbb-4bbb-8bbb-000000000001')));
     await tester.pumpAndSettle();
 
     expect(find.text('Edit block'), findsOneWidget);
@@ -79,16 +79,16 @@ void main() {
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
 
-    final stored = await workspace.schedule.get('bbbbbbbb-bbbb-4bbb-8bbb-000000000001');
+    final stored =
+        await workspace.schedule.get('bbbbbbbb-bbbb-4bbb-8bbb-000000000001');
     expect(stored?.kind, ScheduleBlockKind.rest);
   });
 
   testWidgets('swipe delete confirms and removes the block', (tester) async {
-    final now = DateTime.now();
     await seed(
       block(
         id: 'bbbbbbbb-bbbb-4bbb-8bbb-000000000002',
-        start: DateTime(now.year, now.month, now.day, 10),
+        start: DateTime.now().add(const Duration(hours: 1)),
       ),
     );
 
@@ -100,7 +100,8 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.drag(
-      find.byKey(const Key('schedule-block-bbbbbbbb-bbbb-4bbb-8bbb-000000000002')),
+      find.byKey(
+          const Key('schedule-block-bbbbbbbb-bbbb-4bbb-8bbb-000000000002')),
       const Offset(-500, 0),
     );
     await tester.pumpAndSettle();
@@ -113,16 +114,19 @@ void main() {
         .tap(find.byKey(const Key('block-delete-dialog-confirm-button')));
     await tester.pumpAndSettle();
 
-    expect(await workspace.schedule.get('bbbbbbbb-bbbb-4bbb-8bbb-000000000002'), isNull);
-    expect(find.byKey(const Key('schedule-block-bbbbbbbb-bbbb-4bbb-8bbb-000000000002')), findsNothing);
+    expect(await workspace.schedule.get('bbbbbbbb-bbbb-4bbb-8bbb-000000000002'),
+        isNull);
+    expect(
+        find.byKey(
+            const Key('schedule-block-bbbbbbbb-bbbb-4bbb-8bbb-000000000002')),
+        findsNothing);
   });
 
   testWidgets('locked block can be opened and unlocked', (tester) async {
-    final now = DateTime.now();
     await seed(
       block(
         id: 'bbbbbbbb-bbbb-4bbb-8bbb-000000000003',
-        start: DateTime(now.year, now.month, now.day, 11),
+        start: DateTime.now().add(const Duration(hours: 1)),
         isLocked: true,
       ),
     );
@@ -134,8 +138,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester
-        .tap(find.byKey(const Key('schedule-block-bbbbbbbb-bbbb-4bbb-8bbb-000000000003')));
+    await tester.tap(find.byKey(
+        const Key('schedule-block-bbbbbbbb-bbbb-4bbb-8bbb-000000000003')));
     await tester.pumpAndSettle();
 
     expect(find.text('Edit block'), findsOneWidget);
@@ -144,18 +148,18 @@ void main() {
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
 
-    final stored = await workspace.schedule
-        .get('bbbbbbbb-bbbb-4bbb-8bbb-000000000003');
+    final stored =
+        await workspace.schedule.get('bbbbbbbb-bbbb-4bbb-8bbb-000000000003');
     expect(stored?.isLocked, isFalse);
   });
 
   testWidgets('blocks are grouped by day in time order', (tester) async {
-    final now = DateTime.now();
-    final tomorrow = now.add(const Duration(days: 1));
+    final today = DateTime.now().add(const Duration(hours: 1));
+    final tomorrow = today.add(const Duration(days: 1));
     await seed(
       block(
         id: 'bbbbbbbb-bbbb-4bbb-8bbb-000000000004',
-        start: DateTime(now.year, now.month, now.day, 15),
+        start: today,
       ),
     );
     await seed(

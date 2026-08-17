@@ -10,6 +10,22 @@ export FLUTTER_SUPPRESS_ANALYTICS=true
 export DART_SUPPRESS_ANALYTICS=true
 export PUB_CACHE="${PUB_CACHE:-$cache_root/pub-cache}"
 
+# Android Gradle's JDK image transform is not reliable with GraalVM on macOS.
+# Prefer the standard Homebrew OpenJDK for Flutter builds, while allowing an
+# explicit project-level override when another JDK is required.
+if [[ -n "${STUDYFLOW_JAVA_HOME:-}" ]]; then
+  export JAVA_HOME="$STUDYFLOW_JAVA_HOME"
+elif [[ "$(uname -s)" == "Darwin" ]]; then
+  for java_candidate in \
+    "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home" \
+    "/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home"; do
+    if [[ -x "$java_candidate/bin/java" ]]; then
+      export JAVA_HOME="$java_candidate"
+      break
+    fi
+  done
+fi
+
 flutter_bin=""
 if [[ -n "${STUDYFLOW_FLUTTER_ROOT:-}" ]]; then
   flutter_bin="$STUDYFLOW_FLUTTER_ROOT/bin/flutter"

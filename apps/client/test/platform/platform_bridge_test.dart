@@ -57,6 +57,7 @@ void main() {
         at: DateTime.utc(2026, 8, 11, 10),
       ),
       bridge.startFocusSession(title: 'Algebra'),
+      bridge.cancelFocusSessionNotification(),
       bridge.getUsageSummary(),
       bridge.applyRestriction(rule()),
       bridge.clearRestriction(rule()),
@@ -102,6 +103,21 @@ void main() {
     expect(platform.methods, <String>['startFocusSession']);
   });
 
+  test('focus notification can be cancelled independently', () async {
+    final platform = FakePlatform(<String, Object?>{
+      'cancelFocusSessionNotification': <String, Object?>{
+        'kind': 'supported',
+        'message': 'Focus notification cancelled.',
+      },
+    });
+    final bridge = PlatformBridge(channel: platform);
+
+    final result = await bridge.cancelFocusSessionNotification();
+
+    expect(result.kind, CapabilityResultKind.supported);
+    expect(platform.methods, <String>['cancelFocusSessionNotification']);
+  });
+
   test('permission health is unavailable when the channel is missing',
       () async {
     final bridge = PlatformBridge(channel: UnsupportedPlatform());
@@ -116,8 +132,7 @@ void main() {
     );
   });
 
-  test('permission health parses native states without extra fields',
-      () async {
+  test('permission health parses native states without extra fields', () async {
     final bridge = PlatformBridge(
       channel: FakePlatform(<String, Object?>{
         'getPermissionStatus': <Object?>[
@@ -139,7 +154,8 @@ void main() {
 
     final health = await bridge.getPermissionStatus();
 
-    expect(health.stateFor(PlatformPermissionId.notifications)?.allowed, isTrue);
+    expect(
+        health.stateFor(PlatformPermissionId.notifications)?.allowed, isTrue);
     expect(
       health.stateFor(PlatformPermissionId.usageAccess)?.available,
       isFalse,
@@ -156,8 +172,8 @@ void main() {
     });
     final bridge = PlatformBridge(channel: platform);
 
-    final status = await bridge
-        .requestPermission(PlatformPermissionId.notifications);
+    final status =
+        await bridge.requestPermission(PlatformPermissionId.notifications);
 
     expect(status, 'authorized');
     expect(platform.methods, <String>['requestPermission']);
@@ -173,18 +189,34 @@ void main() {
     });
     final bridge = PlatformBridge(channel: platform);
 
-    final status = await bridge
-        .requestPermission(PlatformPermissionId.notifications);
+    final status =
+        await bridge.requestPermission(PlatformPermissionId.notifications);
 
     expect(status, 'declined');
   });
 
-  test('requestPermission returns null when the channel is missing',
-      () async {
+  test('requestPermission preserves the opened settings status', () async {
+    final bridge = PlatformBridge(
+      channel: FakePlatform(<String, Object?>{
+        'requestPermission': <String, Object?>{
+          'granted': false,
+          'status': 'opened_settings',
+        },
+      }),
+    );
+
+    final status = await bridge.requestPermission(
+      PlatformPermissionId.exactAlarm,
+    );
+
+    expect(status, 'opened_settings');
+  });
+
+  test('requestPermission returns null when the channel is missing', () async {
     final bridge = PlatformBridge(channel: UnsupportedPlatform());
 
-    final status = await bridge
-        .requestPermission(PlatformPermissionId.notifications);
+    final status =
+        await bridge.requestPermission(PlatformPermissionId.notifications);
 
     expect(status, isNull);
   });
@@ -199,8 +231,8 @@ void main() {
     });
     final bridge = PlatformBridge(channel: platform);
 
-    final status = await bridge
-        .requestPermission(PlatformPermissionId.notifications);
+    final status =
+        await bridge.requestPermission(PlatformPermissionId.notifications);
 
     expect(status, 'denied');
   });

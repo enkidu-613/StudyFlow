@@ -150,16 +150,24 @@ final class CheckInDialog extends StatefulWidget {
 }
 
 final class _CheckInDialogState extends State<CheckInDialog> {
-  final _sleepController = TextEditingController(text: '420');
   final _feedbackController = TextEditingController();
   double _sleepQuality = 3;
   double _energy = 3;
   double _mood = 3;
   String? _error;
+  late TimeOfDay _sleepStart;
+  late TimeOfDay _sleepEnd;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = TimeOfDay.now();
+    _sleepEnd = now;
+    _sleepStart = TimeOfDay(hour: (now.hour + 16) % 24, minute: now.minute);
+  }
 
   @override
   void dispose() {
-    _sleepController.dispose();
     _feedbackController.dispose();
     super.dispose();
   }
@@ -167,21 +175,27 @@ final class _CheckInDialogState extends State<CheckInDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final duration = _sleepDuration();
     return AlertDialog(
       title: Text(l10n.checkInNew),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            TextField(
-              key: const Key('check-in-sleep-field'),
-              controller: _sleepController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: l10n.checkInSleepMinutes,
-                suffixText: l10n.minutesSuffix,
-              ),
+            ListTile(
+              key: const Key('check-in-sleep-start'),
+              title: const Text('入睡时间'),
+              trailing: Text(_sleepStart.format(context)),
+              onTap: () => _pickTime(start: true),
             ),
+            ListTile(
+              key: const Key('check-in-sleep-end'),
+              title: const Text('起床时间'),
+              trailing: Text(_sleepEnd.format(context)),
+              onTap: () => _pickTime(start: false),
+            ),
+            Text(
+                '自动计算：${duration.inHours} 小时 ${duration.inMinutes.remainder(60)} 分钟'),
             _RatingSlider(
               label: l10n.checkInSleepQuality,
               value: _sleepQuality,
@@ -222,22 +236,49 @@ final class _CheckInDialogState extends State<CheckInDialog> {
   }
 
   Future<void> _save() async {
-    final sleepMinutes = int.tryParse(_sleepController.text.trim());
-    if (sleepMinutes == null || sleepMinutes < 0) {
-      setState(() => _error = context.l10n.checkInSleepInvalid);
-      return;
-    }
+    final now = DateTime.now();
+    final start = DateTime(
+        now.year, now.month, now.day, _sleepStart.hour, _sleepStart.minute);
+    var end = DateTime(
+        now.year, now.month, now.day, _sleepEnd.hour, _sleepEnd.minute);
+    if (!end.isAfter(start)) end = end.add(const Duration(days: 1));
+    final duration = end.difference(start);
     Navigator.of(context).pop(
       CheckIn(
         id: newUuidV4(),
         recordedAt: DateTime.now(),
-        sleepMinutes: sleepMinutes,
+        sleepMinutes: duration.inMinutes,
         sleepQuality: _sleepQuality.round(),
         energy: _energy.round(),
         mood: _mood.round(),
         feedback: _feedbackController.text.trim(),
+        sleepStartedAt: start,
+        sleepEndedAt: end,
       ),
     );
+  }
+
+  Duration _sleepDuration() {
+    final start = _sleepStart.hour * 60 + _sleepStart.minute;
+    var end = _sleepEnd.hour * 60 + _sleepEnd.minute;
+    if (end <= start) end += 24 * 60;
+    return Duration(minutes: end - start);
+  }
+
+  Future<void> _pickTime({required bool start}) async {
+    final selected = await showTimePicker(
+      context: context,
+      initialTime: start ? _sleepStart : _sleepEnd,
+    );
+    if (selected != null && mounted) {
+      setState(() {
+        if (start) {
+          _sleepStart = selected;
+        } else {
+          _sleepEnd = selected;
+        }
+      });
+    }
   }
 }
 

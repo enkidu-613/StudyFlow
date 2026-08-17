@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:studyflow/app/studyflow_workspace.dart';
+import 'package:studyflow/features/checkins/check_in_screen.dart';
 import 'package:studyflow/l10n/l10n_extension.dart';
 import 'package:studyflow/util/uuid.dart';
 import 'package:studyflow_domain/domain.dart';
@@ -71,7 +72,7 @@ final class _HomeScreenState extends State<HomeScreen> {
   Future<void> _openCheckIn() async {
     final saved = await showDialog<CheckIn>(
       context: context,
-      builder: (context) => const _CheckInDialog(),
+      builder: (context) => const CheckInDialog(),
     );
     if (saved == null) {
       return;
@@ -147,6 +148,17 @@ final class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ],
+            const SizedBox(height: 8),
+            Card(
+              child: ListTile(
+                key: const Key('today-ai-plan-button'),
+                leading: const Icon(Icons.auto_awesome_outlined),
+                title: Text(l10n.aiRecommendTitle),
+                subtitle: Text(l10n.aiEnabledSubtitle),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/ai/recommendations'),
+              ),
+            ),
           ],
         ),
       ),

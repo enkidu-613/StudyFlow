@@ -5,7 +5,10 @@ import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:studyflow/auth/auth_repository.dart';
 import 'package:studyflow/features/checkins/check_in_repository.dart';
 import 'package:studyflow/features/focus/focus_repository.dart';
+import 'package:studyflow/features/medications/medication_repository.dart';
 import 'package:studyflow/features/schedule/schedule_alarm_service.dart';
+import 'package:studyflow/features/schedule/schedule_completion_service.dart';
+import 'package:studyflow/features/schedule/schedule_feedback_repository.dart';
 import 'package:studyflow/features/schedule/schedule_repository.dart';
 import 'package:studyflow/features/tasks/task_repository.dart';
 import 'package:studyflow/platform/platform_bridge.dart';
@@ -18,9 +21,12 @@ final class StudyFlowWorkspace {
     required this.store,
     required this.tasks,
     required this.schedule,
+    required this.scheduleFeedback,
     required this.focus,
+    required this.medications,
     required this.checkIns,
     required this.platform,
+    required this.completion,
   }) : _logicalClock = DateTime.now().toUtc().microsecondsSinceEpoch;
 
   static const String _localAccountId = '00000000-0000-4000-8000-000000000000';
@@ -29,9 +35,12 @@ final class StudyFlowWorkspace {
   final AccountScopedStore store;
   final TaskRepository tasks;
   final ScheduleRepository schedule;
+  final ScheduleFeedbackRepository scheduleFeedback;
   final FocusRepository focus;
+  final MedicationRepository medications;
   final CheckInRepository checkIns;
   final PlatformBridge platform;
+  final ScheduleCompletionService completion;
   late final ScheduleAlarmService alarms;
   int _logicalClock;
 
@@ -50,7 +59,7 @@ final class StudyFlowWorkspace {
 
   Future<void> close() {
     alarms.dispose();
-    return store.close();
+    return completion.dispose().whenComplete(store.close);
   }
 
   static Future<StudyFlowWorkspace> openLocalShell() async {
@@ -105,9 +114,12 @@ final class StudyFlowWorkspace {
       store: store,
       tasks: TaskRepository(store: store),
       schedule: ScheduleRepository(store: store),
+      scheduleFeedback: ScheduleFeedbackRepository(store: store),
       focus: FocusRepository(store: store),
+      medications: MedicationRepository(store: store),
       checkIns: CheckInRepository(store: store),
       platform: platform ?? PlatformBridge(),
+      completion: ScheduleCompletionService(),
     );
     workspace.alarms = ScheduleAlarmService(
       workspace: workspace,

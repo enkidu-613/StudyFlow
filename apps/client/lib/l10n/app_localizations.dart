@@ -932,6 +932,12 @@ abstract class AppLocalizations {
   /// **'通知权限未开启，可稍后到系统设置中开启'**
   String get permissionPromptDeclined;
 
+  /// No description provided for @permissionPromptSettingsOpened.
+  ///
+  /// In zh, this message translates to:
+  /// **'已打开系统设置，请在那里允许 StudyFlow 相关权限'**
+  String get permissionPromptSettingsOpened;
+
   /// No description provided for @permissionPromptDenied.
   ///
   /// In zh, this message translates to:
@@ -947,13 +953,13 @@ abstract class AppLocalizations {
   /// No description provided for @permissionUnavailableTitle.
   ///
   /// In zh, this message translates to:
-  /// **'该权限在 macOS 上不可用'**
+  /// **'当前设备无法直接申请此权限'**
   String get permissionUnavailableTitle;
 
   /// No description provided for @permissionUnavailableMessage.
   ///
   /// In zh, this message translates to:
-  /// **'{permission} 是移动平台专属权限，macOS 上不需要授权。'**
+  /// **'{permission} 需要在系统设置中手动配置，StudyFlow 无法直接弹出授权窗口。'**
   String permissionUnavailableMessage(Object permission);
 
   /// No description provided for @settingsAiEntry.
@@ -1292,6 +1298,48 @@ abstract class AppLocalizations {
   /// **'API Key 只保存在本机安全存储，不会上传。'**
   String get aiEnabledSubtitle;
 
+  /// No description provided for @aiProtocolLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'接口协议'**
+  String get aiProtocolLabel;
+
+  /// No description provided for @aiProtocolChat.
+  ///
+  /// In zh, this message translates to:
+  /// **'OpenAI Chat Completions'**
+  String get aiProtocolChat;
+
+  /// No description provided for @aiProtocolResponses.
+  ///
+  /// In zh, this message translates to:
+  /// **'OpenAI Responses'**
+  String get aiProtocolResponses;
+
+  /// No description provided for @aiProtocolAnthropic.
+  ///
+  /// In zh, this message translates to:
+  /// **'Anthropic Messages'**
+  String get aiProtocolAnthropic;
+
+  /// No description provided for @aiEndpointHintChat.
+  ///
+  /// In zh, this message translates to:
+  /// **'Base URL 示例：https://provider.example/v1 → 请求 .../chat/completions'**
+  String get aiEndpointHintChat;
+
+  /// No description provided for @aiEndpointHintResponses.
+  ///
+  /// In zh, this message translates to:
+  /// **'Base URL 示例：https://provider.example/v1 → 请求 .../responses'**
+  String get aiEndpointHintResponses;
+
+  /// No description provided for @aiEndpointHintAnthropic.
+  ///
+  /// In zh, this message translates to:
+  /// **'Base URL 示例：https://api.anthropic.com（已含 /v1 时不再重复追加）'**
+  String get aiEndpointHintAnthropic;
+
   /// No description provided for @aiBaseUrlLabel.
   ///
   /// In zh, this message translates to:
@@ -1309,6 +1357,18 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'API Key'**
   String get aiApiKeyLabel;
+
+  /// No description provided for @aiApiKeyHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'请输入 API Key'**
+  String get aiApiKeyHint;
+
+  /// No description provided for @aiApiKeySavedHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'已保存，不显示；留空保持不变'**
+  String get aiApiKeySavedHint;
 
   /// No description provided for @aiBaseUrlRequired.
   ///

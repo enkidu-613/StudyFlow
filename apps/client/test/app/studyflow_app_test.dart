@@ -1,9 +1,9 @@
-
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studyflow/app/studyflow_workspace.dart';
+import 'package:studyflow/features/ai/recommendation_screen.dart';
 import 'package:studyflow/features/tasks/task_editor_screen.dart';
 import 'package:studyflow/main.dart';
 import 'package:studyflow_domain/domain.dart';
@@ -41,8 +41,40 @@ void main() {
     }
   });
 
-  testWidgets('task creation is saved to the local store',
-      (tester) async {
+  testWidgets('wide window uses desktop navigation', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(StudyFlowApp(workspace: workspace));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
+    expect(find.text('Today'), findsWidgets);
+    expect(find.text('Settings'), findsWidgets);
+  });
+
+  testWidgets('narrow window keeps mobile navigation', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(600, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(StudyFlowApp(workspace: workspace));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(NavigationRail), findsNothing);
+  });
+
+  testWidgets('Today opens the AI coach chat', (tester) async {
+    await tester.pumpWidget(StudyFlowApp(workspace: workspace));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('today-ai-plan-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(RecommendationScreen), findsOneWidget);
+    expect(find.byKey(const Key('ai-coach-input')), findsOneWidget);
+  });
+
+  testWidgets('task creation is saved to the local store', (tester) async {
     await tester.pumpWidget(StudyFlowApp(workspace: workspace));
     await tester.pumpAndSettle();
 
@@ -156,6 +188,67 @@ void main() {
 
     expect(find.text('Up to date'), findsWidgets);
     expect(find.text('Permissions'), findsOneWidget);
+  });
+
+  testWidgets('editing a medication plan preserves its identity',
+      (tester) async {
+    final plan = MedicationPlan(
+      id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      name: '测试药',
+      strength: '10 mg',
+      dose: '1 片',
+      frequency: MedicationFrequency.daily,
+      reminderTimes: const <MedicationTime>[MedicationTime(hour: 9, minute: 0)],
+      startDate: DateTime.utc(2026, 8, 17),
+      enabled: true,
+      createdAt: DateTime.utc(2026, 8, 17),
+      updatedAt: DateTime.utc(2026, 8, 17),
+    );
+    await tester.runAsync(() async {
+      await workspace.medications.savePlan(
+        plan,
+        write: await workspace.nextWrite(),
+      );
+    });
+    await tester.pumpWidget(StudyFlowApp(workspace: workspace));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('药物'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('测试药'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('编辑药物计划'), findsOneWidget);
+    await tester.enterText(find.byType(TextFormField).at(2), '2 片');
+    await tester.tap(find.text('保存修改'));
+    await tester.pumpAndSettle();
+
+    final plans = await tester.runAsync(workspace.medications.listPlans);
+    expect(plans, hasLength(1));
+    expect(plans!.single.id, plan.id);
+    expect(plans.single.dose, '2 片');
+  });
+
+  testWidgets('medication plan saves a two-day interval', (tester) async {
+    await tester.pumpWidget(StudyFlowApp(workspace: workspace));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('药物'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(FloatingActionButton));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextFormField).at(0), '隔天药');
+    await tester.enterText(find.byType(TextFormField).at(1), '10 mg');
+    await tester.enterText(find.byType(TextFormField).at(2), '1 片');
+    await tester.enterText(
+        find.byKey(const Key('medication-interval-field')), '2');
+    await tester.tap(find.text('确认并创建提醒'));
+    await tester.pumpAndSettle();
+
+    final plan =
+        (await tester.runAsync(workspace.medications.listPlans))!.single;
+    expect(plan.frequency, MedicationFrequency.everyNDays);
+    expect(plan.intervalDays, 2);
   });
 }
 

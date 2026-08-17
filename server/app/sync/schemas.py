@@ -6,7 +6,15 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
-EntityType = Literal["task", "schedule_block", "focus_session", "check_in"]
+EntityType = Literal[
+    "task",
+    "schedule_block",
+    "focus_session",
+    "check_in",
+    "schedule_feedback",
+    "medication_plan",
+    "medication_dose_record",
+]
 MAX_PAYLOAD_BYTES = 256 * 1024
 
 
@@ -51,6 +59,13 @@ class SyncOperationV2(BaseModel):
             raise ValueError("payload must be a JSON object")
         return value
 
+    @field_validator("payload")
+    @classmethod
+    def reject_raw_medical_orders(cls, value: dict[str, object]) -> dict[str, object]:
+        if _contains_raw_medical_order(value):
+            raise ValueError("raw medical orders must never be synchronized")
+        return value
+
     @model_validator(mode="after")
     def validate_payload_nonempty(self) -> SyncOperationV2:
         if not self.payload and self.is_tombstone is not True:
@@ -65,6 +80,17 @@ def _validate_uuid(value: object, field_name: str) -> UUID:
         return UUID(value)
     except ValueError as exc:
         raise ValueError(f"{field_name} must be a valid UUID") from exc
+
+
+def _contains_raw_medical_order(value: object) -> bool:
+    if isinstance(value, dict):
+        return any(
+            key == "rawMedicalOrder" or _contains_raw_medical_order(item)
+            for key, item in value.items()
+        )
+    if isinstance(value, list):
+        return any(_contains_raw_medical_order(item) for item in value)
+    return False
 
 
 class SyncPushRequest(BaseModel):

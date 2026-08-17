@@ -506,6 +506,33 @@ void main() {
     );
   });
 
+  test('authentication failure refreshes credentials and retries once',
+      () async {
+    final api = RefreshingAuthenticationSyncApi();
+    var refreshCalls = 0;
+    final fixture = await testEngine(
+      api: api,
+      refreshAuthContext: () async {
+        refreshCalls += 1;
+        return testAuthContext(accessToken: 'refreshed-access-token');
+      },
+    );
+
+    final result = await fixture.engine.runOnce();
+
+    expect(result.outcome, SyncRunOutcome.succeeded);
+    expect(refreshCalls, 1);
+    expect(
+      api.accessTokens,
+      <String>[
+        'access-token',
+        'refreshed-access-token',
+        'refreshed-access-token',
+      ],
+    );
+    expect(await fixture.engine.pendingCount(), 0);
+  });
+
   test('schema failure retains the pending queue', () async {
     await expectFailureRetainsQueue(
       const SyncSchemaFailure('invalid'),
@@ -513,8 +540,7 @@ void main() {
     );
   });
 
-  test('malformed pulled payload rolls back record apply and cursor',
-      () async {
+  test('malformed pulled payload rolls back record apply and cursor', () async {
     final api = ScriptedSyncApi();
     final fixture = await testEngine(api: api, seedPendingTask: false);
     api
@@ -585,17 +611,35 @@ void main() {
   });
 
   test('cursor state is isolated between account stores', () async {
-    final accountAStore = await openAccountStore(_accountId);
+    final directory =
+        await Directory.systemTemp.createTemp('studyflow-account-scope-');
+    addTearDown(() => directory.delete(recursive: true));
+    final accountAStore = await AccountScopedStore.openForTesting(
+      activeAccountId: _accountId,
+      baseDirectory: directory,
+    );
     const accountB = '23232323-2323-4323-8323-232323232323';
-    final accountBStore = await openAccountStore(accountB);
 
     await accountAStore.operations.commitCursor(11);
     expect(await accountAStore.operations.lastCommittedCursor(), 11);
+    await accountAStore.close();
+
+    final accountBStore = await AccountScopedStore.openForTesting(
+      activeAccountId: accountB,
+      baseDirectory: directory,
+    );
     expect(await accountBStore.operations.lastCommittedCursor(), 0);
 
     await accountBStore.operations.commitCursor(22);
     expect(await accountBStore.operations.lastCommittedCursor(), 22);
-    expect(await accountAStore.operations.lastCommittedCursor(), 11);
+    await accountBStore.close();
+
+    final reopenedAccountAStore = await AccountScopedStore.openForTesting(
+      activeAccountId: _accountId,
+      baseDirectory: directory,
+    );
+    expect(await reopenedAccountAStore.operations.lastCommittedCursor(), 11);
+    await reopenedAccountAStore.close();
   });
 
   test('captured pushed payload is plaintext JSON', () async {
@@ -612,8 +656,7 @@ void main() {
     expect(jsonEncode(captured['payload']), contains('Chapter 1'));
   });
 
-  test('sync logging exposes metadata only, never record payloads',
-      () async {
+  test('sync logging exposes metadata only, never record payloads', () async {
     final logger = CapturingSyncLogger();
     final fixture = await testEngine(
       api: ScriptedSyncApi(),
@@ -857,6 +900,7 @@ Future<TestEngineFixture> testEngine({
   required SyncApi api,
   bool seedPendingTask = true,
   SyncLogger? logger,
+  Future<AuthContext> Function()? refreshAuthContext,
 }) async {
   final temporaryDirectory =
       await Directory.systemTemp.createTemp('studyflow-sync-engine-');
@@ -885,6 +929,7 @@ Future<TestEngineFixture> testEngine({
     authContext: testAuthContext(),
     store: store,
     logger: logger,
+    refreshAuthContext: refreshAuthContext,
   );
   addTearDown(engine.dispose);
   return TestEngineFixture(
@@ -908,13 +953,44 @@ Future<AccountScopedStore> openAccountStore(String accountId) async {
   return store;
 }
 
-AuthContext testAuthContext() => AuthContext(
+AuthContext testAuthContext({String accessToken = 'access-token'}) =>
+    AuthContext(
       userId: _accountId,
       email: 'user@example.com',
-      accessToken: 'access-token',
+      accessToken: accessToken,
       refreshToken: 'refresh-token',
       expiresIn: 900,
     );
+
+final class RefreshingAuthenticationSyncApi implements SyncApi {
+  final List<String> accessTokens = <String>[];
+
+  @override
+  Future<SyncPushResult> push({
+    required AuthContext authContext,
+    required List<SyncOperationV2> operations,
+  }) async {
+    accessTokens.add(authContext.accessToken);
+    if (authContext.accessToken == 'access-token') {
+      throw const SyncAuthenticationFailure('expired');
+    }
+    return SyncPushResult(
+      accepted: operations.map((operation) => operation.operationId),
+      duplicates: const <String>[],
+      rejected: const <String>[],
+    );
+  }
+
+  @override
+  Future<SyncPullResult> pull({
+    required AuthContext authContext,
+    required int after,
+    int limit = 50,
+  }) async {
+    accessTokens.add(authContext.accessToken);
+    return SyncPullResult(nextCursor: after, operations: const []);
+  }
+}
 
 Task testTask({
   String id = _taskId,

@@ -456,6 +456,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Notifications are not enabled. You can allow them in System Settings later.';
 
   @override
+  String get permissionPromptSettingsOpened =>
+      'System settings opened. Allow the StudyFlow permission there.';
+
+  @override
   String get permissionPromptDenied =>
       'System Settings opened. Allow notifications for StudyFlow there.';
 
@@ -464,11 +468,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'Permission request failed. Try again later.';
 
   @override
-  String get permissionUnavailableTitle => 'Not available on macOS';
+  String get permissionUnavailableTitle =>
+      'This permission cannot be requested here';
 
   @override
   String permissionUnavailableMessage(Object permission) {
-    return '$permission is a mobile-only permission and needs no authorization on macOS.';
+    return '$permission must be configured in system settings. StudyFlow cannot open a direct authorization prompt for it.';
   }
 
   @override
@@ -669,6 +674,30 @@ class AppLocalizationsEn extends AppLocalizations {
       'API key stays in the device secure storage and is never uploaded.';
 
   @override
+  String get aiProtocolLabel => 'API protocol';
+
+  @override
+  String get aiProtocolChat => 'OpenAI Chat Completions';
+
+  @override
+  String get aiProtocolResponses => 'OpenAI Responses';
+
+  @override
+  String get aiProtocolAnthropic => 'Anthropic Messages';
+
+  @override
+  String get aiEndpointHintChat =>
+      'Base URL example: https://provider.example/v1 → requests .../chat/completions';
+
+  @override
+  String get aiEndpointHintResponses =>
+      'Base URL example: https://provider.example/v1 → requests .../responses';
+
+  @override
+  String get aiEndpointHintAnthropic =>
+      'Base URL example: https://api.anthropic.com (do not append /v1 again if present)';
+
+  @override
   String get aiBaseUrlLabel => 'Base URL';
 
   @override
@@ -676,6 +705,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiApiKeyLabel => 'API Key';
+
+  @override
+  String get aiApiKeyHint => 'Enter API Key';
+
+  @override
+  String get aiApiKeySavedHint => 'Saved and hidden; leave blank to keep it';
 
   @override
   String get aiBaseUrlRequired => 'Base URL is required';

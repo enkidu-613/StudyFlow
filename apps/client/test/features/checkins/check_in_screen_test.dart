@@ -45,10 +45,8 @@ void main() {
     await tester.tap(find.byType(FloatingActionButton));
     await tester.pumpAndSettle();
 
-    await tester.enterText(
-      find.byKey(const Key('check-in-sleep-field')),
-      '450',
-    );
+    expect(find.byKey(const Key('check-in-sleep-start')), findsOneWidget);
+    expect(find.byKey(const Key('check-in-sleep-end')), findsOneWidget);
     await tester.enterText(
       find.byKey(const Key('check-in-feedback-field')),
       'Slept well',
@@ -63,33 +61,26 @@ void main() {
     }
     await tester.pumpAndSettle();
 
-    expect(find.text('睡眠 450 分钟 · 精力 3'), findsOneWidget);
+    expect(find.textContaining('睡眠 '), findsOneWidget);
     expect(find.text('Slept well'), findsNothing);
 
     final saved = await tester.runAsync(workspace.checkIns.list);
     expect(saved, hasLength(1));
-    expect(saved!.single.sleepMinutes, 450);
+    expect(saved!.single.sleepMinutes, greaterThan(0));
+    expect(saved.single.sleepStartedAt, isNotNull);
+    expect(saved.single.sleepEndedAt, isNotNull);
     expect(saved.single.feedback, 'Slept well');
   });
 
-  testWidgets('invalid sleep minutes shows an inline error', (tester) async {
+  testWidgets('shows an automatically calculated sleep duration',
+      (tester) async {
     await pumpScreen(tester);
 
     await tester.tap(find.byType(FloatingActionButton));
     await tester.pumpAndSettle();
 
-    await tester.enterText(
-      find.byKey(const Key('check-in-sleep-field')),
-      'abc',
-    );
-    await tester.tap(find.byKey(const Key('save-check-in-button')));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.text('睡眠时长必须是非负数字'),
-      findsOneWidget,
-    );
-    expect(await tester.runAsync(workspace.pendingCount), 0);
+    expect(find.textContaining('自动计算：'), findsOneWidget);
+    expect(find.textContaining('小时'), findsOneWidget);
   });
 
   testWidgets('cancelling the dialog saves nothing', (tester) async {

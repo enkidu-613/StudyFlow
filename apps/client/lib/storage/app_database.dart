@@ -17,6 +17,9 @@ part 'tables.dart';
     _ScheduleBlocks,
     _FocusSessions,
     _CheckIns,
+    _ScheduleFeedbacks,
+    _MedicationPlans,
+    _MedicationDoseRecords,
     _PendingOperations,
   ],
 )
@@ -56,11 +59,20 @@ class _AccountDatabase extends _$_AccountDatabase {
   final String activeAccountId;
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (Migrator migrator) => migrator.createAll(),
+        onUpgrade: (Migrator migrator, int from, int to) async {
+          if (from < 2) {
+            await migrator.createTable(scheduleFeedbacks);
+          }
+          if (from < 3) {
+            await migrator.createTable(medicationPlans);
+            await migrator.createTable(medicationDoseRecords);
+          }
+        },
       );
 }
 
@@ -137,7 +149,10 @@ enum EntityType {
   task('task', 'tasks'),
   scheduleBlock('schedule_block', 'schedule_blocks'),
   focusSession('focus_session', 'focus_sessions'),
-  checkIn('check_in', 'check_ins');
+  checkIn('check_in', 'check_ins'),
+  scheduleFeedback('schedule_feedback', 'schedule_feedbacks'),
+  medicationPlan('medication_plan', 'medication_plans'),
+  medicationDoseRecord('medication_dose_record', 'medication_dose_records');
 
   const EntityType(this.wireName, this.tableName);
 

@@ -9,7 +9,11 @@ import 'package:studyflow_domain/domain.dart';
 import '../../helpers/l10n_test_app.dart';
 
 final class _FakePlatformMethodChannel implements PlatformMethodChannel {
+  bool scheduleSupported = true;
   final List<Map<String, Object?>> alarmCalls = <Map<String, Object?>>[];
+  final List<Map<String, Object?>> scheduledCalls = <Map<String, Object?>>[];
+  final List<Map<String, Object?>> cancelledCalls = <Map<String, Object?>>[];
+  int cancelledFocusSessionNotifications = 0;
 
   @override
   Future<Object?> invokeMethod(String method, [Object? arguments]) async {
@@ -19,7 +23,26 @@ final class _FakePlatformMethodChannel implements PlatformMethodChannel {
       );
       return <String, Object?>{'kind': 'supported', 'message': 'ok'};
     }
+    if (method == 'scheduleReminder') {
+      scheduledCalls.add(
+        (arguments as Map<Object?, Object?>).cast<String, Object?>(),
+      );
+      return <String, Object?>{
+        'kind': scheduleSupported ? 'supported' : 'unsupported',
+        'message': 'ok',
+      };
+    }
+    if (method == 'cancelReminder') {
+      cancelledCalls.add(
+        (arguments as Map<Object?, Object?>).cast<String, Object?>(),
+      );
+      return <String, Object?>{'kind': 'supported', 'message': 'ok'};
+    }
     if (method == 'startFocusSession') {
+      return <String, Object?>{'kind': 'supported', 'message': 'ok'};
+    }
+    if (method == 'cancelFocusSessionNotification') {
+      cancelledFocusSessionNotifications += 1;
       return <String, Object?>{'kind': 'supported', 'message': 'ok'};
     }
     throw UnimplementedError('unexpected method: $method');
@@ -76,6 +99,9 @@ void main() {
 
     await tester.tap(find.text('Start'));
     await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(Duration.zero);
+    });
     fakeNow = fakeNow.add(const Duration(seconds: 61));
     await tester.pump(const Duration(seconds: 1));
 
@@ -85,8 +111,13 @@ void main() {
     final sessions = await tester.runAsync(workspace.focus.list);
     expect(sessions, hasLength(1));
     expect(sessions!.single.completionMethod, FocusCompletionMethod.timer);
-    expect(channel.alarmCalls, hasLength(1));
-    expect(channel.alarmCalls.single['title'], 'One Minute focus complete');
+    expect(channel.alarmCalls, isEmpty);
+    expect(channel.scheduledCalls, hasLength(1));
+    expect(channel.scheduledCalls.single['id'], startsWith('focus:'));
+    // A native reminder must remain armed at the focus end so the persistent
+    // notification/service can ring until the user acknowledges it.
+    expect(channel.cancelledCalls, isEmpty);
+    expect(channel.cancelledFocusSessionNotifications, 1);
   });
 
   testWidgets('focus shows countdown to the task duration', (tester) async {
@@ -116,5 +147,30 @@ void main() {
     fakeNow = fakeNow.add(const Duration(seconds: 61));
     await tester.pump(const Duration(seconds: 1));
     expect(find.text('Time remaining'), findsNothing);
+  });
+
+  testWidgets('unsupported native reminder falls back to one alarm',
+      (tester) async {
+    channel.scheduleSupported = false;
+    await tester.runAsync(() async {
+      await workspace.tasks.save(task(), write: await workspace.nextWrite());
+    });
+
+    var fakeNow = DateTime(2026, 1, 1, 9, 0, 0);
+    await pumpWithL10n(
+      tester,
+      FocusScreen(workspace: workspace, now: () => fakeNow),
+      locale: const Locale('en'),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Start'));
+    await tester.pump();
+
+    fakeNow = fakeNow.add(const Duration(seconds: 61));
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+
+    expect(channel.alarmCalls, hasLength(1));
+    expect(channel.cancelledFocusSessionNotifications, 1);
   });
 }

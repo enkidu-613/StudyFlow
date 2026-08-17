@@ -80,7 +80,8 @@ class SyncOperation(TimestampedModel, Base):
             name="ck_sync_operations_logical_clock_nonnegative",
         ),
         CheckConstraint(
-            "entity_type IN ('task', 'schedule_block', 'focus_session', 'check_in')",
+            "entity_type IN ('task', 'schedule_block', 'focus_session', 'check_in', "
+            "'schedule_feedback', 'medication_plan', 'medication_dose_record')",
             name="ck_sync_operations_entity_type",
         ),
         CheckConstraint(
@@ -172,7 +173,8 @@ class UserSyncOperation(TimestampedModel, Base):
             name="ck_user_sync_operations_logical_clock_nonnegative",
         ),
         CheckConstraint(
-            "entity_type IN ('task', 'schedule_block', 'focus_session', 'check_in')",
+            "entity_type IN ('task', 'schedule_block', 'focus_session', 'check_in', "
+            "'schedule_feedback', 'medication_plan', 'medication_dose_record')",
             name="ck_user_sync_operations_entity_type",
         ),
         CheckConstraint(

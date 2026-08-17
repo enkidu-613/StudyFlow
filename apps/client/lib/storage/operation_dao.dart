@@ -659,6 +659,9 @@ const Set<String> _entityTypes = <String>{
   'schedule_block',
   'focus_session',
   'check_in',
+  'schedule_feedback',
+  'medication_plan',
+  'medication_dose_record',
 };
 
 const Set<String> _taskFields = <String>{

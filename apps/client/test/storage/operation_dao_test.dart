@@ -116,19 +116,14 @@ void main() {
   test('all record stores reject cross-account writes and reads', () async {
     final store = await openStore(temporaryDirectory);
     addTearDown(store.close);
-    final recordIds = <String>[
-      '10000000-0000-4000-8000-000000000001',
-      '10000000-0000-4000-8000-000000000002',
-      '10000000-0000-4000-8000-000000000003',
-      '10000000-0000-4000-8000-000000000004',
-    ];
-
     for (var index = 0; index < EntityType.values.length; index++) {
       final entityType = EntityType.values[index];
       final repository = store.records(entityType);
+      final recordId = '10000000-0000-4000-8000-'
+          '${(index + 1).toString().padLeft(12, '0')}';
       final activeRecord = record(
         accountId: accountA,
-        recordId: recordIds[index],
+        recordId: recordId,
         entityType: entityType,
       );
 
@@ -136,7 +131,7 @@ void main() {
       expect(
         await repository.get(
           accountId: accountA,
-          recordId: recordIds[index],
+          recordId: recordId,
         ),
         activeRecord,
       );
@@ -144,14 +139,14 @@ void main() {
         repository.put(
           record(
             accountId: accountB,
-            recordId: recordIds[index],
+            recordId: recordId,
             entityType: entityType,
           ),
         ),
         throwsA(isA<StorageAccountScopeException>()),
       );
       await expectLater(
-        repository.get(accountId: accountB, recordId: recordIds[index]),
+        repository.get(accountId: accountB, recordId: recordId),
         throwsA(isA<StorageAccountScopeException>()),
       );
     }

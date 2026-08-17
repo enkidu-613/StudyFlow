@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:studyflow/app/studyflow_workspace.dart';
 import 'package:studyflow/features/schedule/schedule_block_editor.dart';
+import 'package:studyflow/features/schedule/schedule_history.dart';
 import 'package:studyflow/l10n/app_localizations.dart';
 import 'package:studyflow/l10n/l10n_extension.dart';
 import 'package:studyflow/widgets/confirm_delete_dialog.dart';
@@ -87,13 +89,14 @@ final class _ScheduleScreenState extends State<ScheduleScreen> {
       block.id,
       write: await widget.workspace.nextWrite(),
     );
-    widget.workspace.alarms.cancel(block.id);
-    unawaited(
-      widget.workspace.platform.cancelReminder(block.id).then(
-            (_) {},
-            onError: (_) {},
-          ),
-    );
+    // Remove it immediately so the dismissed row cannot remain visible while
+    // alarm cancellation and the full refresh finish asynchronously.
+    if (mounted) {
+      setState(() {
+        _blocks.removeWhere((item) => item.id == block.id);
+      });
+    }
+    await widget.workspace.alarms.cancel(block.id);
     if (!mounted) {
       return;
     }
@@ -107,7 +110,17 @@ final class _ScheduleScreenState extends State<ScheduleScreen> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.navSchedule)),
+      appBar: AppBar(
+        title: Text(l10n.navSchedule),
+        actions: <Widget>[
+          IconButton(
+            key: const Key('schedule-history-action'),
+            tooltip: '日程历史',
+            icon: const Icon(Icons.history_outlined),
+            onPressed: () => context.push('/schedule/history'),
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: _loading
@@ -158,7 +171,7 @@ final class _ScheduleScreenState extends State<ScheduleScreen> {
     }
 
     final days = <DateTime, List<ScheduleBlock>>{};
-    for (final block in _blocks) {
+    for (final block in currentBlocks(_blocks, DateTime.now())) {
       final day = DateTime(
         block.start.toLocal().year,
         block.start.toLocal().month,

@@ -451,17 +451,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get permissionPromptDeclined => '通知权限未开启，可稍后到系统设置中开启';
 
   @override
+  String get permissionPromptSettingsOpened => '已打开系统设置，请在那里允许 StudyFlow 相关权限';
+
+  @override
   String get permissionPromptDenied => '已打开系统设置，请在通知中允许 StudyFlow';
 
   @override
   String get permissionPromptFailed => '权限请求失败，请稍后重试';
 
   @override
-  String get permissionUnavailableTitle => '该权限在 macOS 上不可用';
+  String get permissionUnavailableTitle => '当前设备无法直接申请此权限';
 
   @override
   String permissionUnavailableMessage(Object permission) {
-    return '$permission 是移动平台专属权限，macOS 上不需要授权。';
+    return '$permission 需要在系统设置中手动配置，StudyFlow 无法直接弹出授权窗口。';
   }
 
   @override
@@ -659,6 +662,30 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiEnabledSubtitle => 'API Key 只保存在本机安全存储，不会上传。';
 
   @override
+  String get aiProtocolLabel => '接口协议';
+
+  @override
+  String get aiProtocolChat => 'OpenAI Chat Completions';
+
+  @override
+  String get aiProtocolResponses => 'OpenAI Responses';
+
+  @override
+  String get aiProtocolAnthropic => 'Anthropic Messages';
+
+  @override
+  String get aiEndpointHintChat =>
+      'Base URL 示例：https://provider.example/v1 → 请求 .../chat/completions';
+
+  @override
+  String get aiEndpointHintResponses =>
+      'Base URL 示例：https://provider.example/v1 → 请求 .../responses';
+
+  @override
+  String get aiEndpointHintAnthropic =>
+      'Base URL 示例：https://api.anthropic.com（已含 /v1 时不再重复追加）';
+
+  @override
   String get aiBaseUrlLabel => 'Base URL';
 
   @override
@@ -666,6 +693,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aiApiKeyLabel => 'API Key';
+
+  @override
+  String get aiApiKeyHint => '请输入 API Key';
+
+  @override
+  String get aiApiKeySavedHint => '已保存，不显示；留空保持不变';
 
   @override
   String get aiBaseUrlRequired => 'Base URL 不能为空';

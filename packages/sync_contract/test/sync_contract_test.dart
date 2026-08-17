@@ -31,8 +31,7 @@ void main() {
       'title': 'Read chapter 1',
       'status': 'pending',
     });
-    expect(operation.toJson(),
-        (fixture['operations'] as List<dynamic>).first);
+    expect(operation.toJson(), (fixture['operations'] as List<dynamic>).first);
   });
 
   test('round-trips every pull fixture operation', () {
@@ -104,6 +103,19 @@ void main() {
       () => SyncOperationV2.fromJson(operation),
       throwsA(isA<SyncContractException>()),
     );
+  });
+
+  test('accepts medication sync entity types', () {
+    for (final entityType in <String>[
+      'medication_plan',
+      'medication_dose_record',
+    ]) {
+      final operation = _pushOperation()
+        ..['entityType'] = entityType
+        ..['payload'] = <String, dynamic>{'id': _pushOperation()['recordId']};
+
+      expect(SyncOperationV2.fromJson(operation).entityType, entityType);
+    }
   });
 
   test('rejects a non-object payload', () {

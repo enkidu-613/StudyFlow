@@ -1,4 +1,8 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:studyflow/features/alarm/pending_alarm.dart';
 import 'package:studyflow_platform_contract/platform_contract.dart';
 
 abstract interface class PlatformMethodChannel {
@@ -19,16 +23,25 @@ final class FlutterPlatformMethodChannel implements PlatformMethodChannel {
 }
 
 final class PlatformBridge {
-  PlatformBridge({PlatformMethodChannel? channel})
-      : _channel = channel ?? FlutterPlatformMethodChannel();
+  PlatformBridge({
+    PlatformMethodChannel? channel,
+    Stream<PendingAlarm>? alarmEvents,
+  })  : _channel = channel ?? FlutterPlatformMethodChannel(),
+        alarmEvents = alarmEvents ??
+            (defaultTargetPlatform == TargetPlatform.android
+                ? _nativeAlarmEvents()
+                : const Stream<PendingAlarm>.empty());
 
   final PlatformMethodChannel _channel;
+  final Stream<PendingAlarm> alarmEvents;
 
   Future<CapabilityResult> scheduleReminder({
     required String title,
     required DateTime at,
     String? payload,
     String? identifier,
+    String? kind,
+    String? entityId,
   }) =>
       _invokeCapability(
         'scheduleReminder',
@@ -37,6 +50,8 @@ final class PlatformBridge {
           'at': at.toUtc().millisecondsSinceEpoch,
           if (payload != null) 'text': payload,
           if (identifier != null) 'id': identifier,
+          if (kind != null) 'kind': kind,
+          if (entityId != null) 'entity_id': entityId,
         },
       );
 
@@ -51,13 +66,53 @@ final class PlatformBridge {
   Future<CapabilityResult> playAlarm({
     required String title,
     required String text,
+    String? identifier,
+    String? kind,
+    String? entityId,
   }) =>
       _invokeCapability(
         'playAlarm',
         <String, Object?>{
           'title': title,
           'text': text,
+          if (identifier != null) 'id': identifier,
+          if (kind != null) 'kind': kind,
+          if (entityId != null) 'entity_id': entityId,
         },
+      );
+
+  Future<List<PendingAlarm>> getPendingAlarms() async {
+    try {
+      final raw = await _channel.invokeMethod('getPendingAlarms');
+      if (raw is! List) {
+        return <PendingAlarm>[];
+      }
+      return <PendingAlarm>[
+        for (final item in raw)
+          if (item is Map) PendingAlarm.fromJson(item.cast<String, Object?>()),
+      ];
+    } on Object {
+      return <PendingAlarm>[];
+    }
+  }
+
+  /// Checks whether the native alarm store is available before opening the
+  /// EventChannel. Flutter widget tests and desktop targets do not register
+  /// the Android alarm channel, and subscribing to it directly would surface
+  /// a MissingPluginException through the test binding.
+  Future<bool> supportsAlarmEvents() async {
+    try {
+      final raw = await _channel.invokeMethod('getPendingAlarms');
+      return raw is List;
+    } on Object {
+      return false;
+    }
+  }
+
+  Future<CapabilityResult> acknowledgeAlarm(String identifier) =>
+      _invokeCapability(
+        'acknowledgeAlarm',
+        <String, Object?>{'id': identifier},
       );
 
   Future<CapabilityResult> startFocusSession({required String title}) =>
@@ -65,6 +120,15 @@ final class PlatformBridge {
         'startFocusSession',
         <String, Object?>{'title': title},
       );
+
+  /// Removes the notification posted when a focus session starts.
+  ///
+  /// The Android implementation uses a stable notification id for this
+  /// informational notification. Clearing it is intentionally separate from
+  /// acknowledging the end-of-session alarm, because the latter is an
+  /// ongoing notification owned by the alarm service.
+  Future<CapabilityResult> cancelFocusSessionNotification() =>
+      _invokeCapability('cancelFocusSessionNotification', <String, Object?>{});
 
   Future<CapabilityResult> getUsageSummary({
     DateTime? from,
@@ -107,7 +171,8 @@ final class PlatformBridge {
     required String message,
   }) async {
     try {
-      final raw = await _channel.invokeMethod('showUnavailablePermission', <String, Object?>{
+      final raw = await _channel
+          .invokeMethod('showUnavailablePermission', <String, Object?>{
         'id': id.name,
         'title': title,
         'message': message,
@@ -122,12 +187,14 @@ final class PlatformBridge {
   /// supports one (notifications on macOS). Returns one of:
   /// - `authorized`: the permission is granted.
   /// - `declined`: the prompt was shown and the user declined it.
+  /// - `opened_settings`: the platform opened a settings page for the user.
   /// - `denied`: the permission was previously denied; macOS never
   ///   re-prompts, and the native side has opened System Settings.
   /// - `unsupported` / `null`: no prompt is available or the request failed.
   Future<String?> requestPermission(PlatformPermissionId id) async {
     try {
-      final raw = await _channel.invokeMethod('requestPermission', <String, Object?>{
+      final raw =
+          await _channel.invokeMethod('requestPermission', <String, Object?>{
         'id': id.name,
       });
       if (raw is Map) {
@@ -255,4 +322,11 @@ final class PlatformBridge {
             ),
         ],
       );
+
+  static Stream<PendingAlarm> _nativeAlarmEvents() {
+    const channel = EventChannel('studyflow/alarm_events');
+    return channel.receiveBroadcastStream().where((item) => item is Map).map(
+          (item) => PendingAlarm.fromJson(item.cast<String, Object?>()),
+        );
+  }
 }

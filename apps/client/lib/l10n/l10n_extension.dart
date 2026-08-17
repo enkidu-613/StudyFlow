@@ -21,13 +21,31 @@ extension PermissionLocalizationX on AppLocalizations {
       };
 
   String permissionDetailText(String detail, {required bool allowed}) {
-    if (detail.isNotEmpty && detail != 'ok' && detail != 'granted') {
-      return detail;
+    final normalized = detail.trim().toLowerCase();
+    if (normalized.isNotEmpty &&
+        normalized != 'ok' &&
+        normalized != 'granted') {
+      final isChinese = localeName.toLowerCase().startsWith('zh');
+      return switch (normalized) {
+        'not restricted' =>
+          isChinese ? '系统未限制后台运行' : 'Background is not restricted',
+        'background restricted' =>
+          isChinese ? '系统限制了后台运行' : 'Background activity is restricted',
+        'allowed' => isChinese ? '已允许' : 'Allowed',
+        'restricted' => isChinese ? '受限制' : 'Restricted',
+        'not granted' => isChinese ? '未授权' : 'Not granted',
+        'not applicable on android' =>
+          isChinese ? 'Android 不支持菜单栏' : 'Menu bar is not available on Android',
+        'in-app focus workflow' =>
+          isChinese ? '应用内专注流程已启用' : 'In-app focus workflow is enabled',
+        _ => detail,
+      };
     }
     return allowed ? permissionDetailGranted : permissionDetailRequired;
   }
 
-  String permissionStatusText({required bool available, required bool allowed}) {
+  String permissionStatusText(
+      {required bool available, required bool allowed}) {
     if (!available) {
       return permissionUnavailable;
     }

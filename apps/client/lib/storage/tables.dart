@@ -44,6 +44,39 @@ class _CheckIns extends Table {
   Set<Column<Object>> get primaryKey => <Column<Object>>{accountId, recordId};
 }
 
+class _ScheduleFeedbacks extends Table {
+  TextColumn get accountId => text()();
+  TextColumn get recordId => text()();
+  IntColumn get schemaVersion => integer()();
+  TextColumn get payload => text()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => <Column<Object>>{accountId, recordId};
+}
+
+class _MedicationPlans extends Table {
+  TextColumn get accountId => text()();
+  TextColumn get recordId => text()();
+  IntColumn get schemaVersion => integer()();
+  TextColumn get payload => text()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => <Column<Object>>{accountId, recordId};
+}
+
+class _MedicationDoseRecords extends Table {
+  TextColumn get accountId => text()();
+  TextColumn get recordId => text()();
+  IntColumn get schemaVersion => integer()();
+  TextColumn get payload => text()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => <Column<Object>>{accountId, recordId};
+}
+
 class _PendingOperations extends Table {
   TextColumn get accountId => text()();
   TextColumn get operationId => text()();

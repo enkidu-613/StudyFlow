@@ -77,6 +77,45 @@ final class ScheduleBlock {
     }
   }
 
+  /// Returns starts of occurrences whose time span overlaps [from, until).
+  /// This includes an occurrence already running when [from] is reached.
+  Iterable<DateTime> occurrencesOverlapping(
+    DateTime from,
+    DateTime until, {
+    int limit = 60,
+  }) sync* {
+    final normalizedFrom = from.toUtc();
+    final normalizedUntil = until.toUtc();
+    if (!normalizedUntil.isAfter(normalizedFrom)) {
+      throw ArgumentError.value(until, 'until', 'must be after from');
+    }
+    if (limit <= 0) {
+      throw ArgumentError.value(limit, 'limit', 'must be positive');
+    }
+
+    final duration = end.difference(start);
+    if (repeatRule == ScheduleRepeatRule.none) {
+      if (start.isBefore(normalizedUntil) && end.isAfter(normalizedFrom)) {
+        yield start;
+      }
+      return;
+    }
+
+    var candidate = start;
+    while (candidate.add(duration).isBefore(normalizedFrom) ||
+        candidate.add(duration).isAtSameMomentAs(normalizedFrom)) {
+      candidate = _nextOccurrence(candidate);
+    }
+    var yielded = 0;
+    while (yielded < limit && candidate.isBefore(normalizedUntil)) {
+      if (candidate.add(duration).isAfter(normalizedFrom)) {
+        yield candidate;
+        yielded += 1;
+      }
+      candidate = _nextOccurrence(candidate);
+    }
+  }
+
   DateTime _nextOccurrence(DateTime current) {
     final local = current.toLocal();
     final days = repeatRule == ScheduleRepeatRule.daily

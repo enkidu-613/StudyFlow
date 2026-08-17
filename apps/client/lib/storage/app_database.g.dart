@@ -1268,6 +1268,959 @@ class _CheckInsCompanion extends UpdateCompanion<_CheckIn> {
   }
 }
 
+class $_ScheduleFeedbacksTable extends _ScheduleFeedbacks
+    with TableInfo<$_ScheduleFeedbacksTable, _ScheduleFeedback> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $_ScheduleFeedbacksTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _accountIdMeta =
+      const VerificationMeta('accountId');
+  @override
+  late final GeneratedColumn<String> accountId = GeneratedColumn<String>(
+      'account_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _recordIdMeta =
+      const VerificationMeta('recordId');
+  @override
+  late final GeneratedColumn<String> recordId = GeneratedColumn<String>(
+      'record_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _schemaVersionMeta =
+      const VerificationMeta('schemaVersion');
+  @override
+  late final GeneratedColumn<int> schemaVersion = GeneratedColumn<int>(
+      'schema_version', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _payloadMeta =
+      const VerificationMeta('payload');
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+      'payload', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [accountId, recordId, schemaVersion, payload, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'schedule_feedbacks';
+  @override
+  VerificationContext validateIntegrity(Insertable<_ScheduleFeedback> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('account_id')) {
+      context.handle(_accountIdMeta,
+          accountId.isAcceptableOrUnknown(data['account_id']!, _accountIdMeta));
+    } else if (isInserting) {
+      context.missing(_accountIdMeta);
+    }
+    if (data.containsKey('record_id')) {
+      context.handle(_recordIdMeta,
+          recordId.isAcceptableOrUnknown(data['record_id']!, _recordIdMeta));
+    } else if (isInserting) {
+      context.missing(_recordIdMeta);
+    }
+    if (data.containsKey('schema_version')) {
+      context.handle(
+          _schemaVersionMeta,
+          schemaVersion.isAcceptableOrUnknown(
+              data['schema_version']!, _schemaVersionMeta));
+    } else if (isInserting) {
+      context.missing(_schemaVersionMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(_payloadMeta,
+          payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta));
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {accountId, recordId};
+  @override
+  _ScheduleFeedback map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return _ScheduleFeedback(
+      accountId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}account_id'])!,
+      recordId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}record_id'])!,
+      schemaVersion: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}schema_version'])!,
+      payload: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}payload'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+    );
+  }
+
+  @override
+  $_ScheduleFeedbacksTable createAlias(String alias) {
+    return $_ScheduleFeedbacksTable(attachedDatabase, alias);
+  }
+}
+
+class _ScheduleFeedback extends DataClass
+    implements Insertable<_ScheduleFeedback> {
+  final String accountId;
+  final String recordId;
+  final int schemaVersion;
+  final String payload;
+  final DateTime updatedAt;
+  const _ScheduleFeedback(
+      {required this.accountId,
+      required this.recordId,
+      required this.schemaVersion,
+      required this.payload,
+      required this.updatedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['account_id'] = Variable<String>(accountId);
+    map['record_id'] = Variable<String>(recordId);
+    map['schema_version'] = Variable<int>(schemaVersion);
+    map['payload'] = Variable<String>(payload);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  _ScheduleFeedbacksCompanion toCompanion(bool nullToAbsent) {
+    return _ScheduleFeedbacksCompanion(
+      accountId: Value(accountId),
+      recordId: Value(recordId),
+      schemaVersion: Value(schemaVersion),
+      payload: Value(payload),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory _ScheduleFeedback.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return _ScheduleFeedback(
+      accountId: serializer.fromJson<String>(json['accountId']),
+      recordId: serializer.fromJson<String>(json['recordId']),
+      schemaVersion: serializer.fromJson<int>(json['schemaVersion']),
+      payload: serializer.fromJson<String>(json['payload']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'accountId': serializer.toJson<String>(accountId),
+      'recordId': serializer.toJson<String>(recordId),
+      'schemaVersion': serializer.toJson<int>(schemaVersion),
+      'payload': serializer.toJson<String>(payload),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  _ScheduleFeedback copyWith(
+          {String? accountId,
+          String? recordId,
+          int? schemaVersion,
+          String? payload,
+          DateTime? updatedAt}) =>
+      _ScheduleFeedback(
+        accountId: accountId ?? this.accountId,
+        recordId: recordId ?? this.recordId,
+        schemaVersion: schemaVersion ?? this.schemaVersion,
+        payload: payload ?? this.payload,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+  _ScheduleFeedback copyWithCompanion(_ScheduleFeedbacksCompanion data) {
+    return _ScheduleFeedback(
+      accountId: data.accountId.present ? data.accountId.value : this.accountId,
+      recordId: data.recordId.present ? data.recordId.value : this.recordId,
+      schemaVersion: data.schemaVersion.present
+          ? data.schemaVersion.value
+          : this.schemaVersion,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('_ScheduleFeedback(')
+          ..write('accountId: $accountId, ')
+          ..write('recordId: $recordId, ')
+          ..write('schemaVersion: $schemaVersion, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(accountId, recordId, schemaVersion, payload, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is _ScheduleFeedback &&
+          other.accountId == this.accountId &&
+          other.recordId == this.recordId &&
+          other.schemaVersion == this.schemaVersion &&
+          other.payload == this.payload &&
+          other.updatedAt == this.updatedAt);
+}
+
+class _ScheduleFeedbacksCompanion extends UpdateCompanion<_ScheduleFeedback> {
+  final Value<String> accountId;
+  final Value<String> recordId;
+  final Value<int> schemaVersion;
+  final Value<String> payload;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const _ScheduleFeedbacksCompanion({
+    this.accountId = const Value.absent(),
+    this.recordId = const Value.absent(),
+    this.schemaVersion = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  _ScheduleFeedbacksCompanion.insert({
+    required String accountId,
+    required String recordId,
+    required int schemaVersion,
+    required String payload,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  })  : accountId = Value(accountId),
+        recordId = Value(recordId),
+        schemaVersion = Value(schemaVersion),
+        payload = Value(payload),
+        updatedAt = Value(updatedAt);
+  static Insertable<_ScheduleFeedback> custom({
+    Expression<String>? accountId,
+    Expression<String>? recordId,
+    Expression<int>? schemaVersion,
+    Expression<String>? payload,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (accountId != null) 'account_id': accountId,
+      if (recordId != null) 'record_id': recordId,
+      if (schemaVersion != null) 'schema_version': schemaVersion,
+      if (payload != null) 'payload': payload,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  _ScheduleFeedbacksCompanion copyWith(
+      {Value<String>? accountId,
+      Value<String>? recordId,
+      Value<int>? schemaVersion,
+      Value<String>? payload,
+      Value<DateTime>? updatedAt,
+      Value<int>? rowid}) {
+    return _ScheduleFeedbacksCompanion(
+      accountId: accountId ?? this.accountId,
+      recordId: recordId ?? this.recordId,
+      schemaVersion: schemaVersion ?? this.schemaVersion,
+      payload: payload ?? this.payload,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (accountId.present) {
+      map['account_id'] = Variable<String>(accountId.value);
+    }
+    if (recordId.present) {
+      map['record_id'] = Variable<String>(recordId.value);
+    }
+    if (schemaVersion.present) {
+      map['schema_version'] = Variable<int>(schemaVersion.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('_ScheduleFeedbacksCompanion(')
+          ..write('accountId: $accountId, ')
+          ..write('recordId: $recordId, ')
+          ..write('schemaVersion: $schemaVersion, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $_MedicationPlansTable extends _MedicationPlans
+    with TableInfo<$_MedicationPlansTable, _MedicationPlan> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $_MedicationPlansTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _accountIdMeta =
+      const VerificationMeta('accountId');
+  @override
+  late final GeneratedColumn<String> accountId = GeneratedColumn<String>(
+      'account_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _recordIdMeta =
+      const VerificationMeta('recordId');
+  @override
+  late final GeneratedColumn<String> recordId = GeneratedColumn<String>(
+      'record_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _schemaVersionMeta =
+      const VerificationMeta('schemaVersion');
+  @override
+  late final GeneratedColumn<int> schemaVersion = GeneratedColumn<int>(
+      'schema_version', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _payloadMeta =
+      const VerificationMeta('payload');
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+      'payload', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [accountId, recordId, schemaVersion, payload, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'medication_plans';
+  @override
+  VerificationContext validateIntegrity(Insertable<_MedicationPlan> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('account_id')) {
+      context.handle(_accountIdMeta,
+          accountId.isAcceptableOrUnknown(data['account_id']!, _accountIdMeta));
+    } else if (isInserting) {
+      context.missing(_accountIdMeta);
+    }
+    if (data.containsKey('record_id')) {
+      context.handle(_recordIdMeta,
+          recordId.isAcceptableOrUnknown(data['record_id']!, _recordIdMeta));
+    } else if (isInserting) {
+      context.missing(_recordIdMeta);
+    }
+    if (data.containsKey('schema_version')) {
+      context.handle(
+          _schemaVersionMeta,
+          schemaVersion.isAcceptableOrUnknown(
+              data['schema_version']!, _schemaVersionMeta));
+    } else if (isInserting) {
+      context.missing(_schemaVersionMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(_payloadMeta,
+          payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta));
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {accountId, recordId};
+  @override
+  _MedicationPlan map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return _MedicationPlan(
+      accountId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}account_id'])!,
+      recordId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}record_id'])!,
+      schemaVersion: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}schema_version'])!,
+      payload: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}payload'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+    );
+  }
+
+  @override
+  $_MedicationPlansTable createAlias(String alias) {
+    return $_MedicationPlansTable(attachedDatabase, alias);
+  }
+}
+
+class _MedicationPlan extends DataClass implements Insertable<_MedicationPlan> {
+  final String accountId;
+  final String recordId;
+  final int schemaVersion;
+  final String payload;
+  final DateTime updatedAt;
+  const _MedicationPlan(
+      {required this.accountId,
+      required this.recordId,
+      required this.schemaVersion,
+      required this.payload,
+      required this.updatedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['account_id'] = Variable<String>(accountId);
+    map['record_id'] = Variable<String>(recordId);
+    map['schema_version'] = Variable<int>(schemaVersion);
+    map['payload'] = Variable<String>(payload);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  _MedicationPlansCompanion toCompanion(bool nullToAbsent) {
+    return _MedicationPlansCompanion(
+      accountId: Value(accountId),
+      recordId: Value(recordId),
+      schemaVersion: Value(schemaVersion),
+      payload: Value(payload),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory _MedicationPlan.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return _MedicationPlan(
+      accountId: serializer.fromJson<String>(json['accountId']),
+      recordId: serializer.fromJson<String>(json['recordId']),
+      schemaVersion: serializer.fromJson<int>(json['schemaVersion']),
+      payload: serializer.fromJson<String>(json['payload']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'accountId': serializer.toJson<String>(accountId),
+      'recordId': serializer.toJson<String>(recordId),
+      'schemaVersion': serializer.toJson<int>(schemaVersion),
+      'payload': serializer.toJson<String>(payload),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  _MedicationPlan copyWith(
+          {String? accountId,
+          String? recordId,
+          int? schemaVersion,
+          String? payload,
+          DateTime? updatedAt}) =>
+      _MedicationPlan(
+        accountId: accountId ?? this.accountId,
+        recordId: recordId ?? this.recordId,
+        schemaVersion: schemaVersion ?? this.schemaVersion,
+        payload: payload ?? this.payload,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+  _MedicationPlan copyWithCompanion(_MedicationPlansCompanion data) {
+    return _MedicationPlan(
+      accountId: data.accountId.present ? data.accountId.value : this.accountId,
+      recordId: data.recordId.present ? data.recordId.value : this.recordId,
+      schemaVersion: data.schemaVersion.present
+          ? data.schemaVersion.value
+          : this.schemaVersion,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('_MedicationPlan(')
+          ..write('accountId: $accountId, ')
+          ..write('recordId: $recordId, ')
+          ..write('schemaVersion: $schemaVersion, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(accountId, recordId, schemaVersion, payload, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is _MedicationPlan &&
+          other.accountId == this.accountId &&
+          other.recordId == this.recordId &&
+          other.schemaVersion == this.schemaVersion &&
+          other.payload == this.payload &&
+          other.updatedAt == this.updatedAt);
+}
+
+class _MedicationPlansCompanion extends UpdateCompanion<_MedicationPlan> {
+  final Value<String> accountId;
+  final Value<String> recordId;
+  final Value<int> schemaVersion;
+  final Value<String> payload;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const _MedicationPlansCompanion({
+    this.accountId = const Value.absent(),
+    this.recordId = const Value.absent(),
+    this.schemaVersion = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  _MedicationPlansCompanion.insert({
+    required String accountId,
+    required String recordId,
+    required int schemaVersion,
+    required String payload,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  })  : accountId = Value(accountId),
+        recordId = Value(recordId),
+        schemaVersion = Value(schemaVersion),
+        payload = Value(payload),
+        updatedAt = Value(updatedAt);
+  static Insertable<_MedicationPlan> custom({
+    Expression<String>? accountId,
+    Expression<String>? recordId,
+    Expression<int>? schemaVersion,
+    Expression<String>? payload,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (accountId != null) 'account_id': accountId,
+      if (recordId != null) 'record_id': recordId,
+      if (schemaVersion != null) 'schema_version': schemaVersion,
+      if (payload != null) 'payload': payload,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  _MedicationPlansCompanion copyWith(
+      {Value<String>? accountId,
+      Value<String>? recordId,
+      Value<int>? schemaVersion,
+      Value<String>? payload,
+      Value<DateTime>? updatedAt,
+      Value<int>? rowid}) {
+    return _MedicationPlansCompanion(
+      accountId: accountId ?? this.accountId,
+      recordId: recordId ?? this.recordId,
+      schemaVersion: schemaVersion ?? this.schemaVersion,
+      payload: payload ?? this.payload,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (accountId.present) {
+      map['account_id'] = Variable<String>(accountId.value);
+    }
+    if (recordId.present) {
+      map['record_id'] = Variable<String>(recordId.value);
+    }
+    if (schemaVersion.present) {
+      map['schema_version'] = Variable<int>(schemaVersion.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('_MedicationPlansCompanion(')
+          ..write('accountId: $accountId, ')
+          ..write('recordId: $recordId, ')
+          ..write('schemaVersion: $schemaVersion, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $_MedicationDoseRecordsTable extends _MedicationDoseRecords
+    with TableInfo<$_MedicationDoseRecordsTable, _MedicationDoseRecord> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $_MedicationDoseRecordsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _accountIdMeta =
+      const VerificationMeta('accountId');
+  @override
+  late final GeneratedColumn<String> accountId = GeneratedColumn<String>(
+      'account_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _recordIdMeta =
+      const VerificationMeta('recordId');
+  @override
+  late final GeneratedColumn<String> recordId = GeneratedColumn<String>(
+      'record_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _schemaVersionMeta =
+      const VerificationMeta('schemaVersion');
+  @override
+  late final GeneratedColumn<int> schemaVersion = GeneratedColumn<int>(
+      'schema_version', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _payloadMeta =
+      const VerificationMeta('payload');
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+      'payload', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [accountId, recordId, schemaVersion, payload, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'medication_dose_records';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<_MedicationDoseRecord> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('account_id')) {
+      context.handle(_accountIdMeta,
+          accountId.isAcceptableOrUnknown(data['account_id']!, _accountIdMeta));
+    } else if (isInserting) {
+      context.missing(_accountIdMeta);
+    }
+    if (data.containsKey('record_id')) {
+      context.handle(_recordIdMeta,
+          recordId.isAcceptableOrUnknown(data['record_id']!, _recordIdMeta));
+    } else if (isInserting) {
+      context.missing(_recordIdMeta);
+    }
+    if (data.containsKey('schema_version')) {
+      context.handle(
+          _schemaVersionMeta,
+          schemaVersion.isAcceptableOrUnknown(
+              data['schema_version']!, _schemaVersionMeta));
+    } else if (isInserting) {
+      context.missing(_schemaVersionMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(_payloadMeta,
+          payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta));
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {accountId, recordId};
+  @override
+  _MedicationDoseRecord map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return _MedicationDoseRecord(
+      accountId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}account_id'])!,
+      recordId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}record_id'])!,
+      schemaVersion: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}schema_version'])!,
+      payload: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}payload'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+    );
+  }
+
+  @override
+  $_MedicationDoseRecordsTable createAlias(String alias) {
+    return $_MedicationDoseRecordsTable(attachedDatabase, alias);
+  }
+}
+
+class _MedicationDoseRecord extends DataClass
+    implements Insertable<_MedicationDoseRecord> {
+  final String accountId;
+  final String recordId;
+  final int schemaVersion;
+  final String payload;
+  final DateTime updatedAt;
+  const _MedicationDoseRecord(
+      {required this.accountId,
+      required this.recordId,
+      required this.schemaVersion,
+      required this.payload,
+      required this.updatedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['account_id'] = Variable<String>(accountId);
+    map['record_id'] = Variable<String>(recordId);
+    map['schema_version'] = Variable<int>(schemaVersion);
+    map['payload'] = Variable<String>(payload);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  _MedicationDoseRecordsCompanion toCompanion(bool nullToAbsent) {
+    return _MedicationDoseRecordsCompanion(
+      accountId: Value(accountId),
+      recordId: Value(recordId),
+      schemaVersion: Value(schemaVersion),
+      payload: Value(payload),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory _MedicationDoseRecord.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return _MedicationDoseRecord(
+      accountId: serializer.fromJson<String>(json['accountId']),
+      recordId: serializer.fromJson<String>(json['recordId']),
+      schemaVersion: serializer.fromJson<int>(json['schemaVersion']),
+      payload: serializer.fromJson<String>(json['payload']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'accountId': serializer.toJson<String>(accountId),
+      'recordId': serializer.toJson<String>(recordId),
+      'schemaVersion': serializer.toJson<int>(schemaVersion),
+      'payload': serializer.toJson<String>(payload),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  _MedicationDoseRecord copyWith(
+          {String? accountId,
+          String? recordId,
+          int? schemaVersion,
+          String? payload,
+          DateTime? updatedAt}) =>
+      _MedicationDoseRecord(
+        accountId: accountId ?? this.accountId,
+        recordId: recordId ?? this.recordId,
+        schemaVersion: schemaVersion ?? this.schemaVersion,
+        payload: payload ?? this.payload,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+  _MedicationDoseRecord copyWithCompanion(
+      _MedicationDoseRecordsCompanion data) {
+    return _MedicationDoseRecord(
+      accountId: data.accountId.present ? data.accountId.value : this.accountId,
+      recordId: data.recordId.present ? data.recordId.value : this.recordId,
+      schemaVersion: data.schemaVersion.present
+          ? data.schemaVersion.value
+          : this.schemaVersion,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('_MedicationDoseRecord(')
+          ..write('accountId: $accountId, ')
+          ..write('recordId: $recordId, ')
+          ..write('schemaVersion: $schemaVersion, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(accountId, recordId, schemaVersion, payload, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is _MedicationDoseRecord &&
+          other.accountId == this.accountId &&
+          other.recordId == this.recordId &&
+          other.schemaVersion == this.schemaVersion &&
+          other.payload == this.payload &&
+          other.updatedAt == this.updatedAt);
+}
+
+class _MedicationDoseRecordsCompanion
+    extends UpdateCompanion<_MedicationDoseRecord> {
+  final Value<String> accountId;
+  final Value<String> recordId;
+  final Value<int> schemaVersion;
+  final Value<String> payload;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const _MedicationDoseRecordsCompanion({
+    this.accountId = const Value.absent(),
+    this.recordId = const Value.absent(),
+    this.schemaVersion = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  _MedicationDoseRecordsCompanion.insert({
+    required String accountId,
+    required String recordId,
+    required int schemaVersion,
+    required String payload,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  })  : accountId = Value(accountId),
+        recordId = Value(recordId),
+        schemaVersion = Value(schemaVersion),
+        payload = Value(payload),
+        updatedAt = Value(updatedAt);
+  static Insertable<_MedicationDoseRecord> custom({
+    Expression<String>? accountId,
+    Expression<String>? recordId,
+    Expression<int>? schemaVersion,
+    Expression<String>? payload,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (accountId != null) 'account_id': accountId,
+      if (recordId != null) 'record_id': recordId,
+      if (schemaVersion != null) 'schema_version': schemaVersion,
+      if (payload != null) 'payload': payload,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  _MedicationDoseRecordsCompanion copyWith(
+      {Value<String>? accountId,
+      Value<String>? recordId,
+      Value<int>? schemaVersion,
+      Value<String>? payload,
+      Value<DateTime>? updatedAt,
+      Value<int>? rowid}) {
+    return _MedicationDoseRecordsCompanion(
+      accountId: accountId ?? this.accountId,
+      recordId: recordId ?? this.recordId,
+      schemaVersion: schemaVersion ?? this.schemaVersion,
+      payload: payload ?? this.payload,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (accountId.present) {
+      map['account_id'] = Variable<String>(accountId.value);
+    }
+    if (recordId.present) {
+      map['record_id'] = Variable<String>(recordId.value);
+    }
+    if (schemaVersion.present) {
+      map['schema_version'] = Variable<int>(schemaVersion.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('_MedicationDoseRecordsCompanion(')
+          ..write('accountId: $accountId, ')
+          ..write('recordId: $recordId, ')
+          ..write('schemaVersion: $schemaVersion, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $_PendingOperationsTable extends _PendingOperations
     with TableInfo<$_PendingOperationsTable, _PendingOperation> {
   @override
@@ -1762,14 +2715,28 @@ abstract class _$_AccountDatabase extends GeneratedDatabase {
   late final $_ScheduleBlocksTable scheduleBlocks = $_ScheduleBlocksTable(this);
   late final $_FocusSessionsTable focusSessions = $_FocusSessionsTable(this);
   late final $_CheckInsTable checkIns = $_CheckInsTable(this);
+  late final $_ScheduleFeedbacksTable scheduleFeedbacks =
+      $_ScheduleFeedbacksTable(this);
+  late final $_MedicationPlansTable medicationPlans =
+      $_MedicationPlansTable(this);
+  late final $_MedicationDoseRecordsTable medicationDoseRecords =
+      $_MedicationDoseRecordsTable(this);
   late final $_PendingOperationsTable pendingOperations =
       $_PendingOperationsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities =>
-      [tasks, scheduleBlocks, focusSessions, checkIns, pendingOperations];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [
+        tasks,
+        scheduleBlocks,
+        focusSessions,
+        checkIns,
+        scheduleFeedbacks,
+        medicationPlans,
+        medicationDoseRecords,
+        pendingOperations
+      ];
 }
 
 typedef $$_TasksTableCreateCompanionBuilder = _TasksCompanion Function({
@@ -2454,6 +3421,542 @@ typedef $$_CheckInsTableProcessedTableManager = ProcessedTableManager<
     (_CheckIn, BaseReferences<_$_AccountDatabase, $_CheckInsTable, _CheckIn>),
     _CheckIn,
     PrefetchHooks Function()>;
+typedef $$_ScheduleFeedbacksTableCreateCompanionBuilder
+    = _ScheduleFeedbacksCompanion Function({
+  required String accountId,
+  required String recordId,
+  required int schemaVersion,
+  required String payload,
+  required DateTime updatedAt,
+  Value<int> rowid,
+});
+typedef $$_ScheduleFeedbacksTableUpdateCompanionBuilder
+    = _ScheduleFeedbacksCompanion Function({
+  Value<String> accountId,
+  Value<String> recordId,
+  Value<int> schemaVersion,
+  Value<String> payload,
+  Value<DateTime> updatedAt,
+  Value<int> rowid,
+});
+
+class $$_ScheduleFeedbacksTableFilterComposer
+    extends Composer<_$_AccountDatabase, $_ScheduleFeedbacksTable> {
+  $$_ScheduleFeedbacksTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get accountId => $composableBuilder(
+      column: $table.accountId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get recordId => $composableBuilder(
+      column: $table.recordId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get schemaVersion => $composableBuilder(
+      column: $table.schemaVersion, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get payload => $composableBuilder(
+      column: $table.payload, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$_ScheduleFeedbacksTableOrderingComposer
+    extends Composer<_$_AccountDatabase, $_ScheduleFeedbacksTable> {
+  $$_ScheduleFeedbacksTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get accountId => $composableBuilder(
+      column: $table.accountId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get recordId => $composableBuilder(
+      column: $table.recordId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get schemaVersion => $composableBuilder(
+      column: $table.schemaVersion,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+      column: $table.payload, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$_ScheduleFeedbacksTableAnnotationComposer
+    extends Composer<_$_AccountDatabase, $_ScheduleFeedbacksTable> {
+  $$_ScheduleFeedbacksTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get accountId =>
+      $composableBuilder(column: $table.accountId, builder: (column) => column);
+
+  GeneratedColumn<String> get recordId =>
+      $composableBuilder(column: $table.recordId, builder: (column) => column);
+
+  GeneratedColumn<int> get schemaVersion => $composableBuilder(
+      column: $table.schemaVersion, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$_ScheduleFeedbacksTableTableManager extends RootTableManager<
+    _$_AccountDatabase,
+    $_ScheduleFeedbacksTable,
+    _ScheduleFeedback,
+    $$_ScheduleFeedbacksTableFilterComposer,
+    $$_ScheduleFeedbacksTableOrderingComposer,
+    $$_ScheduleFeedbacksTableAnnotationComposer,
+    $$_ScheduleFeedbacksTableCreateCompanionBuilder,
+    $$_ScheduleFeedbacksTableUpdateCompanionBuilder,
+    (
+      _ScheduleFeedback,
+      BaseReferences<_$_AccountDatabase, $_ScheduleFeedbacksTable,
+          _ScheduleFeedback>
+    ),
+    _ScheduleFeedback,
+    PrefetchHooks Function()> {
+  $$_ScheduleFeedbacksTableTableManager(
+      _$_AccountDatabase db, $_ScheduleFeedbacksTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$_ScheduleFeedbacksTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$_ScheduleFeedbacksTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$_ScheduleFeedbacksTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> accountId = const Value.absent(),
+            Value<String> recordId = const Value.absent(),
+            Value<int> schemaVersion = const Value.absent(),
+            Value<String> payload = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              _ScheduleFeedbacksCompanion(
+            accountId: accountId,
+            recordId: recordId,
+            schemaVersion: schemaVersion,
+            payload: payload,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String accountId,
+            required String recordId,
+            required int schemaVersion,
+            required String payload,
+            required DateTime updatedAt,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              _ScheduleFeedbacksCompanion.insert(
+            accountId: accountId,
+            recordId: recordId,
+            schemaVersion: schemaVersion,
+            payload: payload,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$_ScheduleFeedbacksTableProcessedTableManager = ProcessedTableManager<
+    _$_AccountDatabase,
+    $_ScheduleFeedbacksTable,
+    _ScheduleFeedback,
+    $$_ScheduleFeedbacksTableFilterComposer,
+    $$_ScheduleFeedbacksTableOrderingComposer,
+    $$_ScheduleFeedbacksTableAnnotationComposer,
+    $$_ScheduleFeedbacksTableCreateCompanionBuilder,
+    $$_ScheduleFeedbacksTableUpdateCompanionBuilder,
+    (
+      _ScheduleFeedback,
+      BaseReferences<_$_AccountDatabase, $_ScheduleFeedbacksTable,
+          _ScheduleFeedback>
+    ),
+    _ScheduleFeedback,
+    PrefetchHooks Function()>;
+typedef $$_MedicationPlansTableCreateCompanionBuilder
+    = _MedicationPlansCompanion Function({
+  required String accountId,
+  required String recordId,
+  required int schemaVersion,
+  required String payload,
+  required DateTime updatedAt,
+  Value<int> rowid,
+});
+typedef $$_MedicationPlansTableUpdateCompanionBuilder
+    = _MedicationPlansCompanion Function({
+  Value<String> accountId,
+  Value<String> recordId,
+  Value<int> schemaVersion,
+  Value<String> payload,
+  Value<DateTime> updatedAt,
+  Value<int> rowid,
+});
+
+class $$_MedicationPlansTableFilterComposer
+    extends Composer<_$_AccountDatabase, $_MedicationPlansTable> {
+  $$_MedicationPlansTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get accountId => $composableBuilder(
+      column: $table.accountId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get recordId => $composableBuilder(
+      column: $table.recordId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get schemaVersion => $composableBuilder(
+      column: $table.schemaVersion, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get payload => $composableBuilder(
+      column: $table.payload, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$_MedicationPlansTableOrderingComposer
+    extends Composer<_$_AccountDatabase, $_MedicationPlansTable> {
+  $$_MedicationPlansTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get accountId => $composableBuilder(
+      column: $table.accountId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get recordId => $composableBuilder(
+      column: $table.recordId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get schemaVersion => $composableBuilder(
+      column: $table.schemaVersion,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+      column: $table.payload, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$_MedicationPlansTableAnnotationComposer
+    extends Composer<_$_AccountDatabase, $_MedicationPlansTable> {
+  $$_MedicationPlansTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get accountId =>
+      $composableBuilder(column: $table.accountId, builder: (column) => column);
+
+  GeneratedColumn<String> get recordId =>
+      $composableBuilder(column: $table.recordId, builder: (column) => column);
+
+  GeneratedColumn<int> get schemaVersion => $composableBuilder(
+      column: $table.schemaVersion, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$_MedicationPlansTableTableManager extends RootTableManager<
+    _$_AccountDatabase,
+    $_MedicationPlansTable,
+    _MedicationPlan,
+    $$_MedicationPlansTableFilterComposer,
+    $$_MedicationPlansTableOrderingComposer,
+    $$_MedicationPlansTableAnnotationComposer,
+    $$_MedicationPlansTableCreateCompanionBuilder,
+    $$_MedicationPlansTableUpdateCompanionBuilder,
+    (
+      _MedicationPlan,
+      BaseReferences<_$_AccountDatabase, $_MedicationPlansTable,
+          _MedicationPlan>
+    ),
+    _MedicationPlan,
+    PrefetchHooks Function()> {
+  $$_MedicationPlansTableTableManager(
+      _$_AccountDatabase db, $_MedicationPlansTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$_MedicationPlansTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$_MedicationPlansTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$_MedicationPlansTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> accountId = const Value.absent(),
+            Value<String> recordId = const Value.absent(),
+            Value<int> schemaVersion = const Value.absent(),
+            Value<String> payload = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              _MedicationPlansCompanion(
+            accountId: accountId,
+            recordId: recordId,
+            schemaVersion: schemaVersion,
+            payload: payload,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String accountId,
+            required String recordId,
+            required int schemaVersion,
+            required String payload,
+            required DateTime updatedAt,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              _MedicationPlansCompanion.insert(
+            accountId: accountId,
+            recordId: recordId,
+            schemaVersion: schemaVersion,
+            payload: payload,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$_MedicationPlansTableProcessedTableManager = ProcessedTableManager<
+    _$_AccountDatabase,
+    $_MedicationPlansTable,
+    _MedicationPlan,
+    $$_MedicationPlansTableFilterComposer,
+    $$_MedicationPlansTableOrderingComposer,
+    $$_MedicationPlansTableAnnotationComposer,
+    $$_MedicationPlansTableCreateCompanionBuilder,
+    $$_MedicationPlansTableUpdateCompanionBuilder,
+    (
+      _MedicationPlan,
+      BaseReferences<_$_AccountDatabase, $_MedicationPlansTable,
+          _MedicationPlan>
+    ),
+    _MedicationPlan,
+    PrefetchHooks Function()>;
+typedef $$_MedicationDoseRecordsTableCreateCompanionBuilder
+    = _MedicationDoseRecordsCompanion Function({
+  required String accountId,
+  required String recordId,
+  required int schemaVersion,
+  required String payload,
+  required DateTime updatedAt,
+  Value<int> rowid,
+});
+typedef $$_MedicationDoseRecordsTableUpdateCompanionBuilder
+    = _MedicationDoseRecordsCompanion Function({
+  Value<String> accountId,
+  Value<String> recordId,
+  Value<int> schemaVersion,
+  Value<String> payload,
+  Value<DateTime> updatedAt,
+  Value<int> rowid,
+});
+
+class $$_MedicationDoseRecordsTableFilterComposer
+    extends Composer<_$_AccountDatabase, $_MedicationDoseRecordsTable> {
+  $$_MedicationDoseRecordsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get accountId => $composableBuilder(
+      column: $table.accountId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get recordId => $composableBuilder(
+      column: $table.recordId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get schemaVersion => $composableBuilder(
+      column: $table.schemaVersion, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get payload => $composableBuilder(
+      column: $table.payload, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$_MedicationDoseRecordsTableOrderingComposer
+    extends Composer<_$_AccountDatabase, $_MedicationDoseRecordsTable> {
+  $$_MedicationDoseRecordsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get accountId => $composableBuilder(
+      column: $table.accountId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get recordId => $composableBuilder(
+      column: $table.recordId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get schemaVersion => $composableBuilder(
+      column: $table.schemaVersion,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+      column: $table.payload, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$_MedicationDoseRecordsTableAnnotationComposer
+    extends Composer<_$_AccountDatabase, $_MedicationDoseRecordsTable> {
+  $$_MedicationDoseRecordsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get accountId =>
+      $composableBuilder(column: $table.accountId, builder: (column) => column);
+
+  GeneratedColumn<String> get recordId =>
+      $composableBuilder(column: $table.recordId, builder: (column) => column);
+
+  GeneratedColumn<int> get schemaVersion => $composableBuilder(
+      column: $table.schemaVersion, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$_MedicationDoseRecordsTableTableManager extends RootTableManager<
+    _$_AccountDatabase,
+    $_MedicationDoseRecordsTable,
+    _MedicationDoseRecord,
+    $$_MedicationDoseRecordsTableFilterComposer,
+    $$_MedicationDoseRecordsTableOrderingComposer,
+    $$_MedicationDoseRecordsTableAnnotationComposer,
+    $$_MedicationDoseRecordsTableCreateCompanionBuilder,
+    $$_MedicationDoseRecordsTableUpdateCompanionBuilder,
+    (
+      _MedicationDoseRecord,
+      BaseReferences<_$_AccountDatabase, $_MedicationDoseRecordsTable,
+          _MedicationDoseRecord>
+    ),
+    _MedicationDoseRecord,
+    PrefetchHooks Function()> {
+  $$_MedicationDoseRecordsTableTableManager(
+      _$_AccountDatabase db, $_MedicationDoseRecordsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$_MedicationDoseRecordsTableFilterComposer(
+                  $db: db, $table: table),
+          createOrderingComposer: () =>
+              $$_MedicationDoseRecordsTableOrderingComposer(
+                  $db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$_MedicationDoseRecordsTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> accountId = const Value.absent(),
+            Value<String> recordId = const Value.absent(),
+            Value<int> schemaVersion = const Value.absent(),
+            Value<String> payload = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              _MedicationDoseRecordsCompanion(
+            accountId: accountId,
+            recordId: recordId,
+            schemaVersion: schemaVersion,
+            payload: payload,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String accountId,
+            required String recordId,
+            required int schemaVersion,
+            required String payload,
+            required DateTime updatedAt,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              _MedicationDoseRecordsCompanion.insert(
+            accountId: accountId,
+            recordId: recordId,
+            schemaVersion: schemaVersion,
+            payload: payload,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$_MedicationDoseRecordsTableProcessedTableManager
+    = ProcessedTableManager<
+        _$_AccountDatabase,
+        $_MedicationDoseRecordsTable,
+        _MedicationDoseRecord,
+        $$_MedicationDoseRecordsTableFilterComposer,
+        $$_MedicationDoseRecordsTableOrderingComposer,
+        $$_MedicationDoseRecordsTableAnnotationComposer,
+        $$_MedicationDoseRecordsTableCreateCompanionBuilder,
+        $$_MedicationDoseRecordsTableUpdateCompanionBuilder,
+        (
+          _MedicationDoseRecord,
+          BaseReferences<_$_AccountDatabase, $_MedicationDoseRecordsTable,
+              _MedicationDoseRecord>
+        ),
+        _MedicationDoseRecord,
+        PrefetchHooks Function()>;
 typedef $$_PendingOperationsTableCreateCompanionBuilder
     = _PendingOperationsCompanion Function({
   required String accountId,
@@ -2705,6 +4208,12 @@ class $_AccountDatabaseManager {
       $$_FocusSessionsTableTableManager(_db, _db.focusSessions);
   $$_CheckInsTableTableManager get checkIns =>
       $$_CheckInsTableTableManager(_db, _db.checkIns);
+  $$_ScheduleFeedbacksTableTableManager get scheduleFeedbacks =>
+      $$_ScheduleFeedbacksTableTableManager(_db, _db.scheduleFeedbacks);
+  $$_MedicationPlansTableTableManager get medicationPlans =>
+      $$_MedicationPlansTableTableManager(_db, _db.medicationPlans);
+  $$_MedicationDoseRecordsTableTableManager get medicationDoseRecords =>
+      $$_MedicationDoseRecordsTableTableManager(_db, _db.medicationDoseRecords);
   $$_PendingOperationsTableTableManager get pendingOperations =>
       $$_PendingOperationsTableTableManager(_db, _db.pendingOperations);
 }

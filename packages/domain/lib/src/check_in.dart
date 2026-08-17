@@ -7,7 +7,11 @@ final class CheckIn {
     required this.energy,
     required this.mood,
     required this.feedback,
-  }) : recordedAt = recordedAt.toUtc() {
+    DateTime? sleepStartedAt,
+    DateTime? sleepEndedAt,
+  })  : recordedAt = recordedAt.toUtc(),
+        sleepStartedAt = sleepStartedAt?.toUtc(),
+        sleepEndedAt = sleepEndedAt?.toUtc() {
     if (sleepMinutes < 0) {
       throw ArgumentError.value(
           sleepMinutes, 'sleepMinutes', 'must not be negative');
@@ -15,6 +19,13 @@ final class CheckIn {
     _validateRating(sleepQuality, 'sleepQuality');
     _validateRating(energy, 'energy');
     _validateRating(mood, 'mood');
+    if ((this.sleepStartedAt == null) != (this.sleepEndedAt == null)) {
+      throw ArgumentError('sleep start and end must be provided together');
+    }
+    if (this.sleepStartedAt != null &&
+        !this.sleepEndedAt!.isAfter(this.sleepStartedAt!)) {
+      throw ArgumentError('sleep end must be after sleep start');
+    }
   }
 
   factory CheckIn.fromJson(Map<String, Object?> json) => CheckIn(
@@ -25,6 +36,12 @@ final class CheckIn {
         energy: json['energy']! as int,
         mood: json['mood']! as int,
         feedback: json['feedback']! as String,
+        sleepStartedAt: json['sleepStartedAt'] == null
+            ? null
+            : DateTime.parse(json['sleepStartedAt']! as String),
+        sleepEndedAt: json['sleepEndedAt'] == null
+            ? null
+            : DateTime.parse(json['sleepEndedAt']! as String),
       );
 
   final String id;
@@ -34,6 +51,8 @@ final class CheckIn {
   final int energy;
   final int mood;
   final String feedback;
+  final DateTime? sleepStartedAt;
+  final DateTime? sleepEndedAt;
 
   Map<String, Object?> toJson() => <String, Object?>{
         'id': id,
@@ -43,6 +62,8 @@ final class CheckIn {
         'energy': energy,
         'mood': mood,
         'feedback': feedback,
+        'sleepStartedAt': sleepStartedAt?.toIso8601String(),
+        'sleepEndedAt': sleepEndedAt?.toIso8601String(),
       };
 
   static void _validateRating(int value, String fieldName) {

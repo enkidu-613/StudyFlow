@@ -27,6 +27,7 @@ final class SyncEngine {
     required AuthContext authContext,
     required AccountScopedStore store,
     SyncLogger? logger,
+    this.refreshAuthContext,
     this.batchSize = 50,
   })  : _api = api,
         _authContext = authContext,
@@ -46,9 +47,10 @@ final class SyncEngine {
   }
 
   final SyncApi _api;
-  final AuthContext _authContext;
+  AuthContext _authContext;
   final AccountScopedStore _store;
   final SyncLogger _logger;
+  final Future<AuthContext> Function()? refreshAuthContext;
   final int batchSize;
   final ValueNotifier<SyncStatus> _status;
 
@@ -56,7 +58,20 @@ final class SyncEngine {
 
   Future<int> pendingCount() => _store.operations.pendingCount();
 
-  Future<SyncRunResult> runOnce() async {
+  Future<SyncRunResult> runOnce() => _runOnce(allowAuthenticationRefresh: true);
+
+  void replaceAuthContext(AuthContext authContext) {
+    if (authContext.userId != _store.activeAccountId) {
+      throw const AuthScopeException(
+        'Refreshed credentials do not match the active sync account.',
+      );
+    }
+    _authContext = authContext;
+  }
+
+  Future<SyncRunResult> _runOnce({
+    required bool allowAuthenticationRefresh,
+  }) async {
     final queuedBefore = await pendingCount();
     _status.value = SyncStatus.syncing(pendingCount: queuedBefore);
     var pushedCount = 0;
@@ -141,6 +156,16 @@ final class SyncEngine {
         cursor,
       );
     } on SyncAuthenticationFailure {
+      final refresh = refreshAuthContext;
+      if (allowAuthenticationRefresh && refresh != null) {
+        try {
+          replaceAuthContext(await refresh());
+          return _runOnce(allowAuthenticationRefresh: false);
+        } on Object {
+          // A rejected or unusable refresh token is surfaced as the existing
+          // authentication failure state, without introducing a retry loop.
+        }
+      }
       return _failureResult(
         SyncStatusKind.failed,
         SyncFailureCategory.authentication,
@@ -334,6 +359,23 @@ final class SyncEngine {
         final checkIn = CheckIn.fromJson(remoteJson);
         if (checkIn.id != operation.recordId) {
           throw const FormatException('Check-in id does not match record id.');
+        }
+      } else if (operation.entityType == EntityType.scheduleFeedback.wireName) {
+        final feedback = ScheduleFeedback.fromJson(remoteJson);
+        if (feedback.id != operation.recordId) {
+          throw const FormatException(
+            'Schedule feedback id does not match record id.',
+          );
+        }
+      } else if (operation.entityType == EntityType.medicationPlan.wireName) {
+        final plan = MedicationPlan.fromJson(remoteJson);
+        if (plan.id != operation.recordId) {
+          throw const FormatException('Medication plan id does not match record id.');
+        }
+      } else if (operation.entityType == EntityType.medicationDoseRecord.wireName) {
+        final record = MedicationDoseRecord.fromJson(remoteJson);
+        if (record.id != operation.recordId) {
+          throw const FormatException('Medication dose record id does not match record id.');
         }
       }
     } on Object catch (error) {

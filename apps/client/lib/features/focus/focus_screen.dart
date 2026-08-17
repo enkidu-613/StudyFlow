@@ -29,6 +29,10 @@ final class _FocusScreenState extends State<FocusScreen> {
   Duration _target = Duration.zero;
   DateTime _now = DateTime.now();
   Timer? _timer;
+  bool _nativeReminderScheduled = false;
+  bool _finishing = false;
+  Future<Object?>? _reminderScheduleFuture;
+  int _reminderGeneration = 0;
 
   DateTime _currentTime() => (widget.now ?? DateTime.now)();
 
@@ -79,9 +83,10 @@ final class _FocusScreenState extends State<FocusScreen> {
     }
   }
 
-  Task? _selectedTask() => _tasks
-      .where((task) => task.id == _taskId)
-      .firstOrNull;
+  Task? _selectedTask() =>
+      _tasks.where((task) => task.id == _taskId).firstOrNull;
+
+  String? get _focusReminderId => _taskId == null ? null : 'focus:$_taskId';
 
   Future<void> _start() async {
     final taskId = _taskId;
@@ -91,6 +96,7 @@ final class _FocusScreenState extends State<FocusScreen> {
     }
     final now = _currentTime();
     setState(() {
+      _finishing = false;
       _sessionStartedAt = now;
       _segmentStartedAt = now;
       _accumulated = Duration.zero;
@@ -105,6 +111,7 @@ final class _FocusScreenState extends State<FocusScreen> {
     final result = await widget.workspace.platform.startFocusSession(
       title: task.title,
     );
+    await _scheduleFocusReminder(at: now.add(_target));
     if (mounted && !result.isSupported) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(result.message)),
@@ -113,7 +120,7 @@ final class _FocusScreenState extends State<FocusScreen> {
   }
 
   void _tick() {
-    if (!mounted) {
+    if (!mounted || _finishing) {
       return;
     }
     setState(() => _now = _currentTime());
@@ -124,9 +131,10 @@ final class _FocusScreenState extends State<FocusScreen> {
 
   Future<void> _autoFinish() async {
     final taskId = _taskId;
-    if (taskId == null || _sessionStartedAt == null) {
+    if (_finishing || taskId == null || _sessionStartedAt == null) {
       return;
     }
+    _finishing = true;
     final l10n = context.l10n;
     final task = _selectedTask();
     final title = task?.title ?? l10n.focusDefaultTitle;
@@ -134,6 +142,8 @@ final class _FocusScreenState extends State<FocusScreen> {
     final alertBody = l10n.focusCompletedBody;
     final snack = l10n.focusCompleted;
     final end = _currentTime();
+    final nativeReminderWasScheduled = await _waitForNativeReminder();
+    _nativeReminderScheduled = false;
     final session = FocusSession(
       id: newUuidV4(),
       taskId: taskId,
@@ -145,9 +155,18 @@ final class _FocusScreenState extends State<FocusScreen> {
       session,
       write: await widget.workspace.nextWrite(),
     );
+    // The end-of-session alarm is acknowledged separately by the shell, but
+    // the informational "session started" notification must not remain in
+    // the notification shade after the session has ended.
+    unawaited(
+      widget.workspace.platform
+          .cancelFocusSessionNotification()
+          .then((_) {}, onError: (_) {}),
+    );
     _timer?.cancel();
     if (mounted) {
       setState(() {
+        _finishing = false;
         _sessionStartedAt = null;
         _segmentStartedAt = null;
         _accumulated = Duration.zero;
@@ -157,11 +176,19 @@ final class _FocusScreenState extends State<FocusScreen> {
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text(snack)));
     }
-    unawaited(
-      widget.workspace.platform
-          .playAlarm(title: alertTitle, text: alertBody)
-          .then((_) {}, onError: (_) {}),
-    );
+    if (!nativeReminderWasScheduled) {
+      unawaited(
+        widget.workspace.platform
+            .playAlarm(
+              title: alertTitle,
+              text: alertBody,
+              identifier: _focusReminderId,
+              kind: 'focus',
+              entityId: taskId,
+            )
+            .then((_) {}, onError: (_) {}),
+      );
+    }
     await _refresh();
   }
 
@@ -174,23 +201,31 @@ final class _FocusScreenState extends State<FocusScreen> {
       _accumulated += _now.difference(startedAt);
       _segmentStartedAt = null;
     });
+    _nativeReminderScheduled = false;
+    unawaited(_cancelFocusReminder());
   }
 
   void _resume() {
     if (_sessionStartedAt == null || _running) {
       return;
     }
+    final now = _currentTime();
+    final remaining = _remaining;
     setState(() {
-      _segmentStartedAt = _currentTime();
-      _now = _segmentStartedAt!;
+      _segmentStartedAt = now;
+      _now = now;
     });
+    unawaited(_scheduleFocusReminder(at: now.add(remaining)));
   }
 
   Future<void> _finish() async {
     final startedAt = _sessionStartedAt;
-    if (startedAt == null || _taskId == null) {
+    if (_finishing || startedAt == null || _taskId == null) {
       return;
     }
+    _finishing = true;
+    _nativeReminderScheduled = false;
+    unawaited(_cancelFocusReminder());
     final end = _currentTime();
     final session = FocusSession(
       id: newUuidV4(),
@@ -203,9 +238,15 @@ final class _FocusScreenState extends State<FocusScreen> {
       session,
       write: await widget.workspace.nextWrite(),
     );
+    unawaited(
+      widget.workspace.platform
+          .cancelFocusSessionNotification()
+          .then((_) {}, onError: (_) {}),
+    );
     _timer?.cancel();
     if (mounted) {
       setState(() {
+        _finishing = false;
         _sessionStartedAt = null;
         _segmentStartedAt = null;
         _accumulated = Duration.zero;
@@ -213,6 +254,63 @@ final class _FocusScreenState extends State<FocusScreen> {
       });
     }
     await _refresh();
+  }
+
+  Future<void> _scheduleFocusReminder({required DateTime at}) async {
+    final task = _selectedTask();
+    if (task == null) {
+      return;
+    }
+    final l10n = context.l10n;
+    final generation = ++_reminderGeneration;
+    final identifier = _focusReminderId;
+    final future = widget.workspace.platform.scheduleReminder(
+      title: l10n.focusCompletedTitle(task.title),
+      at: at,
+      payload: l10n.focusCompletedBody,
+      identifier: identifier,
+      kind: 'focus',
+      entityId: _taskId,
+    );
+    _reminderScheduleFuture = future;
+    final result = await future;
+    if (generation != _reminderGeneration || _sessionStartedAt == null) {
+      if (result.isSupported && identifier != null) {
+        await widget.workspace.platform.cancelReminder(identifier);
+      }
+      return;
+    }
+    _reminderScheduleFuture = null;
+    _nativeReminderScheduled = result.isSupported;
+    if (mounted && !result.isSupported) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.message)),
+      );
+    }
+  }
+
+  Future<void> _cancelFocusReminder() async {
+    _reminderGeneration += 1;
+    _reminderScheduleFuture = null;
+    _nativeReminderScheduled = false;
+    final identifier = _focusReminderId;
+    if (identifier == null) {
+      return;
+    }
+    await widget.workspace.platform.cancelReminder(identifier);
+  }
+
+  Future<bool> _waitForNativeReminder() async {
+    final pending = _reminderScheduleFuture;
+    if (pending == null) {
+      return _nativeReminderScheduled;
+    }
+    try {
+      await pending;
+    } on Object {
+      return false;
+    }
+    return _nativeReminderScheduled;
   }
 
   @override

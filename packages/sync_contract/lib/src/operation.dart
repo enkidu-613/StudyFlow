@@ -8,6 +8,9 @@ const Set<String> supportedEntityTypes = <String>{
   'schedule_block',
   'focus_session',
   'check_in',
+  'schedule_feedback',
+  'medication_plan',
+  'medication_dose_record',
 };
 
 class SyncOperationV2 {
@@ -36,7 +39,8 @@ class SyncOperationV2 {
     };
     final unknownFields = json.keys.where((key) => !fields.contains(key));
     if (unknownFields.isNotEmpty) {
-      throw SyncContractException('unknown fields: ${unknownFields.join(', ')}');
+      throw SyncContractException(
+          'unknown fields: ${unknownFields.join(', ')}');
     }
     try {
       final payload = json['payload'];

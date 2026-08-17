@@ -14,37 +14,55 @@ final class ClientSession {
     this.authRepository,
     this.syncApi,
     this.syncEngine,
-  });
+    required Timer Function(Duration, void Function()) tokenRefreshTimerFactory,
+    this.onSessionExpired,
+  }) : _tokenRefreshTimerFactory = tokenRefreshTimerFactory;
 
   final StudyFlowWorkspace workspace;
   final AuthRepository? authRepository;
   final HttpSyncApi? syncApi;
   final SyncEngine? syncEngine;
+  final Timer Function(Duration, void Function()) _tokenRefreshTimerFactory;
+  final Future<void> Function()? onSessionExpired;
+  Timer? _tokenRefreshTimer;
+  bool _sessionExpired = false;
 
   static Future<ClientSession> openAuthenticated({
     required AuthContext authContext,
     required Uri apiBaseUri,
     AuthRepository? authRepository,
     http.Client? httpClient,
+    Future<StudyFlowWorkspace> Function(AuthContext)? workspaceOpener,
+    Timer Function(Duration, void Function())? tokenRefreshTimerFactory,
+    Future<void> Function()? onSessionExpired,
   }) async {
-    final workspace = await StudyFlowWorkspace.openAuthenticated(
-      authContext: authContext,
+    final workspace = await (workspaceOpener ??
+        (context) => StudyFlowWorkspace.openAuthenticated(
+              authContext: context,
+            ))(
+      authContext,
     );
     final syncApi = HttpSyncApi(
       baseUri: apiBaseUri,
       client: httpClient,
     );
+    late final ClientSession session;
     final syncEngine = SyncEngine(
       api: syncApi,
       authContext: authContext,
       store: workspace.store,
+      refreshAuthContext:
+          authRepository == null ? null : () => session._refreshForSync(),
     );
-    final session = ClientSession._(
+    session = ClientSession._(
       workspace: workspace,
       authRepository: authRepository,
       syncApi: syncApi,
       syncEngine: syncEngine,
+      tokenRefreshTimerFactory: tokenRefreshTimerFactory ?? Timer.new,
+      onSessionExpired: onSessionExpired,
     );
+    session._scheduleTokenRefresh(authContext);
     unawaited(session.syncNow());
     return session;
   }
@@ -53,7 +71,59 @@ final class ClientSession {
       ? Future<SyncRunResult?>.value()
       : syncEngine!.runOnce();
 
+  Future<AuthContext> _refreshForSync() async {
+    final refreshed = await _refreshAuthentication();
+    _scheduleTokenRefresh(refreshed);
+    return refreshed;
+  }
+
+  Future<void> _refreshProactively() async {
+    try {
+      final refreshed = await _refreshAuthentication();
+      syncEngine?.replaceAuthContext(refreshed);
+      _scheduleTokenRefresh(refreshed);
+    } on Object {
+      // The next sync will show its existing network/authentication status.
+    }
+  }
+
+  Future<AuthContext> _refreshAuthentication() async {
+    final repository = authRepository;
+    if (repository == null) {
+      throw const AuthScopeException('No authentication repository is active.');
+    }
+    try {
+      return await repository.refresh();
+    } on AuthApiException catch (error) {
+      if (error.statusCode == 401) {
+        await _expireSession();
+      }
+      rethrow;
+    }
+  }
+
+  void _scheduleTokenRefresh(AuthContext context) {
+    _tokenRefreshTimer?.cancel();
+    final secondsUntilRefresh = context.expiresIn - 60;
+    final delay =
+        Duration(seconds: secondsUntilRefresh > 0 ? secondsUntilRefresh : 1);
+    _tokenRefreshTimer = _tokenRefreshTimerFactory(
+      delay,
+      () => unawaited(_refreshProactively()),
+    );
+  }
+
+  Future<void> _expireSession() async {
+    if (_sessionExpired) {
+      return;
+    }
+    _sessionExpired = true;
+    _tokenRefreshTimer?.cancel();
+    await onSessionExpired?.call();
+  }
+
   Future<void> close() async {
+    _tokenRefreshTimer?.cancel();
     syncEngine?.dispose();
     syncApi?.close();
     await workspace.close();

@@ -119,6 +119,30 @@ def test_unknown_entity_type_is_rejected() -> None:
         SyncOperationV2.model_validate(operation)
 
 
+def test_schedule_feedback_entity_type_is_accepted() -> None:
+    operation = dict(_load_fixture("sync_push_v2.json")["operations"][0])
+    operation["entityType"] = "schedule_feedback"
+    operation["payload"] = {"id": operation["recordId"], "outcome": "completed"}
+
+    parsed = SyncOperationV2.model_validate(operation)
+
+    assert parsed.entity_type == "schedule_feedback"
+
+
+def test_medication_entities_are_accepted_but_raw_order_is_rejected() -> None:
+    operation = dict(_load_fixture("sync_push_v2.json")["operations"][0])
+    operation["entityType"] = "medication_plan"
+    operation["payload"] = {"id": operation["recordId"], "name": "测试药"}
+    assert SyncOperationV2.model_validate(operation).entity_type == "medication_plan"
+
+    operation["payload"] = {
+        "id": operation["recordId"],
+        "rawMedicalOrder": "医嘱原文不得同步",
+    }
+    with pytest.raises(ValidationError):
+        SyncOperationV2.model_validate(operation)
+
+
 def test_extra_user_id_field_is_rejected() -> None:
     operation = dict(_load_fixture("sync_push_v2.json")["operations"][0])
     operation["userId"] = "11111111-1111-4111-8111-111111111111"

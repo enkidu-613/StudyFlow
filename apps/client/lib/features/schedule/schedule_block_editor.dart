@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:studyflow/app/studyflow_workspace.dart';
 import 'package:studyflow/l10n/app_localizations.dart';
@@ -104,21 +102,10 @@ final class _ScheduleBlockEditorState extends State<ScheduleBlockEditor> {
       block,
       write: await widget.workspace.nextWrite(),
     );
-    widget.workspace.alarms.upsert(
+    await widget.workspace.alarms.upsert(
       block,
       title: reminderTitle,
       text: reminderBody,
-    );
-    unawaited(
-      widget.workspace.platform.scheduleReminder(
-        title: reminderTitle,
-        at: block.start,
-        payload: reminderBody,
-        identifier: block.id,
-      ).then(
-        (_) {},
-        onError: (_) {},
-      ),
     );
     if (mounted) {
       Navigator.of(context).pop(block);
