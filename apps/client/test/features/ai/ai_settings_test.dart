@@ -44,6 +44,7 @@ final class RecordingAiRepository implements AiRepository {
     required AiScheduleLookup scheduleLookup,
     AiScheduleFeedbackLookup? feedbackLookup,
     AiMedicationLookup? medicationLookup,
+    AiTaskLookup? taskLookup,
     AiWorkspaceChangeLookup? workspaceChangeLookup,
   }) async =>
       const AiCoachReply('测试回复');

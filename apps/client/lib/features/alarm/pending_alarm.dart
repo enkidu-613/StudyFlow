@@ -1,6 +1,7 @@
 enum PendingAlarmKind {
   focus,
   schedule,
+  medication,
   other,
 }
 
@@ -22,6 +23,7 @@ final class PendingAlarm {
       kind: switch (kindName) {
         'focus' => PendingAlarmKind.focus,
         'schedule' => PendingAlarmKind.schedule,
+        'medication' => PendingAlarmKind.medication,
         _ => PendingAlarmKind.other,
       },
       entityId: json['entity_id'] as String?,

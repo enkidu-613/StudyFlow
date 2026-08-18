@@ -18,6 +18,9 @@ import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.os.Process
 import android.provider.Settings
 import android.util.Log
@@ -405,12 +408,20 @@ object StudyFlowPlatform {
                 text,
                 requestCodeFor(alarmId),
                 ongoing = true,
+                kind = kind,
             )
         }
         if (hasNotificationPermission(context)) {
-            AlarmRingingService.start(context, alarmId)
+            AlarmRingingService.start(
+                context,
+                alarmId,
+                shouldVibrate = kind == "medication",
+            )
         } else {
-            AlarmSoundController.play(context)
+            AlarmSoundController.play(
+                context,
+                shouldVibrate = kind == "medication",
+            )
         }
         result.success(
             mapOf(
@@ -568,13 +579,13 @@ class ReminderReceiver : BroadcastReceiver() {
         val text = intent.getStringExtra("text") ?: "Scheduled block"
         val notificationId = intent.getIntExtra("notification_id", 1000)
         val reminderId = intent.getStringExtra("reminder_id")
+        val kind = intent.getStringExtra("kind") ?: "other"
         Log.i(
             alarmLogTag,
-            "ReminderReceiver fired id=$reminderId kind=${intent.getStringExtra("kind")} " +
+            "ReminderReceiver fired id=$reminderId kind=$kind " +
                 "at=${System.currentTimeMillis()}",
         )
         if (reminderId != null) {
-            val kind = intent.getStringExtra("kind") ?: "other"
             val entityId = intent.getStringExtra("entity_id")
             rememberPendingAlarm(context, reminderId, title, text, kind, entityId)
             // The one-shot AlarmManager entry has fired. Keep the pending
@@ -592,16 +603,30 @@ class ReminderReceiver : BroadcastReceiver() {
             )
         }
         if (hasNotificationPermission(context)) {
-            postAlarmNotification(context, title, text, notificationId, ongoing = true)
+            postAlarmNotification(
+                context,
+                title,
+                text,
+                notificationId,
+                ongoing = true,
+                kind = kind,
+            )
         }
         if (reminderId != null) {
             try {
-                AlarmRingingService.start(context, reminderId)
+                AlarmRingingService.start(
+                    context,
+                    reminderId,
+                    shouldVibrate = kind == "medication",
+                )
             } catch (error: Throwable) {
                 Log.e(alarmLogTag, "Unable to start alarm foreground service", error)
             }
         } else {
-            AlarmSoundController.play(context)
+            AlarmSoundController.play(
+                context,
+                shouldVibrate = kind == "medication",
+            )
         }
     }
 }
@@ -669,6 +694,10 @@ class AlarmRingingService : android.app.Service() {
             stopIfIdle(this)
             return START_NOT_STICKY
         }
+        val shouldVibrate = intent.getBooleanExtra(
+            "should_vibrate",
+            alarm.optString("kind", "other") == "medication",
+        )
         val notificationId = requestCodeFor(alarmId)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForeground(
@@ -679,6 +708,7 @@ class AlarmRingingService : android.app.Service() {
                     alarm.optString("text", ""),
                     notificationId,
                     ongoing = true,
+                    kind = alarm.optString("kind", "other"),
                 ),
             )
         } else {
@@ -691,11 +721,15 @@ class AlarmRingingService : android.app.Service() {
                     alarm.optString("text", ""),
                     notificationId,
                     ongoing = true,
+                    kind = alarm.optString("kind", "other"),
                 ),
             )
         }
         Log.i(alarmLogTag, "AlarmRingingService starting looping sound id=$alarmId")
-        AlarmSoundController.play(this)
+        AlarmSoundController.play(
+            this,
+            shouldVibrate = shouldVibrate,
+        )
         return START_STICKY
     }
 
@@ -716,9 +750,14 @@ class AlarmRingingService : android.app.Service() {
     override fun onBind(intent: Intent?): android.os.IBinder? = null
 
     companion object {
-        fun start(context: Context, alarmId: String) {
+        fun start(
+            context: Context,
+            alarmId: String,
+            shouldVibrate: Boolean = false,
+        ) {
             val intent = Intent(context, AlarmRingingService::class.java)
                 .putExtra("alarm_id", alarmId)
+                .putExtra("should_vibrate", shouldVibrate)
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     ContextCompat.startForegroundService(context, intent)
@@ -750,7 +789,11 @@ class AlarmRingingService : android.app.Service() {
                 // Reuse the running service when another alarm is pending.
                 // Stopping and immediately starting it races with onDestroy,
                 // whose cleanup would otherwise stop the new ringtone too.
-                start(context, nextId)
+                start(
+                    context,
+                    nextId,
+                    shouldVibrate = next.get("kind") == "medication",
+                )
             } else {
                 context.stopService(Intent(context, AlarmRingingService::class.java))
             }
@@ -768,6 +811,10 @@ private const val focusSessionNotificationId = 2000
 // The version suffix also avoids reusing the old channel whose sound setting
 // is immutable after it has been created on the device.
 private const val alarmChannelId = "studyflow_alarm_v3_silent"
+// v2: bumped so devices that already created v1 (with channel vibration
+// enabled) drop the stale one-shot channel vibration, which would otherwise
+// cancel the repeating programmatic alarm vibration.
+private const val medicationAlarmChannelId = "studyflow_medication_alarm_v2"
 private const val alarmEventsChannelName = "studyflow/alarm_events"
 private const val alarmLogTag = "StudyFlowAlarm"
 
@@ -1120,11 +1167,12 @@ private fun postAlarmNotification(
     text: String,
     notificationId: Int,
     ongoing: Boolean = true,
+    kind: String = "other",
 ) {
     val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     manager.notify(
         notificationId,
-        buildAlarmNotification(context, title, text, notificationId, ongoing),
+        buildAlarmNotification(context, title, text, notificationId, ongoing, kind),
     )
 }
 
@@ -1134,6 +1182,7 @@ private fun buildAlarmNotification(
     text: String,
     notificationId: Int,
     ongoing: Boolean,
+    kind: String = "other",
 ): Notification {
     val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     val openIntent = Intent(context, MainActivity::class.java).apply {
@@ -1152,18 +1201,23 @@ private fun buildAlarmNotification(
         PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag,
     )
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val isMedication = kind == "medication"
+        val channelId = if (isMedication) medicationAlarmChannelId else alarmChannelId
         val channel = NotificationChannel(
-            alarmChannelId,
-            "StudyFlow alarms",
+            channelId,
+            if (isMedication) "StudyFlow medication reminders" else "StudyFlow alarms",
             NotificationManager.IMPORTANCE_HIGH,
         ).apply {
             setSound(null, null)
+            // Vibration is driven programmatically by AlarmSoundController;
+            // a channel-level one-shot vibration would cancel the repeating
+            // alarm vibration started by the foreground service.
             enableVibration(false)
             enableLights(true)
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         }
         manager.createNotificationChannel(channel)
-        val notification = Notification.Builder(context, alarmChannelId)
+        val notification = Notification.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(title)
             .setContentText(text)
@@ -1192,8 +1246,9 @@ private fun buildAlarmNotification(
 
 private object AlarmSoundController {
     private var activeRingtone: Ringtone? = null
+    private var activeVibrator: Vibrator? = null
 
-    fun play(context: Context) {
+    fun play(context: Context, shouldVibrate: Boolean = false) {
         stop()
         val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
@@ -1208,10 +1263,50 @@ private object AlarmSoundController {
         }
         activeRingtone = ringtone
         ringtone.play()
+        if (shouldVibrate) {
+            startVibration(context)
+        }
     }
 
     fun stop() {
         activeRingtone?.stop()
         activeRingtone = null
+        activeVibrator?.cancel()
+        activeVibrator = null
+    }
+
+    // Medication vibration runs programmatically instead of via the
+    // notification channel: channel settings are immutable after creation,
+    // and a repeating waveform with USAGE_ALARM attributes is required for
+    // background vibration on Android 16. Schedule and focus alarms call
+    // play() with shouldVibrate=false, so they remain audible only.
+    private fun startVibration(context: Context) {
+        try {
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val manager =
+                    context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                manager.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            }
+            if (!vibrator.hasVibrator()) {
+                return
+            }
+            val attributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+            val pattern = longArrayOf(0L, 600L, 400L, 600L)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createWaveform(pattern, 0), attributes)
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(pattern, 0, attributes)
+            }
+            activeVibrator = vibrator
+        } catch (error: Throwable) {
+            Log.e(alarmLogTag, "Unable to start alarm vibration", error)
+        }
     }
 }

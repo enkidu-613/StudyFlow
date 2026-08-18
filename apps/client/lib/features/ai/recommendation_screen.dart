@@ -56,6 +56,7 @@ final class _RecommendationScreenState extends State<RecommendationScreen> {
   bool _restoring = true;
   List<AiWorkspaceChangeDraft> _pendingDrafts = <AiWorkspaceChangeDraft>[];
   bool _applyingDrafts = false;
+  List<AiWorkspaceChangeResult>? _lastApplyResults;
 
   @override
   void initState() {
@@ -246,6 +247,7 @@ final class _RecommendationScreenState extends State<RecommendationScreen> {
               ? '未能应用 ${failures.length} 项变更，请检查后重试。'
               : '已成功应用 $succeeded 项变更；另有 ${failures.length} 项未能应用。';
       setState(() {
+        _lastApplyResults = results;
         final messageIndex = _messages.length;
         _messages.add(AiCoachMessage.assistant(resultMessage));
         _tracesByMessageIndex[messageIndex] = <AiToolTrace>[
@@ -320,6 +322,8 @@ final class _RecommendationScreenState extends State<RecommendationScreen> {
                         applying: _applyingDrafts,
                         onApply: _applyDrafts,
                       ),
+                    if (_lastApplyResults != null && !_applyingDrafts)
+                      _ApplyResultCard(results: _lastApplyResults!),
                     if (_loading)
                       const _ChatBubble(
                         message: AiCoachMessage.assistant('正在分析你的学习与日程…'),
@@ -508,7 +512,7 @@ final class _WorkspaceChangeCard extends StatelessWidget {
               children: <Widget>[
                 Text('待应用变更', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 6),
-                for (final draft in drafts) Text('• ${_description(draft)}'),
+                for (final draft in drafts) _DraftTile(draft: draft),
                 const SizedBox(height: 8),
                 FilledButton.icon(
                   key: const Key('ai-apply-workspace-changes'),
@@ -523,11 +527,48 @@ final class _WorkspaceChangeCard extends StatelessWidget {
               ]),
         ),
       );
+}
 
-  String _description(AiWorkspaceChangeDraft draft) {
+/// One draft rendered with concrete titles, dates and time ranges — never a
+/// bare UUID — plus a before/after comparison for update drafts.
+final class _DraftTile extends StatelessWidget {
+  const _DraftTile({required this.draft});
+
+  final AiWorkspaceChangeDraft draft;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final title = draft.previewTitle ?? _fallbackTitle(draft);
     final detail = draft.previewTimeRange ?? _fallbackTimeRange(draft);
-    return '${draft.actionLabel}${draft.entityLabel}：$title${detail == null ? '' : '（$detail）'}';
+    final previous = draft.previewPrevious;
+    final isUpdate =
+        draft.action == AiWorkspaceChangeAction.update && previous != null;
+    final after = detail == null ? title : '$title（$detail）';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            '${draft.actionLabel}${draft.entityLabel}：'
+            '$title${detail == null ? '' : '（$detail）'}',
+            key: const Key('ai-draft-summary'),
+          ),
+          if (isUpdate) ...<Widget>[
+            const SizedBox(height: 2),
+            Text(
+              '修改前：$previous',
+              style: TextStyle(color: colors.outline, fontSize: 13),
+            ),
+            Text(
+              '修改后：$after',
+              style: TextStyle(color: colors.primary, fontSize: 13),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   String _fallbackTitle(AiWorkspaceChangeDraft draft) {
@@ -550,6 +591,63 @@ final class _WorkspaceChangeCard extends StatelessWidget {
       if (start != null) start.replaceFirst('T', ' '),
       if (end != null) end.replaceFirst('T', ' ')
     ].join(' 至 ');
+  }
+}
+
+/// Outcome card shown after the user applies drafts: a success summary, or
+/// the concrete per-change failure reasons.
+final class _ApplyResultCard extends StatelessWidget {
+  const _ApplyResultCard({required this.results});
+
+  final List<AiWorkspaceChangeResult> results;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final failures =
+        results.where((result) => !result.succeeded).toList(growable: false);
+    final succeeded = results.length - failures.length;
+    final allSucceeded = failures.isEmpty;
+    return Card(
+      key: const Key('ai-apply-result-card'),
+      margin: const EdgeInsets.only(bottom: 12),
+      color: allSucceeded
+          ? colors.primaryContainer
+          : colors.errorContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Icon(
+                  allSucceeded ? Icons.check_circle : Icons.error_outline,
+                  color: allSucceeded ? colors.primary : colors.error,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  allSucceeded
+                      ? '执行成功：已应用 $succeeded 项变更'
+                      : succeeded == 0
+                          ? '执行失败：${failures.length} 项变更均未应用'
+                          : '部分成功：$succeeded 项成功，${failures.length} 项失败',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ],
+            ),
+            for (final failure in failures) ...<Widget>[
+              const SizedBox(height: 6),
+              Text(
+                '• ${failure.draft.entityLabel}「${failure.draft.previewTitle ?? failure.draft.id ?? ''}」'
+                '失败原因：${failure.error ?? '未知错误'}',
+                style: TextStyle(color: colors.onErrorContainer, fontSize: 13),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }
 

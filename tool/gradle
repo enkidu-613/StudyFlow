@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+tool_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "$tool_dir/.." && pwd)"
+
+source "$tool_dir/android-java-env.sh"
+
+cd "$repo_root/apps/client/android"
+exec ./gradlew "$@"

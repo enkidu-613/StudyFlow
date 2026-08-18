@@ -156,6 +156,7 @@ void main() {
         'get_current_time',
         'get_schedule_feedback',
         'get_medication_plans',
+        'get_tasks',
         'propose_workspace_changes',
       },
     );

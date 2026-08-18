@@ -53,6 +53,10 @@ final class TodayAiPlanning {
         arguments: arguments,
         medicationPlans: medicationPlans,
       ),
+      taskLookup: (arguments) async => _tasksForTool(
+        arguments: arguments,
+        tasks: tasks,
+      ),
       workspaceChangeLookup: (drafts) async => _withHumanReadablePreviews(
         drafts: drafts,
         tasks: tasks,
@@ -106,6 +110,34 @@ final class TodayAiPlanning {
   DateTime? _toolDate(Object? value) =>
       value is String ? DateTime.tryParse(value)?.toUtc() : null;
 
+  List<Map<String, Object?>> _tasksForTool({
+    required Map<String, Object?> arguments,
+    required List<Task> tasks,
+  }) {
+    final ids = arguments['taskIds'] is List
+        ? (arguments['taskIds'] as List).whereType<String>().toSet()
+        : const <String>{};
+    final includeCompleted = arguments['includeCompleted'] as bool? ?? false;
+    return tasks
+        .where((task) =>
+            (ids.isEmpty || ids.contains(task.id)) &&
+            (includeCompleted ||
+                (task.status != TaskStatus.completed &&
+                    task.status != TaskStatus.cancelled)))
+        .take(20)
+        .map((task) => <String, Object?>{
+              'id': task.id,
+              'title': task.title,
+              'description': task.description,
+              'estimatedMinutes': task.estimatedMinutes,
+              'priority': task.priority.name,
+              'status': task.status.name,
+              'tags': task.tags.toList(growable: false),
+              'repeatRule': task.repeatRule.name,
+            })
+        .toList(growable: false);
+  }
+
   List<AiWorkspaceChangeDraft> _withHumanReadablePreviews({
     required List<AiWorkspaceChangeDraft> drafts,
     required List<Task> tasks,
@@ -125,6 +157,7 @@ final class TodayAiPlanning {
           id: draft.id,
           values: values,
           previewTitle: values['title'] as String? ?? existing?.title ?? '任务',
+          previewPrevious: existing?.title,
         );
       }
 
@@ -136,6 +169,10 @@ final class TodayAiPlanning {
       final kind = _scheduleKindFromName(kindName);
       final start = _localDate(values['start']) ?? existing?.start.toLocal();
       final end = _localDate(values['end']) ?? existing?.end.toLocal();
+      final previousTitle = existing == null
+          ? null
+          : tasksById[existing.taskId]?.title ??
+              _scheduleKindLabel(existing.kind);
       return AiWorkspaceChangeDraft(
         entityType: draft.entityType,
         action: draft.action,
@@ -143,6 +180,9 @@ final class TodayAiPlanning {
         values: values,
         previewTitle: tasksById[taskId]?.title ?? _scheduleKindLabel(kind),
         previewTimeRange: _timeRange(start, end),
+        previewPrevious: existing == null
+            ? null
+            : '$previousTitle（${_timeRange(existing.start.toLocal(), existing.end.toLocal()) ?? ''}）',
       );
     }).toList(growable: false);
   }

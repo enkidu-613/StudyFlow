@@ -123,6 +123,33 @@ void main() {
     status.dispose();
   });
 
+  testWidgets('settings shows the server failure detail', (tester) async {
+    final status = ValueNotifier<SyncStatus>(
+      const SyncStatus(
+        kind: SyncStatusKind.failed,
+        pendingCount: 0,
+        failureCategory: SyncFailureCategory.schema,
+        failureMessage: 'entityType: Input should be a valid option',
+      ),
+    );
+
+    await pumpWithL10n(
+      tester,
+      SettingsScreen(
+        workspace: workspace,
+        syncStatus: status,
+      ),
+      locale: const Locale('en'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('entityType: Input should be a valid option'),
+      findsOneWidget,
+    );
+    status.dispose();
+  });
+
   testWidgets('settings no longer offers a recovery key export',
       (tester) async {
     await pumpWithL10n(

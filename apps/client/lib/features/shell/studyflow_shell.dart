@@ -112,8 +112,11 @@ final class _StudyFlowShellState extends State<StudyFlowShell>
 
   Future<void> _confirmAlarm(PendingAlarm alarm) async {
     if (!mounted) return;
-    final target =
-        alarm.kind == PendingAlarmKind.focus ? '/focus' : '/schedule';
+    final target = switch (alarm.kind) {
+      PendingAlarmKind.focus => '/focus',
+      PendingAlarmKind.medication => '/medications',
+      _ => '/schedule',
+    };
     await _navigateTo(target);
     if (!mounted) return;
 

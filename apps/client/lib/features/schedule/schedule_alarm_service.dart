@@ -16,7 +16,7 @@ final class ScheduleAlarmService {
   })  : _workspace = workspace,
         _enabled = enabled {
     if (_enabled) {
-      unawaited(resync());
+      unawaited(_resyncSafely());
     }
   }
 
@@ -39,6 +39,20 @@ final class ScheduleAlarmService {
         title: title,
         text: _defaultText(block),
       );
+    }
+  }
+
+  /// Startup reconciliation must never become an uncaught Flutter exception.
+  ///
+  /// The explicit [resync] method remains awaitable for callers such as sync
+  /// and settings, where the caller can surface an error to the user. This
+  /// wrapper is only for the best-effort constructor startup task.
+  Future<void> _resyncSafely() async {
+    try {
+      await resync();
+    } on Object {
+      // A later explicit sync or upsert can retry alarm registration. One
+      // malformed/stale record must not take down the whole application.
     }
   }
 
@@ -105,7 +119,7 @@ final class ScheduleAlarmService {
       // old implementation started both paths at once, so a slow native call
       // could make the fallback ring and then let AlarmManager ring again.
       unawaited(
-        _scheduleOrFallback(
+        _scheduleOrFallbackSafely(
           block: block,
           alarmId: alarmId,
           occurrence: occurrence,
@@ -121,7 +135,7 @@ final class ScheduleAlarmService {
         '${block.id}:end:${occurrence.toUtc().millisecondsSinceEpoch}';
     final endDelay = end.difference(DateTime.now());
     unawaited(
-      _scheduleOrFallback(
+      _scheduleOrFallbackSafely(
         block: block,
         alarmId: endAlarmId,
         occurrence: end,
@@ -132,6 +146,33 @@ final class ScheduleAlarmService {
         notifyCompletionWhenUnsupported: true,
       ),
     );
+  }
+
+  Future<void> _scheduleOrFallbackSafely({
+    required ScheduleBlock block,
+    required String alarmId,
+    required DateTime occurrence,
+    required Duration delay,
+    required String title,
+    required String text,
+    required int generation,
+    bool notifyCompletionWhenUnsupported = false,
+  }) async {
+    try {
+      await _scheduleOrFallback(
+        block: block,
+        alarmId: alarmId,
+        occurrence: occurrence,
+        delay: delay,
+        title: title,
+        text: text,
+        generation: generation,
+        notifyCompletionWhenUnsupported: notifyCompletionWhenUnsupported,
+      );
+    } on Object {
+      // Platform scheduling is best effort. The UI remains usable and the
+      // next explicit resync/upsert can retry this individual alarm.
+    }
   }
 
   /// Cancels all alarms for [blockId], if any.

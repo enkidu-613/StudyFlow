@@ -268,6 +268,7 @@ final class _CapturingAiRepository implements AiRepository {
   Map<String, double>? sleepMetrics;
   AiScheduleLookup? scheduleLookup;
   AiMedicationLookup? medicationLookup;
+  AiTaskLookup? taskLookup;
   AiWorkspaceChangeLookup? workspaceChangeLookup;
 
   @override
@@ -302,6 +303,7 @@ final class _CapturingAiRepository implements AiRepository {
     required AiScheduleLookup scheduleLookup,
     AiScheduleFeedbackLookup? feedbackLookup,
     AiMedicationLookup? medicationLookup,
+    AiTaskLookup? taskLookup,
     AiWorkspaceChangeLookup? workspaceChangeLookup,
   }) async {
     coachMessage = userMessage;
@@ -309,6 +311,7 @@ final class _CapturingAiRepository implements AiRepository {
     coachTaskTitles = taskTitles;
     this.scheduleLookup = scheduleLookup;
     this.medicationLookup = medicationLookup;
+    this.taskLookup = taskLookup;
     this.workspaceChangeLookup = workspaceChangeLookup;
     return const AiCoachReply('好的，我们先安排休息。');
   }

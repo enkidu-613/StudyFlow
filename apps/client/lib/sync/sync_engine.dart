@@ -141,21 +141,23 @@ final class SyncEngine {
         pendingCount: remaining,
         cursor: cursor,
       );
-    } on SyncOfflineFailure {
+    } on SyncOfflineFailure catch (error) {
       return _failureResult(
         SyncStatusKind.offline,
         SyncFailureCategory.network,
         pushedCount,
         cursor,
+        error.message,
       );
-    } on SyncNetworkFailure {
+    } on SyncNetworkFailure catch (error) {
       return _failureResult(
         SyncStatusKind.failed,
         SyncFailureCategory.network,
         pushedCount,
         cursor,
+        error.message,
       );
-    } on SyncAuthenticationFailure {
+    } on SyncAuthenticationFailure catch (error) {
       final refresh = refreshAuthContext;
       if (allowAuthenticationRefresh && refresh != null) {
         try {
@@ -171,27 +173,31 @@ final class SyncEngine {
         SyncFailureCategory.authentication,
         pushedCount,
         cursor,
+        error.message,
       );
-    } on SyncConflictFailure {
+    } on SyncConflictFailure catch (error) {
       return _failureResult(
         SyncStatusKind.failed,
         SyncFailureCategory.protocol,
         pushedCount,
         cursor,
+        error.message,
       );
-    } on SyncProtocolFailure {
+    } on SyncProtocolFailure catch (error) {
       return _failureResult(
         SyncStatusKind.failed,
         SyncFailureCategory.protocol,
         pushedCount,
         cursor,
+        error.message,
       );
-    } on SyncSchemaFailure {
+    } on SyncSchemaFailure catch (error) {
       return _failureResult(
         SyncStatusKind.failed,
         SyncFailureCategory.schema,
         pushedCount,
         cursor,
+        error.message,
       );
     }
   }
@@ -249,6 +255,7 @@ final class SyncEngine {
     SyncFailureCategory category,
     int pushedCount,
     int cursor,
+    String failureMessage,
   ) async {
     final remaining = await pendingCount();
     _log(
@@ -261,6 +268,7 @@ final class SyncEngine {
       kind: kind,
       pendingCount: remaining,
       failureCategory: category,
+      failureMessage: failureMessage,
       retry: runOnce,
     );
     return SyncRunResult(
@@ -270,6 +278,7 @@ final class SyncEngine {
       pendingCount: remaining,
       cursor: cursor,
       failureCategory: category,
+      failureMessage: failureMessage,
     );
   }
 
@@ -325,7 +334,10 @@ final class SyncEngine {
         schemaVersion: operation.schemaVersion,
       );
     } on Object catch (error) {
-      throw SyncSchemaFailure('Pulled operation was invalid.', cause: error);
+      throw SyncSchemaFailure(
+        'Pulled operation was invalid: $error',
+        cause: error,
+      );
     }
   }
 
@@ -333,6 +345,20 @@ final class SyncEngine {
     Operation operation,
     SyncRecordSnapshot snapshot,
   ) async {
+    // Tombstones intentionally carry an empty payload. Resolve them before
+    // validating the entity payload so deleting a record does not require a
+    // complete, non-null domain object.
+    if (operation.isTombstone) {
+      final currentVersion = snapshot.currentVersion;
+      final shouldDelete = currentVersion == null ||
+          _compareStamp(operation, currentVersion) >= 0;
+      return SyncRecordMutation(
+        recordIdsToDelete:
+            shouldDelete ? <String>[operation.recordId] : const <String>[],
+        recordIncomingVersion: false,
+      );
+    }
+
     late final Map<String, Object?> remoteJson;
     try {
       remoteJson = operation.payload;
@@ -380,19 +406,8 @@ final class SyncEngine {
       }
     } on Object catch (error) {
       throw SyncSchemaFailure(
-        'Pulled operation did not match the supported schema.',
+        'Pulled operation did not match the supported schema: $error',
         cause: error,
-      );
-    }
-
-    if (operation.isTombstone) {
-      final currentVersion = snapshot.currentVersion;
-      final shouldDelete = currentVersion == null ||
-          _compareStamp(operation, currentVersion) >= 0;
-      return SyncRecordMutation(
-        recordIdsToDelete:
-            shouldDelete ? <String>[operation.recordId] : const <String>[],
-        recordIncomingVersion: false,
       );
     }
 
@@ -570,7 +585,7 @@ final class SyncEngine {
       return payload.cast<String, Object?>();
     } on Object catch (error) {
       throw SyncSchemaFailure(
-        'Local record did not match the supported schema.',
+        'Local record did not match the supported schema: $error',
         cause: error,
       );
     }

@@ -44,6 +44,18 @@ mise exec -- poetry install
 bash tool/flutter pub get
 ```
 
+Android 构建会自动选择 Android Gradle 兼容的标准 JDK：优先使用由
+`mise` 选中的标准 JDK，macOS 没有时使用已安装的 Homebrew OpenJDK；不会使用
+GraalVM 或 Java 26。直接运行 Gradle 时也使用项目脚本：
+
+```bash
+# 项目根目录
+bash tool/gradle :app:assembleDebug
+```
+
+如需临时指定 JDK，在命令前设置 `STUDYFLOW_JAVA_HOME`，值必须是包含
+`bin/java` 和 `bin/jlink` 的 JDK 根目录。
+
 ## 测试
 
 ```bash

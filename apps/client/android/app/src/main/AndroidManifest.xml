@@ -1,5 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
     <!--
          StudyFlow is a personal schedule/focus alarm application. It declares
          both SCHEDULE_EXACT_ALARM and USE_EXACT_ALARM:

@@ -67,9 +67,23 @@ final class ClientSession {
     return session;
   }
 
-  Future<SyncRunResult?> syncNow() => syncEngine == null
-      ? Future<SyncRunResult?>.value()
-      : syncEngine!.runOnce();
+  Future<SyncRunResult?> syncNow() async {
+    final engine = syncEngine;
+    if (engine == null) {
+      return null;
+    }
+    final result = await engine.runOnce();
+    // A pull can add or update medication plans after the workspace was
+    // opened. Re-arm both local and native reminders against the merged data.
+    try {
+      await workspace.alarms.resync();
+      await workspace.medicationAlarms.resync();
+    } on Object {
+      // Alarm registration must not turn a successful data sync into a sync
+      // failure. The next app open or manual refresh will retry it.
+    }
+    return result;
+  }
 
   Future<AuthContext> _refreshForSync() async {
     final refreshed = await _refreshAuthentication();

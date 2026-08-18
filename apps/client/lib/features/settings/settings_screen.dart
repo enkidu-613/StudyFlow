@@ -136,8 +136,12 @@ final class _SettingsScreenState extends State<SettingsScreen>
             ),
             const SizedBox(height: 8),
             for (final state in _health?.states ?? const <PermissionState>[])
+              // On Android the native side reports both `notifications` and
+              // the macOS-only alias `userNotifications`; showing both rows
+              // would render the same status twice.
               if (!(Theme.of(context).platform == TargetPlatform.android &&
-                  state.id == PlatformPermissionId.menuBar))
+                  (state.id == PlatformPermissionId.menuBar ||
+                      state.id == PlatformPermissionId.userNotifications)))
                 Card(
                   child: ListTile(
                     leading: Icon(
@@ -457,7 +461,7 @@ final class _SyncStatusCard extends StatelessWidget {
     final isFailed = value.kind == SyncStatusKind.failed;
     final upToDate = value.kind == SyncStatusKind.idle && pending == 0;
     final hasPending = value.kind == SyncStatusKind.idle && pending > 0;
-    final subtitle = switch (value.kind) {
+    final subtitleText = switch (value.kind) {
       SyncStatusKind.idle when hasPending => l10n.syncPendingCount(pending),
       SyncStatusKind.idle => l10n.syncUpToDate,
       SyncStatusKind.syncing => l10n.syncSyncing,
@@ -466,6 +470,22 @@ final class _SyncStatusCard extends StatelessWidget {
           value.failureCategory?.name ?? l10n.syncUnknown,
         ),
     };
+    final failureMessage = value.failureMessage?.trim();
+    final subtitle = isFailed && failureMessage != null && failureMessage.isNotEmpty
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(subtitleText),
+              const SizedBox(height: 2),
+              Text(
+                failureMessage,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          )
+        : Text(subtitleText);
     return Card(
       child: ListTile(
         leading: Icon(
@@ -476,7 +496,7 @@ final class _SyncStatusCard extends StatelessWidget {
                   : Icons.cloud_upload_outlined),
         ),
         title: Text(upToDate ? l10n.syncUpToDate : l10n.syncPending),
-        subtitle: Text(subtitle),
+        subtitle: subtitle,
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[

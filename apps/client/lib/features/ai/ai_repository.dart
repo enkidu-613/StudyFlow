@@ -52,6 +52,7 @@ final class AiWorkspaceChangeDraft {
     this.values = const <String, Object?>{},
     this.previewTitle,
     this.previewTimeRange,
+    this.previewPrevious,
   }) {
     if (action != AiWorkspaceChangeAction.create &&
         (id == null || id!.isEmpty)) {
@@ -94,6 +95,11 @@ final class AiWorkspaceChangeDraft {
   /// into a task or schedule record.
   final String? previewTitle;
   final String? previewTimeRange;
+
+  /// Human-readable description of the entity before this change applies,
+  /// so update/delete drafts can render a before/after comparison instead
+  /// of bare UUIDs. Local-only, like [previewTitle].
+  final String? previewPrevious;
 
   String get entityLabel =>
       entityType == AiWorkspaceEntityType.scheduleBlock ? '日程' : '任务';
@@ -174,6 +180,10 @@ typedef AiMedicationLookup = Future<List<Map<String, Object?>>> Function(
   Map<String, Object?> arguments,
 );
 
+typedef AiTaskLookup = Future<List<Map<String, Object?>>> Function(
+  Map<String, Object?> arguments,
+);
+
 typedef AiWorkspaceChangeLookup = Future<List<AiWorkspaceChangeDraft>> Function(
   List<AiWorkspaceChangeDraft> drafts,
 );
@@ -247,6 +257,7 @@ abstract interface class AiRepository {
     required AiScheduleLookup scheduleLookup,
     AiScheduleFeedbackLookup? feedbackLookup,
     AiMedicationLookup? medicationLookup,
+    AiTaskLookup? taskLookup,
     AiWorkspaceChangeLookup? workspaceChangeLookup,
   });
 
@@ -291,6 +302,7 @@ final class HttpAiRepository implements AiRepository {
     required AiScheduleLookup scheduleLookup,
     AiScheduleFeedbackLookup? feedbackLookup,
     AiMedicationLookup? medicationLookup,
+    AiTaskLookup? taskLookup,
     AiWorkspaceChangeLookup? workspaceChangeLookup,
   }) async {
     final adapter = _adapterFor(settings);
@@ -344,6 +356,7 @@ final class HttpAiRepository implements AiRepository {
             scheduleLookup: scheduleLookup,
             feedbackLookup: feedbackLookup,
             medicationLookup: medicationLookup,
+            taskLookup: taskLookup,
             workspaceChangeLookup: workspaceChangeLookup,
           );
           return leakedDslReply ??
@@ -357,6 +370,7 @@ final class HttpAiRepository implements AiRepository {
             scheduleLookup: scheduleLookup,
             feedbackLookup: feedbackLookup,
             medicationLookup: medicationLookup,
+            taskLookup: taskLookup,
             workspaceChangeLookup: workspaceChangeLookup,
           );
           drafts.addAll(toolResult.drafts);
@@ -435,6 +449,7 @@ final class HttpAiRepository implements AiRepository {
     required AiScheduleLookup scheduleLookup,
     required AiScheduleFeedbackLookup? feedbackLookup,
     required AiMedicationLookup? medicationLookup,
+    required AiTaskLookup? taskLookup,
     required AiWorkspaceChangeLookup? workspaceChangeLookup,
   }) async {
     switch (name) {
@@ -481,6 +496,24 @@ final class HttpAiRepository implements AiRepository {
               });
         return _AiToolResult(
             <String, Object?>{'plans': values.take(20).toList()});
+      case 'get_tasks':
+        final taskIds = arguments['taskIds'];
+        if (taskIds != null && taskIds is! List) {
+          throw const AiSchemaFailure('任务工具的 taskIds 必须是字符串数组。');
+        }
+        final includeCompleted = arguments['includeCompleted'];
+        if (includeCompleted != null && includeCompleted is! bool) {
+          throw const AiSchemaFailure('任务工具的 includeCompleted 必须是布尔值。');
+        }
+        final values = taskLookup == null
+            ? const <Map<String, Object?>>[]
+            : await taskLookup(<String, Object?>{
+                if (taskIds is List) 'taskIds': taskIds,
+                if (includeCompleted is bool)
+                  'includeCompleted': includeCompleted,
+              });
+        return _AiToolResult(
+            <String, Object?>{'tasks': values.take(20).toList()});
       case 'propose_workspace_changes':
         final rawChanges = arguments['changes'];
         if (rawChanges is! List ||
@@ -516,6 +549,7 @@ final class HttpAiRepository implements AiRepository {
     required AiScheduleLookup scheduleLookup,
     required AiScheduleFeedbackLookup? feedbackLookup,
     required AiMedicationLookup? medicationLookup,
+    required AiTaskLookup? taskLookup,
     required AiWorkspaceChangeLookup? workspaceChangeLookup,
   }) async {
     final toolCallsMatch = _dslToolCalls.firstMatch(content);
@@ -547,6 +581,7 @@ final class HttpAiRepository implements AiRepository {
           scheduleLookup: scheduleLookup,
           feedbackLookup: feedbackLookup,
           medicationLookup: medicationLookup,
+          taskLookup: taskLookup,
           workspaceChangeLookup: workspaceChangeLookup,
         );
         drafts.addAll(result.drafts);
@@ -605,6 +640,14 @@ final class HttpAiRepository implements AiRepository {
           inputSummary:
               arguments['enabledOnly'] == true ? '仅查询已启用的服药计划。' : '查询服药计划。',
           summary: '已查询 ${count('plans')} 个服药计划。',
+        ),
+      'get_tasks' => AiToolTrace(
+          toolName: name,
+          label: '查询任务',
+          inputSummary: arguments['taskIds'] is List
+              ? '按 ${(arguments['taskIds'] as List).length} 个任务标识查询。'
+              : '查询任务列表。',
+          summary: '已查询 ${count('tasks')} 条任务。',
         ),
       'propose_workspace_changes' => AiToolTrace(
           toolName: name,
@@ -701,6 +744,22 @@ final class HttpAiRepository implements AiRepository {
         'type': 'object',
         'properties': <String, Object?>{
           'enabledOnly': <String, String>{'type': 'boolean'},
+        },
+      },
+    ),
+    AiProtocolTool(
+      name: 'get_tasks',
+      description: '查询用户一条或多条任务的标题、描述、预计分钟数、优先级、状态、标签和重复规则；只读。'
+          '修改任务前必须先用此工具或查询日程工具取得原始 UUID。',
+      parameters: <String, Object?>{
+        'type': 'object',
+        'properties': <String, Object?>{
+          'taskIds': <String, Object?>{
+            'type': 'array',
+            'items': <String, String>{'type': 'string'},
+            'description': '要查询的任务 UUID 列表；省略时查询全部未完成任务。',
+          },
+          'includeCompleted': <String, String>{'type': 'boolean'},
         },
       },
     ),

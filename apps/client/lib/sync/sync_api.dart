@@ -98,7 +98,7 @@ final class HttpSyncApi implements SyncApi {
       rethrow;
     } on Object catch (error) {
       throw SyncSchemaFailure(
-        'Pulled operation violated the sync contract.',
+        'Pulled operation violated the sync contract: $error',
         cause: error,
       );
     }
@@ -124,9 +124,7 @@ final class HttpSyncApi implements SyncApi {
         );
       }
       if (response.statusCode == 422) {
-        throw const SyncSchemaFailure(
-          'Synchronization request violated the server contract.',
-        );
+        throw SyncSchemaFailure(_schemaFailureMessage(response));
       }
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw SyncNetworkFailure(
@@ -160,6 +158,51 @@ final class HttpSyncApi implements SyncApi {
       };
 
   void close() => _client.close();
+}
+
+String _schemaFailureMessage(http.Response response) {
+  const fallback = 'Synchronization request violated the server contract.';
+  try {
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map) {
+      return '$fallback (HTTP ${response.statusCode}).';
+    }
+    final formatted = _formatServerDetail(decoded['detail']);
+    if (formatted.isEmpty) {
+      return '$fallback (HTTP ${response.statusCode}).';
+    }
+    return 'HTTP ${response.statusCode}: $formatted';
+  } on Object {
+    return '$fallback (HTTP ${response.statusCode}).';
+  }
+}
+
+String _formatServerDetail(Object? detail) {
+  if (detail is String) {
+    return detail.trim();
+  }
+  if (detail is! List) {
+    return '';
+  }
+  final messages = <String>[];
+  for (final item in detail) {
+    if (item is! Map) {
+      continue;
+    }
+    final message = item['msg'];
+    if (message is! String || message.trim().isEmpty) {
+      continue;
+    }
+    final location = item['loc'];
+    final field = location is List && location.isNotEmpty
+        ? location.last.toString()
+        : '';
+    messages.add(field.isEmpty ? message.trim() : '$field: ${message.trim()}');
+    if (messages.length == 3) {
+      break;
+    }
+  }
+  return messages.join('; ');
 }
 
 final class SyncPushResult {

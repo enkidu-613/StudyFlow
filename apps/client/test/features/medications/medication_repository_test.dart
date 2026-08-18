@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -31,7 +32,9 @@ void main() {
         strength: '10 mg',
         dose: '1 片',
         frequency: MedicationFrequency.daily,
-        reminderTimes: const <MedicationTime>[MedicationTime(hour: 8, minute: 30)],
+        reminderTimes: const <MedicationTime>[
+          MedicationTime(hour: 8, minute: 30)
+        ],
         startDate: DateTime.utc(2026, 8, 17),
         enabled: true,
         createdAt: DateTime.utc(2026, 8, 17),
@@ -41,7 +44,8 @@ void main() {
   test('save plan queues account-scoped medication sync operation', () async {
     await repository.savePlan(
       plan(),
-      write: Write(operationId: '33333333-3333-4333-8333-333333333333', logicalClock: 1),
+      write: Write(
+          operationId: '33333333-3333-4333-8333-333333333333', logicalClock: 1),
     );
 
     expect((await repository.listPlans()).single.name, '测试药');
@@ -60,10 +64,86 @@ void main() {
     );
     await repository.saveDoseRecord(
       record,
-      write: Write(operationId: '55555555-5555-4555-8555-555555555555', logicalClock: 2),
+      write: Write(
+          operationId: '55555555-5555-4555-8555-555555555555', logicalClock: 2),
     );
 
-    expect((await repository.listDoseRecords()).single.outcome, MedicationDoseOutcome.taken);
-    expect((await store.operations.pending(10)).single.entityType, 'medication_dose_record');
+    expect((await repository.listDoseRecords()).single.outcome,
+        MedicationDoseOutcome.taken);
+    expect((await store.operations.pending(10)).single.entityType,
+        'medication_dose_record');
+  });
+
+  test('delete plan removes the local record and queues a tombstone', () async {
+    final medication = plan();
+    await repository.savePlan(
+      medication,
+      write: Write(
+        operationId: '66666666-6666-4666-8666-666666666666',
+        logicalClock: 3,
+      ),
+    );
+
+    await repository.deletePlan(
+      medication.id,
+      write: Write(
+        operationId: '77777777-7777-4777-8777-777777777777',
+        logicalClock: 4,
+      ),
+    );
+
+    expect(await repository.listPlans(), isEmpty);
+    final operation = (await store.operations.pending(10)).last;
+    expect(operation.entityType, 'medication_plan');
+    expect(operation.isTombstone, isTrue);
+    expect(operation.recordId, medication.id);
+  });
+
+  test('listPlans skips corrupt or legacy records instead of failing', () async {
+    await repository.savePlan(
+      plan(),
+      write: Write(
+        operationId: '88888888-8888-4888-8888-888888888888',
+        logicalClock: 5,
+      ),
+    );
+    await store.transaction((transaction) async {
+      await transaction.putRecord(
+        LocalRecord(
+          accountId: store.activeAccountId,
+          recordId: '99999999-9999-4999-8999-999999999998',
+          entityType: EntityType.medicationPlan,
+          schemaVersion: 1,
+          // 旧格式：缺少 reminderTimes 等必填字段。
+          payload: jsonEncode(<String, Object?>{
+            'id': '99999999-9999-4999-8999-999999999998',
+            'name': '旧版计划',
+          }),
+          updatedAt: DateTime.utc(2026, 8, 1),
+        ),
+      );
+    });
+
+    final plans = await repository.listPlans();
+
+    expect(plans.length, 1);
+    expect(plans.single.name, '测试药');
+  });
+
+  test('listDoseRecords skips corrupt records instead of failing', () async {
+    await store.transaction((transaction) async {
+      await transaction.putRecord(
+        LocalRecord(
+          accountId: store.activeAccountId,
+          recordId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          entityType: EntityType.medicationDoseRecord,
+          schemaVersion: 1,
+          payload: jsonEncode(<String, Object?>{'id': 'broken'}),
+          updatedAt: DateTime.utc(2026, 8, 1),
+        ),
+      );
+    });
+
+    expect(await repository.listDoseRecords(), isEmpty);
   });
 }

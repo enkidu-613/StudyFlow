@@ -6,6 +6,7 @@ import 'package:studyflow/auth/auth_repository.dart';
 import 'package:studyflow/features/checkins/check_in_repository.dart';
 import 'package:studyflow/features/focus/focus_repository.dart';
 import 'package:studyflow/features/medications/medication_repository.dart';
+import 'package:studyflow/features/medications/medication_alarm_service.dart';
 import 'package:studyflow/features/schedule/schedule_alarm_service.dart';
 import 'package:studyflow/features/schedule/schedule_completion_service.dart';
 import 'package:studyflow/features/schedule/schedule_feedback_repository.dart';
@@ -42,6 +43,7 @@ final class StudyFlowWorkspace {
   final PlatformBridge platform;
   final ScheduleCompletionService completion;
   late final ScheduleAlarmService alarms;
+  late final MedicationAlarmService medicationAlarms;
   int _logicalClock;
 
   Future<Write> nextWrite() {
@@ -59,6 +61,7 @@ final class StudyFlowWorkspace {
 
   Future<void> close() {
     alarms.dispose();
+    medicationAlarms.dispose();
     return completion.dispose().whenComplete(store.close);
   }
 
@@ -122,6 +125,10 @@ final class StudyFlowWorkspace {
       completion: ScheduleCompletionService(),
     );
     workspace.alarms = ScheduleAlarmService(
+      workspace: workspace,
+      enabled: alarmsEnabled,
+    );
+    workspace.medicationAlarms = MedicationAlarmService(
       workspace: workspace,
       enabled: alarmsEnabled,
     );

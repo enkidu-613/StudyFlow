@@ -59,6 +59,19 @@ void main() {
     expect(alarm.scheduleOccurrenceStart, isNull);
   });
 
+  test('medication alarm kind is preserved', () {
+    final alarm = PendingAlarm.fromJson(<String, Object?>{
+      'id': 'medication#1',
+      'title': '测试药',
+      'text': '请按医嘱服用',
+      'kind': 'medication',
+      'entity_id': 'plan-1',
+    });
+
+    expect(alarm.kind, PendingAlarmKind.medication);
+    expect(alarm.entityId, 'plan-1');
+  });
+
   test('bridge reads persisted pending alarms', () async {
     final channel = _FakeAlarmChannel(<String, Object?>{
       'getPendingAlarms': <Object?>[

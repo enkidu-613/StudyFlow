@@ -345,6 +345,35 @@ void main() {
     );
   });
 
+  test('medication tombstone accepts an empty payload', () async {
+    final api = ScriptedSyncApi();
+    final fixture = await testEngine(api: api, seedPendingTask: false);
+    api
+      ..nextCursor = 1
+      ..pulledOperations = <SyncOperationV2>[
+        await fixture.contractOperation(
+          operationId: '13131313-1313-4313-8313-131313131313',
+          recordId: '24242424-2424-4424-8424-242424242424',
+          logicalClock: 1,
+          entityType: 'medication_plan',
+          payload: const <String, Object?>{},
+          isTombstone: true,
+        ),
+      ];
+
+    final result = await fixture.engine.runOnce();
+
+    expect(result.outcome, SyncRunOutcome.succeeded);
+    expect(result.failureCategory, isNull);
+    expect(await fixture.store.operations.lastCommittedCursor(), 1);
+    expect(
+      await fixture.store.operations.retainedTombstoneCount(
+        '24242424-2424-4424-8424-242424242424',
+      ),
+      1,
+    );
+  });
+
   test('finished focus sessions are append-only', () async {
     const sessionId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
     const remoteOperationId = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
@@ -477,6 +506,72 @@ void main() {
     );
   });
 
+  test('HTTP 422 preserves the server validation detail', () async {
+    final api = HttpSyncApi(
+      baseUri: Uri.parse('https://api.studyflow.test'),
+      client: MockClient(
+        (_) async => http.Response(
+          jsonEncode(<String, Object?>{
+            'detail': <Object?>[
+              <String, Object?>{
+                'loc': <Object?>['body', 'operations', 0, 'entityType'],
+                'msg': 'Input should be a valid option',
+              },
+            ],
+          }),
+          422,
+        ),
+      ),
+    );
+
+    await expectLater(
+      api.push(authContext: testAuthContext(), operations: const []),
+      throwsA(
+        isA<SyncSchemaFailure>().having(
+          (failure) => failure.message,
+          'message',
+          contains('entityType: Input should be a valid option'),
+        ),
+      ),
+    );
+  });
+
+  test('invalid pulled entity reports the rejected entity type', () async {
+    final api = HttpSyncApi(
+      baseUri: Uri.parse('https://api.studyflow.test'),
+      client: MockClient(
+        (_) async => http.Response(
+          jsonEncode(<String, Object?>{
+            'next_cursor': 1,
+            'operations': <Object?>[
+              <String, Object?>{
+                'operationId': _operationId,
+                'recordId': _taskId,
+                'logicalClock': 1,
+                'entityType': 'legacy_medication_plan',
+                'payload': <String, Object?>{},
+                'isTombstone': true,
+                'schemaVersion': 1,
+              },
+            ],
+          }),
+          200,
+        ),
+      ),
+    );
+
+    await expectLater(
+      api.pull(authContext: testAuthContext(), after: 0),
+      throwsA(
+        isA<SyncSchemaFailure>().having(
+          (failure) => failure.message,
+          'message',
+          contains('legacy_medication_plan'),
+        ),
+      ),
+    );
+  });
+
   test('app providers expose a usable engine and its status', () async {
     final api = ScriptedSyncApi();
     final fixture = await testEngine(api: api, seedPendingTask: false);
@@ -538,6 +633,17 @@ void main() {
       const SyncSchemaFailure('invalid'),
       SyncFailureCategory.schema,
     );
+  });
+
+  test('schema failure detail is exposed in sync status', () async {
+    final fixture = await testEngine(
+      api: const AlwaysFailingSyncApi(SyncSchemaFailure('server detail')),
+    );
+
+    final result = await fixture.engine.runOnce();
+
+    expect(result.failureMessage, 'server detail');
+    expect(fixture.engine.status.value.failureMessage, 'server detail');
   });
 
   test('malformed pulled payload rolls back record apply and cursor', () async {

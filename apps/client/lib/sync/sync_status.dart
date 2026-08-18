@@ -19,6 +19,7 @@ final class SyncStatus {
     required this.kind,
     required this.pendingCount,
     this.failureCategory,
+    this.failureMessage,
     this.retry,
   });
 
@@ -31,6 +32,7 @@ final class SyncStatus {
   final SyncStatusKind kind;
   final int pendingCount;
   final SyncFailureCategory? failureCategory;
+  final String? failureMessage;
   final SyncRetry? retry;
 }
 
@@ -42,6 +44,7 @@ final class SyncRunResult {
     required this.pendingCount,
     required this.cursor,
     this.failureCategory,
+    this.failureMessage,
   });
 
   final SyncRunOutcome outcome;
@@ -50,6 +53,7 @@ final class SyncRunResult {
   final int pendingCount;
   final int cursor;
   final SyncFailureCategory? failureCategory;
+  final String? failureMessage;
 }
 
 typedef SyncStatusListenable = ValueListenable<SyncStatus>;
